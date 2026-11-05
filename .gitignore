@@ -1,0 +1,8 @@
+build*/
+*.obj
+*.log
+graphify-modding/graphify-out/
+graphify-modding/
+__pycache__/
+*.pyc
+thirdparty/

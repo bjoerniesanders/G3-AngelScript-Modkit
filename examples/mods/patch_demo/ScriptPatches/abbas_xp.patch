@@ -1,0 +1,9 @@
+--- a/Data/Quests/G3_World_01/Abbas_Artefakt_quest_G3_World_01.quest
++++ b/Data/Quests/G3_World_01/Abbas_Artefakt_quest_G3_World_01.quest
+@@ -5,5 +5,5 @@
+ LogTopic=QUEST_FILLER60
+ LogText
+-ExperiencePoints=300
++ExperiencePoints=600
+ PoliticalSuccess=0
+ PoliticalSuccessAmount=0
