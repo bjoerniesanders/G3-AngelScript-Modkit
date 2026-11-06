@@ -37,9 +37,9 @@ bool Override_ReceiveItem(Entity giver, Entity receiver, const bCString &in name
     return ok;
 }
 
-// Schaden: Override_Damage(Opfer, Angreifer, Menge, Typ) greift in jeden Treffer ein. Bei NPCs kommt er vor dem Abziehen der Lebenspunkte (SetHitPoints),
-// beim Helden danach: die Lebenspunkte (Attribut HP) sind dann schon abgezogen, eine geaenderte Menge wird nachtraeglich ausgeglichen. SetOverrideArg(2, ..) aendert
-// die Menge; ohne Super() entfaellt der Treffer. Der Angreifer ist meist die Waffe oder das Geschoss, beim Helden leer.
+// Schaden: Override_Damage(Opfer, Waffe/Geschoss, Verursacher, Menge, Typ) (ab API 25) greift in jeden Treffer ein. Bei NPCs kommt er vor dem Abziehen der Lebenspunkte (SetHitPoints),
+// beim Helden danach: die Lebenspunkte (Attribut HP) sind dann schon abgezogen, eine geaenderte Menge wird nachtraeglich ausgeglichen. SetOverrideArg(3, ..) aendert
+// die Menge; ohne Super() entfaellt der Treffer. owner = wahrer Verursacher (NPC), inflictor = Waffe/Geschoss, beim Helden leer.
 // HELD_SCHADEN_HALB halbiert den Schaden, den der Held erleidet. Zum Abschalten auf false setzen.
 const bool HELD_SCHADEN_HALB = true;
 int schadenLog = 0;
@@ -47,15 +47,15 @@ bool heldGetroffen = false;
 int letzteHP = -1;
 int hpLog = 0;
 
-bool Override_Damage(Entity victim, Entity attacker, int amount, int type) {
+bool Override_Damage(Entity victim, Entity inflictor, Entity owner, int amount, int type) {
     if (schadenLog < 40) {
         schadenLog++;
-        print("Schaden: '" + victim.GetName() + "' <- '" + attacker.GetName() + "', Menge " + amount + ", Typ " + type);
+        print("Schaden: '" + victim.GetName() + "' <- '" + owner.GetName() + "' mit '" + inflictor.GetName() + "', Menge " + amount + ", Typ " + type);
     }
     if (victim.IsValid() && victim == GetHero()) heldGetroffen = true;   // fuer die Pro-Bild-Pruefung unten
     if (HELD_SCHADEN_HALB && victim.IsValid() && victim == GetHero() && amount > 1) {
-        SetOverrideArg(2, uint(amount / 2));
-        print("  Held: Schaden " + amount + " -> " + GetOverrideArg(2));
+        SetOverrideArg(3, uint(amount / 2));
+        print("  Held: Schaden " + amount + " -> " + GetOverrideArg(3));
     }
     return Super();
 }

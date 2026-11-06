@@ -27,7 +27,8 @@ Das Originalverhalten läuft zuerst, dann deine Funktion.
 | `void OnEnter(Entity who, const bCString &in area)` | Jemand betritt einen Bereich (`Silden_InnerZone`, ...) |
 | `void OnLeave(Entity who, const bCString &in area)` | Jemand verlässt einen Bereich |
 | `void OnSpellCast(Entity caster, Entity target, const bCString &in spell)` | Ein Zauber wird gewirkt (`Spl_Fireball`, `Spl_HealOther`, ...) |
-| `void OnDamage(Entity victim, Entity attacker, int amount, int type)` | Ein Treffer hat Lebenspunkte gekostet (nach dem Original; `attacker` kann leer sein) |
+| `void OnDamage(Entity victim, Entity inflictor, Entity owner, int amount, int type)` | Ein Treffer hat Lebenspunkte gekostet (nach dem Original). `inflictor` = Waffe/Geschoss (kann leer sein), `owner` = Verursacher, siehe `Override_Damage` (ab Version 25) |
+| `void OnDamage(Entity victim, Entity attacker, int amount, int type)` | Alte Form ohne `owner`, weiter unterstützt; `attacker` ist dasselbe wie `inflictor` |
 
 Hinweise aus dem Spieltest:
 

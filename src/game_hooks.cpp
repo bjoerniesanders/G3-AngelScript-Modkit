@@ -163,6 +163,68 @@ void* SafeCall0(FnGetEnt f, void* obj) {
         return f(obj);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
+
+// ---- Angreifer des Opfers: gCNPC_PS::CurrentAttackerEntity / LastAttackerEntity ----
+typedef const void*(__thiscall* FnGetRef)(const void*);
+typedef void*(__thiscall* FnGetPS)(void*, int);
+FnGetRef g_lastAtk = nullptr, g_curAtk = nullptr;
+FnGetPS g_getPS = nullptr;
+
+// eCEntityProxy-Referenz (Rueckgabe von Get...Entity) -> eCEntity*
+void* ProxyTarget(const void* proxyRef) {
+    if (!proxyRef || !g_proxyEntity) return nullptr;
+    return SafeCall0(g_proxyEntity, const_cast<void*>(proxyRef));
+}
+// gCNPC_PS des Entity (eEPropertySetType_NPC = 30) und daraus Letzter/Aktueller Angreifer; false, wenn das Entity kein NPC ist
+bool NpcAttackers(void* ent, void** last, void** cur) {
+    *last = *cur = nullptr;
+    if (!ent || !g_getPS || !g_lastAtk || !g_curAtk || !ReadableMem(ent, 8)) return false;
+    __try {
+        void* ps = g_getPS(ent, 30);
+        if (!ps) return false;
+        *last = ProxyTarget(g_lastAtk(ps));
+        *cur = ProxyTarget(g_curAtk(ps));
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+// Wahrer Verursacher eines Treffers (API 25, Parameter "owner"): ist der Verursacher (Waffe/Geschoss/Zauber) selbst ein NPC, dieser; sonst der aktuelle Gegner
+// des Opfers (gCNPC_PS::CurrentAttackerEntity, im Spieltest 2026-11-06 bei Held und NPCs der zuschlagende Gegner). Kann leer sein; im Gruppenkampf ist der
+// Fallback nur eine Naeherung (es ist der Gegner, den das Opfer gerade im Visier hat, nicht zwingend der Schlaeger).
+void* DamageOwner(void* victim, void* inflictor) {
+    void *l, *c;
+    if (inflictor && NpcAttackers(inflictor, &l, &c)) return inflictor;
+    if (victim && NpcAttackers(victim, &l, &c) && c && c != victim) return c;
+    return nullptr;
+}
+// Schadens-Kette: erst Override_Damage(victim, inflictor, owner, amount, type) (API 25), dann als "Original" dieser Kette die alte Form
+// Override_Damage(victim, attacker, amount, type); deren Original ist apply(Menge) = die eigentliche Spielwirkung. Mods mit alter und neuer Form arbeiten also
+// gemeinsam. *called: lief die Spielwirkung? (dann folgen OnDamage in beiden Formen, mit der urspruenglichen Menge)
+void DamageDispatch(void* victim, void* inflictor, void* owner, int amount, int type, const std::function<bool(int)>& apply, bool* called) {
+    static const char* kNew = "bool Override_Damage(Entity, Entity, Entity, int, int)";
+    static const char* kOld = "bool Override_Damage(Entity, Entity, int, int)";
+    EvArg an[] = {EvArg::Ent(victim), EvArg::Ent(inflictor), EvArg::Ent(owner), EvArg::U(static_cast<unsigned>(amount)), EvArg::U(static_cast<unsigned>(type))};
+    bool outer = false, applied = false;
+    RunHook(
+        kNew, an, 5,
+        [&](const EvArg* n) {
+            EvArg ao[] = {EvArg::Ent(victim), EvArg::Ent(inflictor), n[3], n[4]};
+            bool inner = false;
+            RunHook(kOld, ao, 4, [&](const EvArg* o) { return apply(static_cast<int>(o[2].value)); }, &inner);
+            if (inner) applied = true;
+            return true;
+        },
+        &outer);
+    *called = applied;
+    if (applied) {
+        Seen(6, "OnDamage");
+        EvArg e5[] = {EvArg::Ent(victim), EvArg::Ent(inflictor), EvArg::Ent(owner), EvArg::U(static_cast<unsigned>(amount)), EvArg::U(static_cast<unsigned>(type))};
+        g_host->CallEvent("void OnDamage(Entity, Entity, Entity, int, int)", e5, 5);
+        EvArg e4[] = {EvArg::Ent(victim), EvArg::Ent(inflictor), EvArg::U(static_cast<unsigned>(amount)), EvArg::U(static_cast<unsigned>(type))};
+        g_host->CallEvent("void OnDamage(Entity, Entity, int, int)", e4, 4);
+    }
+}
+
 void __fastcall HSetHP(void* self, void*, const long* v) {
     if (g_inDamage || !v || !self || !ReadableMem(self, 0x40)) {
         o_setHP(self, v);
@@ -178,14 +240,13 @@ void __fastcall HSetHP(void* self, void*, const long* v) {
     void* attacker = SafeCall0(g_proxyEntity, ps + 0x38);
     const long amount = alt - neu;
     const int type = *reinterpret_cast<int*>(ps + 0x30);
-    EvArg a[] = {EvArg::Ent(victim), EvArg::Ent(attacker), EvArg::U(static_cast<unsigned>(amount)), EvArg::U(static_cast<unsigned>(type))};
     bool called = false;
     g_inDamage = true;
-    RunHook(
-        "bool Override_Damage(Entity, Entity, int, int)", a, 4,
-        [&](const EvArg* ar) {
+    DamageDispatch(
+        victim, attacker, DamageOwner(victim, attacker), static_cast<int>(amount), type,
+        [&](int mi) {
             long neuHp = neu;
-            const long m = static_cast<long>(static_cast<int>(ar[2].value));
+            const long m = static_cast<long>(mi);
             if (m != amount) {
                 const long max = *reinterpret_cast<long*>(ps + 0x18);
                 neuHp = alt - m;
@@ -199,10 +260,6 @@ void __fastcall HSetHP(void* self, void*, const long* v) {
         },
         &called);
     g_inDamage = false;
-    if (called) {
-        Seen(6, "OnDamage");
-        g_host->CallEvent("void OnDamage(Entity, Entity, int, int)", a, 4);
-    }
 }
 
 // Treffer auf den Helden: sein gCDamageReceiver_PS steht immer auf 1, die Lebenspunkte liegen im Attribut "HP" und sind beim Aufruf von gCEntity::OnDamage
@@ -213,14 +270,13 @@ typedef void(__thiscall* FnOnDmg)(void*, void*, void*, int, int, void*);
 FnOnDmg o_gOnDmg = nullptr;
 void HeroHit(void* hero, int amount, int type) {
     if (g_inDamage || amount <= 0) return;
-    EvArg a[] = {EvArg::Ent(hero), EvArg::Ent(nullptr), EvArg::U(static_cast<unsigned>(amount)), EvArg::U(static_cast<unsigned>(type))};
     int neu = amount;
     bool called = false;
     g_inDamage = true;
-    RunHook(
-        "bool Override_Damage(Entity, Entity, int, int)", a, 4,
-        [&](const EvArg* ar) {
-            neu = static_cast<int>(ar[2].value);
+    DamageDispatch(
+        hero, nullptr, DamageOwner(hero, nullptr), amount, type,
+        [&](int m) {
+            neu = m;
             return true;
         },
         &called);
@@ -233,10 +289,6 @@ void HeroHit(void* hero, int amount, int type) {
         g_inDamage = false;
         g_host->Log("Schaden am Helden: " + std::to_string(amount) + " -> " + std::to_string(neu) +
                     (ok ? " (Lebenspunkte korrigiert)" : " (Korrektur nicht moeglich)"));
-    }
-    if (called) {
-        Seen(6, "OnDamage");
-        g_host->CallEvent("void OnDamage(Entity, Entity, int, int)", a, 4);
     }
 }
 void __fastcall HGOnDmg(void* self, void*, void* a, void* b, int amount, int type, void* it) {
@@ -416,6 +468,9 @@ int InstallGameHooks(ScriptHost& host) {
     if (HMODULE eng = GetModuleHandleA("Engine.dll")) {
         g_psEntity = reinterpret_cast<FnGetEnt>(GetProcAddress(eng, "?GetEntity@eCEntityPropertySet@@UAEPAVeCEntity@@XZ"));
         g_proxyEntity = reinterpret_cast<FnGetEnt>(GetProcAddress(eng, "?GetEntity@eCEntityProxy@@QAEPAVeCEntity@@XZ"));
+        g_getPS = reinterpret_cast<FnGetPS>(GetProcAddress(eng, "?GetPropertySet@eCEntity@@UAEPAVeCEntityPropertySet@@W4eEPropertySetType@@@Z"));
+        g_lastAtk = reinterpret_cast<FnGetRef>(GetProcAddress(game, "?GetLastAttackerEntity@gCNPC_PS@@QBEABVeCEntityProxy@@XZ"));
+        g_curAtk = reinterpret_cast<FnGetRef>(GetProcAddress(game, "?GetCurrentAttackerEntity@gCNPC_PS@@QBEABVeCEntityProxy@@XZ"));
     }
     n += Hook(game, "?SetHitPoints@gCDamageReceiver_PS@@QAEXABJ@Z", reinterpret_cast<void*>(&HSetHP), reinterpret_cast<void**>(&o_setHP),
               host);
