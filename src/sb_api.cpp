@@ -6,7 +6,10 @@ SbApi g_sb;
 
 template <class F> static void Get(HMODULE m, F& f, const char* name, std::string& missing) {
     f = reinterpret_cast<F>(GetProcAddress(m, name));
-    if (!f) { missing += name; missing += ' '; }
+    if (!f) {
+        missing += name;
+        missing += ' ';
+    }
 }
 
 bool SbApi::Resolve(HMODULE m) {
@@ -70,4 +73,4 @@ bool SbApi::Resolve(HMODULE m) {
     return strCtor && strCtorText && strCopy && strDtor && strAssign && strGetText && strGetLength;
 }
 
-}  // namespace og3p
+}   // namespace og3p

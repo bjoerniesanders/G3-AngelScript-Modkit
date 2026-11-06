@@ -25,9 +25,20 @@ namespace {
 using Log = std::function<void(const std::string&)>;
 
 // ---------------------------------------------------------------- Hilfen
-std::string Lower(std::string s) { for (char& c : s) c = char(tolower((unsigned char)c)); return s; }
-std::string Slash(std::string s) { for (char& c : s) if (c == '\\') c = '/'; return s; }
-std::string Win(std::string s) { for (char& c : s) if (c == '/') c = '\\'; return s; }
+std::string Lower(std::string s) {
+    for (char& c : s) c = char(tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+std::string Slash(std::string s) {
+    for (char& c : s)
+        if (c == '\\') c = '/';
+    return s;
+}
+std::string Win(std::string s) {
+    for (char& c : s)
+        if (c == '/') c = '\\';
+    return s;
+}
 
 bool ReadFile(const std::string& path, std::string* out) {
     FILE* f = std::fopen(path.c_str(), "rb");
@@ -61,12 +72,26 @@ struct PakReader {
     std::string meta;
     FILE* f = nullptr;
     size_t pos = 0;
-    struct Entry { std::string name; uint64_t off = 0, a = 0, b = 0; uint32_t type = 0; };
+    struct Entry {
+        std::string name;
+        uint64_t off = 0, a = 0, b = 0;
+        uint32_t type = 0;
+    };
     std::vector<Entry> entries;
     bool ok = false;
 
-    uint32_t U32() { uint32_t v = 0; if (pos + 4 <= meta.size()) std::memcpy(&v, &meta[pos], 4); pos += 4; return v; }
-    uint64_t U64() { uint64_t v = 0; if (pos + 8 <= meta.size()) std::memcpy(&v, &meta[pos], 8); pos += 8; return v; }
+    uint32_t U32() {
+        uint32_t v = 0;
+        if (pos + 4 <= meta.size()) std::memcpy(&v, &meta[pos], 4);
+        pos += 4;
+        return v;
+    }
+    uint64_t U64() {
+        uint64_t v = 0;
+        if (pos + 8 <= meta.size()) std::memcpy(&v, &meta[pos], 8);
+        pos += 8;
+        return v;
+    }
     std::string Str() {
         const uint32_t n = U32();
         std::string s;
@@ -82,7 +107,9 @@ struct PakReader {
         pos += 0x24;
         if (!(hdr[8] & 0x10)) {
             Entry e;
-            e.off = U64(); e.a = U64(); e.b = U64();
+            e.off = U64();
+            e.a = U64();
+            e.b = U64();
             U32();
             e.type = U32();
             e.name = Str();
@@ -114,7 +141,9 @@ struct PakReader {
         ok = true;
         return true;
     }
-    ~PakReader() { if (f) std::fclose(f); }
+    ~PakReader() {
+        if (f) std::fclose(f);
+    }
     // Rueckgabe: 1 ok, 0 nicht gefunden, -1 komprimiert/nicht lesbar
     int Read(const std::string& inner, std::string* out) {
         const std::string want = Lower(Slash(inner));
@@ -130,17 +159,31 @@ struct PakReader {
 };
 
 // ---------------------------------------------------------------- Unified Diff
-struct Hunk { int oldStart = 0, oldCount = 0; std::vector<std::string> oldLines, newLines; };
-struct FilePatch { std::string target; bool isNew = false; std::vector<Hunk> hunks; std::string source; };
+struct Hunk {
+    int oldStart = 0, oldCount = 0;
+    std::vector<std::string> oldLines, newLines;
+};
+struct FilePatch {
+    std::string target;
+    bool isNew = false;
+    std::vector<Hunk> hunks;
+    std::string source;
+};
 
 std::vector<std::string> SplitLines(const std::string& text, bool* crlf, bool* finalNewline) {
     std::vector<std::string> lines;
     size_t i = 0, crlfCount = 0;
     while (i < text.size()) {
         size_t j = text.find('\n', i);
-        if (j == std::string::npos) { lines.push_back(text.substr(i)); break; }
+        if (j == std::string::npos) {
+            lines.push_back(text.substr(i));
+            break;
+        }
         std::string l = text.substr(i, j - i);
-        if (!l.empty() && l.back() == '\r') { l.pop_back(); ++crlfCount; }
+        if (!l.empty() && l.back() == '\r') {
+            l.pop_back();
+            ++crlfCount;
+        }
         lines.push_back(l);
         i = j + 1;
     }
@@ -161,8 +204,14 @@ bool ParsePatch(const std::string& text, const std::string& source, std::vector<
     std::vector<std::string> L = SplitLines(text, &crlf, &fin);
     size_t i = 0;
     while (i < L.size()) {
-        if (L[i].compare(0, 4, "--- ") != 0) { ++i; continue; }
-        if (i + 1 >= L.size() || L[i + 1].compare(0, 4, "+++ ") != 0) { ++i; continue; }
+        if (L[i].compare(0, 4, "--- ") != 0) {
+            ++i;
+            continue;
+        }
+        if (i + 1 >= L.size() || L[i + 1].compare(0, 4, "+++ ") != 0) {
+            ++i;
+            continue;
+        }
         FilePatch fp;
         fp.source = source;
         const std::string from = L[i].substr(4);
@@ -173,32 +222,58 @@ bool ParsePatch(const std::string& text, const std::string& source, std::vector<
             Hunk h;
             int os = 0, oc = 1, ns = 0, nc = 1;
             if (std::sscanf(L[i].c_str(), "@@ -%d,%d +%d,%d @@", &os, &oc, &ns, &nc) < 4) {
-                if (std::sscanf(L[i].c_str(), "@@ -%d +%d,%d @@", &os, &ns, &nc) == 3) oc = 1;
-                else if (std::sscanf(L[i].c_str(), "@@ -%d,%d +%d @@", &os, &oc, &ns) == 3) nc = 1;
-                else if (std::sscanf(L[i].c_str(), "@@ -%d +%d @@", &os, &ns) == 2) { oc = 1; nc = 1; }
-                else { *err = source + ": ungueltiger Hunk-Kopf '" + L[i] + "'"; return false; }
+                if (std::sscanf(L[i].c_str(), "@@ -%d +%d,%d @@", &os, &ns, &nc) == 3)
+                    oc = 1;
+                else if (std::sscanf(L[i].c_str(), "@@ -%d,%d +%d @@", &os, &oc, &ns) == 3)
+                    nc = 1;
+                else if (std::sscanf(L[i].c_str(), "@@ -%d +%d @@", &os, &ns) == 2) {
+                    oc = 1;
+                    nc = 1;
+                } else {
+                    *err = source + ": ungueltiger Hunk-Kopf '" + L[i] + "'";
+                    return false;
+                }
             }
-            h.oldStart = os; h.oldCount = oc;
+            h.oldStart = os;
+            h.oldCount = oc;
             ++i;
             int oldSeen = 0, newSeen = 0;
             while (i < L.size() && (oldSeen < oc || newSeen < nc)) {
                 const std::string& l = L[i];
-                if (!l.empty() && l[0] == '\\') { ++i; continue; }   // "\ No newline at end of file"
+                if (!l.empty() && l[0] == '\\') {
+                    ++i;
+                    continue;
+                }   // "\ No newline at end of file"
                 const char c = l.empty() ? ' ' : l[0];
                 const std::string body = l.empty() ? std::string() : l.substr(1);
-                if (c == ' ') { h.oldLines.push_back(body); h.newLines.push_back(body); ++oldSeen; ++newSeen; }
-                else if (c == '-') { h.oldLines.push_back(body); ++oldSeen; }
-                else if (c == '+') { h.newLines.push_back(body); ++newSeen; }
-                else break;
+                if (c == ' ') {
+                    h.oldLines.push_back(body);
+                    h.newLines.push_back(body);
+                    ++oldSeen;
+                    ++newSeen;
+                } else if (c == '-') {
+                    h.oldLines.push_back(body);
+                    ++oldSeen;
+                } else if (c == '+') {
+                    h.newLines.push_back(body);
+                    ++newSeen;
+                } else
+                    break;
                 ++i;
             }
             while (i < L.size() && !L[i].empty() && L[i][0] == '\\') ++i;
             fp.hunks.push_back(std::move(h));
         }
-        if (fp.hunks.empty()) { *err = source + ": keine Hunks fuer " + fp.target; return false; }
+        if (fp.hunks.empty()) {
+            *err = source + ": keine Hunks fuer " + fp.target;
+            return false;
+        }
         out->push_back(std::move(fp));
     }
-    if (out->empty()) { *err = source + ": keine Dateipatches gefunden (Unified-Diff erwartet)"; return false; }
+    if (out->empty()) {
+        *err = source + ": keine Dateipatches gefunden (Unified-Diff erwartet)";
+        return false;
+    }
     return true;
 }
 
@@ -210,7 +285,8 @@ bool SameLine(const std::string& a, const std::string& b) {
 }
 bool MatchAt(const std::vector<std::string>& file, size_t at, const std::vector<std::string>& old) {
     if (at + old.size() > file.size()) return false;
-    for (size_t k = 0; k < old.size(); ++k) if (!SameLine(file[at + k], old[k])) return false;
+    for (size_t k = 0; k < old.size(); ++k)
+        if (!SameLine(file[at + k], old[k])) return false;
     return true;
 }
 // Wendet alle Hunks auf die Zeilenliste an. Hunks duerfen gegen die erwartete Stelle verschoben sein (+-300 Zeilen).
@@ -253,7 +329,10 @@ std::string Join(const std::vector<std::string>& lines, bool crlf, bool finalNew
 
 // Original der Zieldatei: Archiv (Data/<Archiv>/<innen>) oder - falls eine eigene physische Datei existiert - diese
 bool LoadBase(const std::string& gameDir, const std::string& target, std::string* content, std::string* how, std::string* err) {
-    if (ReadFile(gameDir + Win(target), content)) { *how = "physische Datei"; return true; }
+    if (ReadFile(gameDir + Win(target), content)) {
+        *how = "physische Datei";
+        return true;
+    }
     const std::string t = Slash(target);
     if (t.size() > 5 && Lower(t.substr(0, 5)) == "data/") {
         const size_t sl = t.find('/', 5);
@@ -261,10 +340,17 @@ bool LoadBase(const std::string& gameDir, const std::string& target, std::string
             const std::string pak = t.substr(5, sl - 5), inner = t.substr(sl + 1);
             PakReader r;
             const std::string pakPath = gameDir + "Data\\" + pak + ".pak";
-            if (!r.Open(pakPath)) { *err = "Archiv nicht lesbar: " + pakPath; return false; }
+            if (!r.Open(pakPath)) {
+                *err = "Archiv nicht lesbar: " + pakPath;
+                return false;
+            }
             const int rc = r.Read(inner, content);
-            if (rc == 1) { *how = "Archiv " + pak + ".pak"; return true; }
-            *err = rc == 0 ? ("nicht im Archiv " + pak + ".pak gefunden: " + inner) : ("Eintrag in " + pak + ".pak ist komprimiert (noch nicht unterstuetzt): " + inner);
+            if (rc == 1) {
+                *how = "Archiv " + pak + ".pak";
+                return true;
+            }
+            *err = rc == 0 ? ("nicht im Archiv " + pak + ".pak gefunden: " + inner)
+                           : ("Eintrag in " + pak + ".pak ist komprimiert (noch nicht unterstuetzt): " + inner);
             return false;
         }
     }
@@ -272,7 +358,7 @@ bool LoadBase(const std::string& gameDir, const std::string& target, std::string
     return false;
 }
 
-}  // namespace
+}   // namespace
 
 // ---------------------------------------------------------------- Einstieg
 int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir, const std::function<void(const std::string&)>& log) {
@@ -299,15 +385,24 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
         WIN32_FIND_DATAA fd;
         HANDLE h = FindFirstFileA((dir + "\\*.patch").c_str(), &fd);
         if (h == INVALID_HANDLE_VALUE) continue;
-        do { if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) names.push_back(fd.cFileName); } while (FindNextFileA(h, &fd));
+        do {
+            if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) names.push_back(fd.cFileName);
+        } while (FindNextFileA(h, &fd));
         FindClose(h);
-        std::sort(names.begin(), names.end(), [](const std::string& a, const std::string& b) { return _stricmp(a.c_str(), b.c_str()) < 0; });
+        std::sort(names.begin(), names.end(),
+                  [](const std::string& a, const std::string& b) { return _stricmp(a.c_str(), b.c_str()) < 0; });
         for (const std::string& n : names) {
             std::string text, err;
             const std::string src = mod + "\\ScriptPatches\\" + n;
-            if (!ReadFile(dir + "\\" + n, &text)) { log("Patch nicht lesbar: " + src); continue; }
+            if (!ReadFile(dir + "\\" + n, &text)) {
+                log("Patch nicht lesbar: " + src);
+                continue;
+            }
             std::vector<FilePatch> parsed;
-            if (!ParsePatch(text, src, &parsed, &err)) { log("Patch ungueltig: " + err); continue; }
+            if (!ParsePatch(text, src, &parsed, &err)) {
+                log("Patch ungueltig: " + err);
+                continue;
+            }
             ++patchFiles;
             for (FilePatch& p : parsed) patches.push_back(std::move(p));
         }
@@ -318,7 +413,13 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
     }
 
     // 3) je Zieldatei der Reihe nach anwenden
-    struct Work { std::vector<std::string> lines; bool crlf = true, finalNewline = true; std::string how; bool loaded = false, failed = false; int applied = 0; };
+    struct Work {
+        std::vector<std::string> lines;
+        bool crlf = true, finalNewline = true;
+        std::string how;
+        bool loaded = false, failed = false;
+        int applied = 0;
+    };
     std::map<std::string, Work> work;
     std::vector<std::string> order;
     for (const FilePatch& p : patches) {
@@ -345,7 +446,10 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
         if (w.failed) continue;
         std::vector<std::string> trial = w.lines;
         std::string err;
-        if (!ApplyHunks(&trial, p.hunks, &err)) { log("Patch " + p.source + " (" + p.target + "): " + err + " - dieser Patch wird uebersprungen"); continue; }
+        if (!ApplyHunks(&trial, p.hunks, &err)) {
+            log("Patch " + p.source + " (" + p.target + "): " + err + " - dieser Patch wird uebersprungen");
+            continue;
+        }
         w.lines = std::move(trial);
         ++w.applied;
     }
@@ -357,9 +461,16 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
         Work& w = work[key];
         if (w.failed || w.applied == 0) continue;
         std::string target;
-        for (const FilePatch& p : patches) if (Lower(p.target) == key) { target = p.target; break; }
+        for (const FilePatch& p : patches)
+            if (Lower(p.target) == key) {
+                target = p.target;
+                break;
+            }
         const std::string data = Join(w.lines, w.crlf, w.finalNewline);
-        if (!WriteFileBinary(gameDir + Win(target), data)) { log("Datei nicht schreibbar: " + target); continue; }
+        if (!WriteFileBinary(gameDir + Win(target), data)) {
+            log("Datei nicht schreibbar: " + target);
+            continue;
+        }
         newManifest += target + "\n";
         ++written;
         log("Datei-Patch angewendet: " + target + " (Basis: " + w.how + ", " + std::to_string(w.applied) + " Patch(es))");
@@ -369,4 +480,4 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
     return written;
 }
 
-}  // namespace og3p
+}   // namespace og3p

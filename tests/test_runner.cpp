@@ -11,7 +11,10 @@ static void HostLog(const char* s) { std::printf("%s\n", s); }
 
 int main(int argc, char** argv) {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
-    if (argc < 3) { std::printf("Aufruf: og3_patch_test <SharedBase.dll> <skript.as> [Dialogs.dll]\n"); return 100; }
+    if (argc < 3) {
+        std::printf("Aufruf: og3_patch_test <SharedBase.dll> <skript.as> [Dialogs.dll]\n");
+        return 100;
+    }
     char full[MAX_PATH];
     GetFullPathNameA(argv[1], MAX_PATH, full, nullptr);
     std::string dir(full);
@@ -19,7 +22,10 @@ int main(int argc, char** argv) {
     SetDllDirectoryA(dir.c_str());
     if (argc > 3) LoadLibraryA(argv[3]);
     HMODULE sb = LoadLibraryA(full);
-    if (!sb) { std::printf("%s nicht ladbar (%lu)\n", full, GetLastError()); return 101; }
+    if (!sb) {
+        std::printf("%s nicht ladbar (%lu)\n", full, GetLastError());
+        return 101;
+    }
     char self[MAX_PATH];
     GetModuleFileNameA(nullptr, self, MAX_PATH);
     std::string selfDir(self);
@@ -29,15 +35,22 @@ int main(int argc, char** argv) {
     typedef int (*RunFn)(const char*);
     auto init = p ? reinterpret_cast<InitFn>(GetProcAddress(p, "og3_patch_init")) : nullptr;
     auto run = p ? reinterpret_cast<RunFn>(GetProcAddress(p, "og3_patch_run_file")) : nullptr;
-    if (!init || !run) { std::printf("og3_patch.dll fehlt (%lu)\n", GetLastError()); return 102; }
+    if (!init || !run) {
+        std::printf("og3_patch.dll fehlt (%lu)\n", GetLastError());
+        return 102;
+    }
     char tmp[MAX_PATH];
     GetTempPathA(MAX_PATH, tmp);
-    if (!init(sb, tmp, HostLog)) { std::printf("og3_patch_init fehlgeschlagen\n"); return 103; }
+    if (!init(sb, tmp, HostLog)) {
+        std::printf("og3_patch_init fehlgeschlagen\n");
+        return 103;
+    }
     if (const char* pt = std::getenv("OG3_TEST_PATCHES")) {   // "<Spielordner>|<Modordner>": Datei-Patches anwenden (ohne Spiel)
         std::string v(pt);
         const size_t bar = v.find('|');
         auto apply = reinterpret_cast<int (*)(const char*, const char*)>(GetProcAddress(p, "og3_patch_apply_patches"));
-        if (apply && bar != std::string::npos) std::printf("Datei-Patches: %d Datei(en) gepatcht\n", apply(v.substr(0, bar).c_str(), v.substr(bar + 1).c_str()));
+        if (apply && bar != std::string::npos)
+            std::printf("Datei-Patches: %d Datei(en) gepatcht\n", apply(v.substr(0, bar).c_str(), v.substr(bar + 1).c_str()));
     }
     if (const char* gd = std::getenv("OG3_TEST_GAMEDLL")) {   // optional: echte Game.dll laden und die Spielereignis-Hooks pruefen
         std::string gdir(gd);

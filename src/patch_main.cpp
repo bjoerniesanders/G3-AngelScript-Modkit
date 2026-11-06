@@ -34,11 +34,17 @@ std::atomic<bool> g_initDone{false};
 bool g_mainRan = false;
 
 void Log(const std::string& s) {
-    if (!g_logLockInit) { InitializeCriticalSection(&g_logLock); g_logLockInit = true; }
+    if (!g_logLockInit) {
+        InitializeCriticalSection(&g_logLock);
+        g_logLockInit = true;
+    }
     EnterCriticalSection(&g_logLock);
     SYSTEMTIME t;
     GetLocalTime(&t);
-    if (g_log) { std::fprintf(g_log, "%02d:%02d:%02d.%03d %s\n", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, s.c_str()); std::fflush(g_log); }
+    if (g_log) {
+        std::fprintf(g_log, "%02d:%02d:%02d.%03d %s\n", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, s.c_str());
+        std::fflush(g_log);
+    }
     LeaveCriticalSection(&g_logLock);
     if (g_hostLog) g_hostLog(("og3_patch: " + s).c_str());
 }
@@ -54,7 +60,10 @@ float FrameTime() {
         if (!eng) return 0.0f;
         g_appInstance = reinterpret_cast<AppInstanceFn>(GetProcAddress(eng, "?GetInstance@eCApplication@@SGAAV1@XZ"));
         g_appFrameTime = reinterpret_cast<AppFrameTimeFn>(GetProcAddress(eng, "?GetScaledFrameTimeInSeconds@eCApplication@@QBEMXZ"));
-        if (!g_appInstance || !g_appFrameTime) { g_appInstance = nullptr; return 0.0f; }
+        if (!g_appInstance || !g_appFrameTime) {
+            g_appInstance = nullptr;
+            return 0.0f;
+        }
     }
     return g_appFrameTime(g_appInstance());
 }
@@ -92,8 +101,10 @@ LRESULT CALLBACK QuietWndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_SYSCHAR) return 0;
     if (msg == WM_MENUCHAR) return MAKELRESULT(0, MNC_CLOSE);
     // Tasten-Ereignis fuer Skripte (OnKey); Wiederholung (Bit 30) wird nicht gemeldet, die Nachricht geht immer weiter ans Spiel
-    if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) { if (!(lp & (1 << 30))) g_host.CallKey(static_cast<int>(wp), true); }
-    else if (msg == WM_KEYUP || msg == WM_SYSKEYUP) g_host.CallKey(static_cast<int>(wp), false);
+    if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) {
+        if (!(lp & (1 << 30))) g_host.CallKey(static_cast<int>(wp), true);
+    } else if (msg == WM_KEYUP || msg == WM_SYSKEYUP)
+        g_host.CallKey(static_cast<int>(wp), false);
     return g_wndUnicode ? CallWindowProcW(g_origWndProc, h, msg, wp, lp) : CallWindowProcA(g_origWndProc, h, msg, wp, lp);
 }
 void InstallQuietMenu() {
@@ -107,7 +118,10 @@ void InstallQuietMenu() {
     g_wndUnicode = IsWindowUnicode(h) != FALSE;
     LONG_PTR prev = g_wndUnicode ? SetWindowLongPtrW(h, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&QuietWndProc))
                                  : SetWindowLongPtrA(h, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&QuietWndProc));
-    if (!prev) { Log("Fensterprozedur nicht ersetzbar (Menueton bleibt)"); return; }
+    if (!prev) {
+        Log("Fensterprozedur nicht ersetzbar (Menueton bleibt)");
+        return;
+    }
     g_origWndProc = reinterpret_cast<WNDPROC>(prev);
     Log("Menuetaste stumm (F10/Alt ohne Windows-Piepton)");
 }
@@ -119,8 +133,14 @@ void __fastcall HProcess(void* self, void*) {
     if (g_hotReload) g_host.CheckReload();
     g_host.CallFrame(FrameTime());
 }
-void __fastcall HWorldActivate(void* self, void*) { g_orig[kWorldActivate](self); g_host.CallSimple("void OnWorldActivate()"); }
-void __fastcall HWorldDeactivate(void* self, void*) { g_host.CallSimple("void OnWorldDeactivate()"); g_orig[kWorldDeactivate](self); }
+void __fastcall HWorldActivate(void* self, void*) {
+    g_orig[kWorldActivate](self);
+    g_host.CallSimple("void OnWorldActivate()");
+}
+void __fastcall HWorldDeactivate(void* self, void*) {
+    g_host.CallSimple("void OnWorldDeactivate()");
+    g_orig[kWorldDeactivate](self);
+}
 void* const kHookFns[kHookCount] = {reinterpret_cast<void*>(&HPostInit), reinterpret_cast<void*>(&HProcess),
                                     reinterpret_cast<void*>(&HWorldActivate), reinterpret_cast<void*>(&HWorldDeactivate)};
 
@@ -138,7 +158,10 @@ bool FindExeSlots() {
             if (IMAGE_SNAP_BY_ORDINAL(names[i].u1.Ordinal)) continue;
             const char* n = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(base + names[i].u1.AddressOfData)->Name;
             for (int h = 0; h < kHookCount; ++h)
-                if (!strcmp(n, kHookNames[h])) { g_slot[h] = reinterpret_cast<void**>(&iat[i].u1.Function); ++found; }
+                if (!strcmp(n, kHookNames[h])) {
+                    g_slot[h] = reinterpret_cast<void**>(&iat[i].u1.Function);
+                    ++found;
+                }
         }
     }
     return found > 0;
@@ -156,7 +179,10 @@ int PatchBoundSlots() {
     for (int h = 0; h < kHookCount; ++h) {
         if (!g_slot[h] || g_orig[h]) continue;
         void* cur = *g_slot[h];
-        if (!cur || InExe(cur)) { ++open; continue; }   // noch nicht gebunden (enthaelt RVA des Namens)
+        if (!cur || InExe(cur)) {
+            ++open;
+            continue;
+        }   // noch nicht gebunden (enthaelt RVA des Namens)
         HMODULE eng = GetModuleHandleA("Engine.dll");
         void* exp = eng ? reinterpret_cast<void*>(GetProcAddress(eng, kHookNames[h])) : nullptr;
         g_orig[h] = reinterpret_cast<VoidMethod>(cur);
@@ -164,7 +190,8 @@ int PatchBoundSlots() {
         VirtualProtect(g_slot[h], sizeof(void*), PAGE_READWRITE, &old);
         *g_slot[h] = kHookFns[h];
         VirtualProtect(g_slot[h], sizeof(void*), old, &old);
-        Log(std::string("eingehaengt: ") + kHookNames[h] + (cur == exp ? "" : " (Import zeigt nicht auf den Engine-Export - fremder Hook davor, wird weitergereicht)"));
+        Log(std::string("eingehaengt: ") + kHookNames[h] +
+            (cur == exp ? "" : " (Import zeigt nicht auf den Engine-Export - fremder Hook davor, wird weitergereicht)"));
     }
     return open;
 }
@@ -184,13 +211,16 @@ bool InitCommon(HMODULE sb, const char* gameDir, void (*hostLog)(const char*)) {
     g_gameDir = gameDir ? gameDir : "";
     if (!g_gameDir.empty() && g_gameDir.back() != '\\' && g_gameDir.back() != '/') g_gameDir += '\\';
     g_log = _fsopen((g_gameDir + "og3_patch.log").c_str(), "w", _SH_DENYNO);   // waehrend des Spiels lesbar
-    if (!g_sb.Resolve(sb ? sb : GetModuleHandleA("SharedBase.dll"))) { Log("SharedBase-Exporte fuer bCString fehlen - Abbruch: " + g_sb.missing); return false; }
+    if (!g_sb.Resolve(sb ? sb : GetModuleHandleA("SharedBase.dll"))) {
+        Log("SharedBase-Exporte fuer bCString fehlen - Abbruch: " + g_sb.missing);
+        return false;
+    }
     if (!g_sb.missing.empty()) Log("Hinweis: nicht gefundene SharedBase-Exporte: " + g_sb.missing);
     g_host.frameTime = &FrameTime;
     return g_host.Init([](const std::string& s) { Log(s); });
 }
 
-}  // namespace
+}   // namespace
 
 // Fuer Tests: Host ohne Spiel-Hooks anlegen
 extern "C" __declspec(dllexport) int og3_patch_init(HMODULE sharedBase, const char* logDir, void (*hostLog)(const char*)) {
@@ -213,7 +243,8 @@ extern "C" __declspec(dllexport) int og3_patch_run_file(const char* path) {
         g_host.SetModsDir(path);
         g_host.ScanMods();
         if (!g_host.Loaded()) return -1;
-    } else if (!g_host.Load(path)) return -1;
+    } else if (!g_host.Load(path))
+        return -1;
     g_host.CallMain();
     {   // Ereignisse mit Argumenten (ohne Spiel: ungueltige Entities)
         SStr id("GUID-123"), nm("It_Test");
@@ -224,23 +255,46 @@ extern "C" __declspec(dllexport) int og3_patch_run_file(const char* path) {
     {   // Override-Kette: Super() ruft das "Original", Rueckgabe wird vom Skript veraendert; ohne Super() wird das Original uebersprungen
         EvArg a[] = {EvArg::U(5)};
         bool res = true, orig = false;
-        bool handled = g_host.CallOverride("bool Override_Test(uint)", a, 1, [&](const EvArg*) { orig = true; return true; }, &res, &orig);
+        bool handled = g_host.CallOverride(
+            "bool Override_Test(uint)", a, 1,
+            [&](const EvArg*) {
+                orig = true;
+                return true;
+            },
+            &res, &orig);
         if (dirMode) {   // Kette ueber mehrere Mods (zeta -> alpha -> Original): beide rufen Super(), Ergebnis bleibt wahr
             g_host.Check(handled && orig && res, "Override-Kette ueber mehrere Mods: Original am Ende, Ergebnis unveraendert");
         } else {
             g_host.Check(handled && orig && !res, "Override mit Super(): Original lief, Ergebnis vom Skript umgekehrt");
-            res = false; orig = false;
-            handled = g_host.CallOverride("bool Override_TestCancel(uint)", a, 1, [&](const EvArg*) { orig = true; return false; }, &res, &orig);
+            res = false;
+            orig = false;
+            handled = g_host.CallOverride(
+                "bool Override_TestCancel(uint)", a, 1,
+                [&](const EvArg*) {
+                    orig = true;
+                    return false;
+                },
+                &res, &orig);
             g_host.Check(handled && !orig && res, "Override ohne Super(): Original uebersprungen, Ergebnis vom Skript");
         }
         if (!dirMode) {   // Argument aendern: der Mod verdoppelt es (SetOverrideArg), Super() reicht es ans Original weiter
             EvArg b[] = {EvArg::U(5)};
             unsigned seen = 0;
-            res = false; orig = false;
-            handled = g_host.CallOverride("bool Override_TestArg(uint)", b, 1, [&](const EvArg* ar) { seen = ar[0].value; orig = true; return true; }, &res, &orig);
+            res = false;
+            orig = false;
+            handled = g_host.CallOverride(
+                "bool Override_TestArg(uint)", b, 1,
+                [&](const EvArg* ar) {
+                    seen = ar[0].value;
+                    orig = true;
+                    return true;
+                },
+                &res, &orig);
             g_host.Check(handled && orig && res && seen == 10, "SetOverrideArg: geaenderter Wert kommt beim Original an");
         }
-        g_host.Check(!g_host.CallOverride("bool Override_Gibts_Nicht(uint)", a, 1, [](const EvArg*) { return true; }, &res, &orig), "Override ohne Skriptfunktion: nicht uebernommen");
+        g_host.Check(!g_host.CallOverride(
+                         "bool Override_Gibts_Nicht(uint)", a, 1, [](const EvArg*) { return true; }, &res, &orig),
+                     "Override ohne Skriptfunktion: nicht uebernommen");
     }
     g_host.CallKey(0x7A, true);
     g_host.CallKey(0x7A, false);
@@ -253,7 +307,8 @@ extern "C" __declspec(dllexport) int og3_patch_run_file(const char* path) {
 }
 
 // Spielbetrieb (vom Proxy): Host anlegen und in die Importtabelle der EXE einhaengen
-extern "C" __declspec(dllexport) int og3_patch_start(HMODULE sharedBase, const char* ini, const char* gameDir, void (*hostLog)(const char*)) {
+extern "C" __declspec(dllexport) int og3_patch_start(HMODULE sharedBase, const char* ini, const char* gameDir,
+                                                     void (*hostLog)(const char*)) {
     if (!InitCommon(sharedBase, gameDir, hostLog)) return 0;
     char script[MAX_PATH] = "og3\\scripts\\main.as", modsRel[MAX_PATH] = "og3\\mods";
     if (ini && *ini) {
@@ -267,9 +322,13 @@ extern "C" __declspec(dllexport) int og3_patch_start(HMODULE sharedBase, const c
     g_modsDir = (modsRel[1] == ':' || modsRel[0] == '\\') ? std::string(modsRel) : g_gameDir + modsRel;
     while (!g_modsDir.empty() && (g_modsDir.back() == '\\' || g_modsDir.back() == '/')) g_modsDir.pop_back();
     g_scriptPath = (script[1] == ':' || script[0] == '\\') ? std::string(script) : g_gameDir + script;
-    if (g_filePatches) ApplyScriptPatches(g_gameDir, g_modsDir, [](const std::string& s) { Log(s); });   // vor dem ersten Lesen der Daten durch das Spiel
+    if (g_filePatches)
+        ApplyScriptPatches(g_gameDir, g_modsDir, [](const std::string& s) { Log(s); });   // vor dem ersten Lesen der Daten durch das Spiel
     Log("Skript: " + g_scriptPath + (g_hotReload ? " (Neuladen bei Aenderung an)" : "") + ", Mod-Ordner: " + g_modsDir);
-    if (!FindExeSlots()) { Log("Gothic3.exe importiert die eCApplication-Ereignisse nicht - nur ohne Spiel-Ereignisse nutzbar"); return 1; }
+    if (!FindExeSlots()) {
+        Log("Gothic3.exe importiert die eCApplication-Ereignisse nicht - nur ohne Spiel-Ereignisse nutzbar");
+        return 1;
+    }
     if (PatchBoundSlots() > 0) CloseHandle(CreateThread(nullptr, 0, WaitForBinding, nullptr, 0, nullptr));
     return 1;
 }

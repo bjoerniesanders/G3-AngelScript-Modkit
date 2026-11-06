@@ -18,11 +18,13 @@
 #include "script_host.h"
 
 namespace og3p {
-bool RegisterQuestBindings(asIScriptEngine* e);   // quest_bindings.cpp
-bool RegisterDialogBindings(asIScriptEngine* e);  // dialog_bindings.cpp
+bool RegisterQuestBindings(asIScriptEngine* e);    // quest_bindings.cpp
+bool RegisterDialogBindings(asIScriptEngine* e);   // dialog_bindings.cpp
 namespace {
 
-struct Entity { void* p; };
+struct Entity {
+    void* p;
+};
 
 typedef void*(__stdcall* InstFn)();
 typedef void*(__thiscall* ObjFn)(void*);
@@ -82,11 +84,15 @@ bool Resolve() {
     void** vt = static_cast<void**>(E("??_7eCEntity@@6B@"));
     if (vt && setPos)
         for (int i = 0; i < 256 && InModule(g_e.engine, vt[i]); ++i)
-            if (vt[i] == setPos) { g_e.setPosSlot = i; break; }
+            if (vt[i] == setPos) {
+                g_e.setPosSlot = i;
+                break;
+            }
     g_e.ok = g_e.sessionInstance && g_e.sessionGetHero && g_e.getName && g_e.getWorldPos;
     if (!g_e.tried && ScriptHost::s_current) {
-        ScriptHost::s_current->Log(g_e.ok ? (g_e.setPosSlot >= 0 ? "Engine-Bindings bereit" : "Engine-Bindings bereit (SetPosition nicht verfuegbar)")
-                                          : "Engine-Bindings: Exporte fehlen");
+        ScriptHost::s_current->Log(
+            g_e.ok ? (g_e.setPosSlot >= 0 ? "Engine-Bindings bereit" : "Engine-Bindings bereit (SetPosition nicht verfuegbar)")
+                   : "Engine-Bindings: Exporte fehlen");
     }
     g_e.tried = true;
     return g_e.ok;
@@ -116,22 +122,39 @@ void* SafeSceneAdmin(const void* nameStr) {
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
 void* SafeByName(void* admin, const void* nameStr) {
-    __try { return g_e.byName(admin, nameStr); } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+    __try {
+        return g_e.byName(admin, nameStr);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
 bool SafeName(const void* p, const char** out) {
-    __try { *out = g_sb.strGetText(g_e.getName(p)); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        *out = g_sb.strGetText(g_e.getName(p));
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 bool SafeById(void* admin, const void* pid, void** out) {
-    __try { *out = g_e.byId(admin, pid, 2 /* eEGetEntityTypeHint_TemplateEntity */); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        *out = g_e.byId(admin, pid, 2 /* eEGetEntityTypeHint_TemplateEntity */);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 bool SafePos(const void* p, SVec3* out) {
-    __try { std::memcpy(out, g_e.getWorldPos(p), sizeof(SVec3)); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        std::memcpy(out, g_e.getWorldPos(p), sizeof(SVec3));
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 bool SafeRot(const void* p, SQuat* out) {
-    __try { g_e.getWorldRot(p, out); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        g_e.getWorldRot(p, out);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 bool SafeDist(const void* a, const void* b, float* out) {
-    __try { *out = g_e.distance(a, b); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        *out = g_e.distance(a, b);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 bool SafeSetPos(void* p, const SVec3* v) {
     __try {
@@ -146,7 +169,10 @@ Entity GetHero() { return {Resolve() ? SafeHero(false) : nullptr}; }
 Entity GetPlayer() { return {Resolve() ? SafeHero(true) : nullptr}; }
 Entity FindEntity(const SStr& name) {
     if (!Resolve() || !g_e.byName) return {nullptr};
-    if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) { SStr mod("eCSceneAdmin"); g_e.sceneAdmin = SafeSceneAdmin(&mod); }
+    if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
+        SStr mod("eCSceneAdmin");
+        g_e.sceneAdmin = SafeSceneAdmin(&mod);
+    }
     return {g_e.sceneAdmin ? SafeByName(g_e.sceneAdmin, &name) : nullptr};
 }
 void EntConstruct(void* m) { new (m) Entity{nullptr}; }
@@ -157,7 +183,10 @@ SStr EntName(const Entity& e) {
     return SStr();
 }
 bool SafeMat(const void* p, SMat4* out) {
-    __try { std::memcpy(out, g_e.getWorldMat(p), sizeof(SMat4)); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        std::memcpy(out, g_e.getWorldMat(p), sizeof(SMat4));
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 SMat4 EntWorldMatrix(const Entity& e) {   // Einheitsmatrix bei Fehler
     SMat4 m;
@@ -167,27 +196,63 @@ SMat4 EntWorldMatrix(const Entity& e) {   // Einheitsmatrix bei Fehler
     return m;
 }
 // ---- Bauwerke/Objekte erkennen: Vorlagenname, Huellquader (Welt, samt Kindern), Elternobjekt (das Fadenkreuz trifft oft Teilobjekte)
-struct SBox { SVec3 min, max; };
+struct SBox {
+    SVec3 min, max;
+};
 bool SafeBox(const void* p, SBox* out) {
-    __try { std::memcpy(out, g_e.getTreeBox(p), sizeof(SBox)); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        std::memcpy(out, g_e.getTreeBox(p), sizeof(SBox));
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-const void* SafeTplId(const void* p) { __try { return g_e.getTplId(p); } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; } }
-const void* SafeParent(const void* p) { __try { return g_e.getParent(p); } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; } }
+const void* SafeTplId(const void* p) {
+    __try {
+        return g_e.getTplId(p);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+const void* SafeParent(const void* p) {
+    __try {
+        return g_e.getParent(p);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
 SStr EntTemplateName(const Entity& e) {
     if (!EntIsValid(e) || !g_e.getTplId) return SStr();
     const void* id = SafeTplId(e.p);
     return SStr(id ? TemplateNameForId(id) : std::string());
 }
-SVec3 EntBoundsMin(const Entity& e) { SBox b{{0, 0, 0}, {0, 0, 0}}; if (EntIsValid(e) && g_e.getTreeBox) SafeBox(e.p, &b); return b.min; }
-SVec3 EntBoundsMax(const Entity& e) { SBox b{{0, 0, 0}, {0, 0, 0}}; if (EntIsValid(e) && g_e.getTreeBox) SafeBox(e.p, &b); return b.max; }
+SVec3 EntBoundsMin(const Entity& e) {
+    SBox b{{0, 0, 0}, {0, 0, 0}};
+    if (EntIsValid(e) && g_e.getTreeBox) SafeBox(e.p, &b);
+    return b.min;
+}
+SVec3 EntBoundsMax(const Entity& e) {
+    SBox b{{0, 0, 0}, {0, 0, 0}};
+    if (EntIsValid(e) && g_e.getTreeBox) SafeBox(e.p, &b);
+    return b.max;
+}
 Entity EntParent(const Entity& e) {
     Entity r{nullptr};
-    if (EntIsValid(e) && g_e.getParent) { const void* p = SafeParent(e.p); if (p && Valid(p)) r.p = const_cast<void*>(p); }
+    if (EntIsValid(e) && g_e.getParent) {
+        const void* p = SafeParent(e.p);
+        if (p && Valid(p)) r.p = const_cast<void*>(p);
+    }
     return r;
 }
-SVec3 EntPos(const Entity& e) { SVec3 v{0, 0, 0}; if (EntIsValid(e)) SafePos(e.p, &v); return v; }
-SQuat EntRot(const Entity& e) { SQuat q{0, 0, 0, 1}; if (EntIsValid(e) && g_e.getWorldRot) SafeRot(e.p, &q); return q; }
-float EntDist(const Entity& a, const Entity& b) { float d = -1; if (EntIsValid(a) && EntIsValid(b) && g_e.distance) SafeDist(a.p, b.p, &d); return d; }
+SVec3 EntPos(const Entity& e) {
+    SVec3 v{0, 0, 0};
+    if (EntIsValid(e)) SafePos(e.p, &v);
+    return v;
+}
+SQuat EntRot(const Entity& e) {
+    SQuat q{0, 0, 0, 1};
+    if (EntIsValid(e) && g_e.getWorldRot) SafeRot(e.p, &q);
+    return q;
+}
+float EntDist(const Entity& a, const Entity& b) {
+    float d = -1;
+    if (EntIsValid(a) && EntIsValid(b) && g_e.distance) SafeDist(a.p, b.p, &d);
+    return d;
+}
 bool EntSetPos(Entity& e, const SVec3& v) { return EntIsValid(e) && g_e.setPosSlot >= 0 && SafeSetPos(e.p, &v); }
 bool EntEquals(const Entity& a, const Entity& b) { return a.p == b.p; }
 
@@ -235,23 +300,32 @@ bool ResolveStats() {
     g_s.setHour = reinterpret_cast<ClockSetFn>(S("?SetHour@PSClock@@QBEXH@Z"));
     g_s.setMinute = reinterpret_cast<ClockSetFn>(S("?SetMinute@PSClock@@QBEXH@Z"));
     g_s.ok = g_s.pmCtor && g_s.getValue && g_s.getBase && g_s.getMax && g_s.setBase && g_s.addBase && g_s.addValue && g_s.setValue;
-    g_s.clockOk = g_s.clockCtor && g_s.currentWorld && g_s.worldEntity && g_s.day && g_s.hour && g_s.minute && g_s.setDay &&
-                  g_s.setHour && g_s.setMinute;
+    g_s.clockOk = g_s.clockCtor && g_s.currentWorld && g_s.worldEntity && g_s.day && g_s.hour && g_s.minute && g_s.setDay && g_s.setHour &&
+                  g_s.setMinute;
     if (!g_s.tried && ScriptHost::s_current)
-        ScriptHost::s_current->Log(std::string("Attribut-Bindings ") + (g_s.ok ? "bereit" : "fehlen") + ", Uhr " + (g_s.clockOk ? "bereit" : "fehlt"));
+        ScriptHost::s_current->Log(std::string("Attribut-Bindings ") + (g_s.ok ? "bereit" : "fehlen") + ", Uhr " +
+                                   (g_s.clockOk ? "bereit" : "fehlt"));
     g_s.tried = true;
     return g_s.ok;
 }
 
 void* SafePlayerMemory(void* ent) {
     void* holder = nullptr;
-    __try { g_s.pmCtor(&holder, ent); return holder; } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+    __try {
+        g_s.pmCtor(&holder, ent);
+        return holder;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
 bool SafePMGet(PMGetFn f, const void* ps, const void* tag, int* out) {
-    __try { *out = f(ps, tag); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        *out = f(ps, tag);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 bool SafePMSet(PMSetFn f, void* ps, const void* tag, int v) {
-    __try { return f(ps, tag, v); } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        return f(ps, tag, v);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 void* SafeWorldClock() {
     void* holder = nullptr;
@@ -265,10 +339,16 @@ void* SafeWorldClock() {
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
 bool SafeClockGet(ClockGetFn f, void* holder, int* out) {
-    __try { *out = f(&holder); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        *out = f(&holder);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 bool SafeClockSet(ClockSetFn f, void* holder, int v) {
-    __try { f(&holder, v); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        f(&holder, v);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
 // ---- Spielereignis-Flags: kleine Schalter (Text), die das Spiel im Spielstand speichert (PlayerMemory des Helden). Fuer Mods, die ueber Speichern/Laden
@@ -331,14 +411,17 @@ typedef bool(__thiscall* InvDeleteFn)(void*, int, unsigned);
 typedef int(__thiscall* InvCreateFn)(void*, const void*, unsigned, unsigned);
 typedef int(__thiscall* CountPartFn)(void*, const void*, int);
 typedef void*(__thiscall* ByPartFn)(void*, const void*, int, int);
-typedef void*(__thiscall* TplCloneFn)(const void*);       // eCNode::Clone() const
-typedef void(__thiscall* TplSetNameFn)(void*, const void*);  // eCTemplateEntity::SetName(const bCString&)
-typedef bool(__thiscall* RegTplFn)(void*, void*);             // eCSceneAdmin::RegisterTemplateEntity(eCTemplateEntity*) (geschuetzt, aber exportiert)
-typedef const void*(__thiscall* NodeIdFn)(const void*);       // eCNode::GetID() const -> const bCPropertyID&
-struct PropIdVal { unsigned char core[16]; unsigned count; };   // bCPropertyID (20 Byte) als Wertparameter
-typedef void(__thiscall* SetIdFn)(void*, PropIdVal);          // eCNode::SetID(bCPropertyID): meldet alte ID ab, setzt neue, RegisterNodeID
-typedef void(__thiscall* IdFromStrFn)(void*, const void*);    // bCPropertyID::CreateFromString(const bCString&): MD5 des Textes
-typedef void*(__thiscall* IdTextFn)(const void*, void*);      // bCPropertyID::GetText() -> bCString (Rueckgabe per Zeiger)
+typedef void*(__thiscall* TplCloneFn)(const void*);           // eCNode::Clone() const
+typedef void(__thiscall* TplSetNameFn)(void*, const void*);   // eCTemplateEntity::SetName(const bCString&)
+typedef bool(__thiscall* RegTplFn)(void*, void*);   // eCSceneAdmin::RegisterTemplateEntity(eCTemplateEntity*) (geschuetzt, aber exportiert)
+typedef const void*(__thiscall* NodeIdFn)(const void*);   // eCNode::GetID() const -> const bCPropertyID&
+struct PropIdVal {
+    unsigned char core[16];
+    unsigned count;
+};                                                           // bCPropertyID (20 Byte) als Wertparameter
+typedef void(__thiscall* SetIdFn)(void*, PropIdVal);         // eCNode::SetID(bCPropertyID): meldet alte ID ab, setzt neue, RegisterNodeID
+typedef void(__thiscall* IdFromStrFn)(void*, const void*);   // bCPropertyID::CreateFromString(const bCString&): MD5 des Textes
+typedef void*(__thiscall* IdTextFn)(const void*, void*);     // bCPropertyID::GetText() -> bCString (Rueckgabe per Zeiger)
 struct InvApi {
     bool tried = false, ok = false;
     PSCtorFn ctor = nullptr;
@@ -373,12 +456,16 @@ bool ResolveInv() {
     g_i.amount = reinterpret_cast<StackAmountFn>(G("?GetAmount@gCInventoryStack@@QBEABHXZ"));
     g_i.del = reinterpret_cast<InvDeleteFn>(G("?DeleteItems@gCInventory_PS@@QAE_NHK@Z"));
     g_i.create = reinterpret_cast<InvCreateFn>(G("?CreateItems@gCInventory_PS@@QAEHPBVeCTemplateEntity@@KK@Z"));
-    g_i.tplByName = reinterpret_cast<ByNameFn>(GetProcAddress(g_e.engine, "?GetTemplateEntityByName@eCSceneAdmin@@QAEPAVeCTemplateEntity@@ABVbCString@@@Z"));
-    g_i.countPart = reinterpret_cast<CountPartFn>(GetProcAddress(g_e.engine, "?GetEntityCountByPartName@eCSceneAdmin@@QAEHABVbCString@@W4eEGetEntityTypeHint@@@Z"));
-    g_i.byPart = reinterpret_cast<ByPartFn>(GetProcAddress(g_e.engine, "?GetEntityByPartName@eCSceneAdmin@@QAEPAVeCEntity@@ABVbCString@@W4eEGetEntityTypeHint@@H@Z"));
+    g_i.tplByName = reinterpret_cast<ByNameFn>(
+        GetProcAddress(g_e.engine, "?GetTemplateEntityByName@eCSceneAdmin@@QAEPAVeCTemplateEntity@@ABVbCString@@@Z"));
+    g_i.countPart = reinterpret_cast<CountPartFn>(
+        GetProcAddress(g_e.engine, "?GetEntityCountByPartName@eCSceneAdmin@@QAEHABVbCString@@W4eEGetEntityTypeHint@@@Z"));
+    g_i.byPart = reinterpret_cast<ByPartFn>(
+        GetProcAddress(g_e.engine, "?GetEntityByPartName@eCSceneAdmin@@QAEPAVeCEntity@@ABVbCString@@W4eEGetEntityTypeHint@@H@Z"));
     g_i.clone = reinterpret_cast<TplCloneFn>(GetProcAddress(g_e.engine, "?Clone@eCNode@@QBEPAV1@XZ"));
     g_i.setName = reinterpret_cast<TplSetNameFn>(GetProcAddress(g_e.engine, "?SetName@eCTemplateEntity@@UAEXABVbCString@@@Z"));
-    g_i.regTpl = reinterpret_cast<RegTplFn>(GetProcAddress(g_e.engine, "?RegisterTemplateEntity@eCSceneAdmin@@IAE_NPAVeCTemplateEntity@@@Z"));
+    g_i.regTpl =
+        reinterpret_cast<RegTplFn>(GetProcAddress(g_e.engine, "?RegisterTemplateEntity@eCSceneAdmin@@IAE_NPAVeCTemplateEntity@@@Z"));
     g_i.nodeId = reinterpret_cast<NodeIdFn>(GetProcAddress(g_e.engine, "?GetID@eCNode@@QBEABVbCPropertyID@@XZ"));
     g_i.setId = reinterpret_cast<SetIdFn>(GetProcAddress(g_e.engine, "?SetID@eCNode@@IAEXVbCPropertyID@@@Z"));
     if (HMODULE sb = GetModuleHandleA("SharedBase.dll")) {
@@ -386,14 +473,18 @@ bool ResolveInv() {
         g_i.idFromStr = reinterpret_cast<IdFromStrFn>(GetProcAddress(sb, "?CreateFromString@bCPropertyID@@QAEXABVbCString@@@Z"));
     }
     g_i.ok = g_i.ctor && g_i.find && g_i.getStack && g_i.amount && g_i.del;
-    if (!g_i.tried && ScriptHost::s_current) ScriptHost::s_current->Log(g_i.ok ? "Inventar-Bindings bereit" : "Inventar-Bindings: Exporte fehlen");
+    if (!g_i.tried && ScriptHost::s_current)
+        ScriptHost::s_current->Log(g_i.ok ? "Inventar-Bindings bereit" : "Inventar-Bindings: Exporte fehlen");
     g_i.tried = true;
     return g_i.ok;
 }
 
 void* SafeInventory(void* ent) {
     void* holder = nullptr;
-    __try { g_i.ctor(&holder, ent); return holder; } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+    __try {
+        g_i.ctor(&holder, ent);
+        return holder;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
 // Gesamtmenge des Items ueber alle Stapel mit diesem Namen
 bool SafeItemCount(void* inv, const void* name, int* out) {
@@ -471,7 +562,10 @@ int SafeCloneTemplate(void* admin, const void* baseName, const char* baseWanted,
         if (!clone) return -6;
         if (fixedId && g_i.setId) g_i.setId(clone, *fixedId);   // feste ID (aus dem Namen): gleiche Vorlage in jedem Spielstart
         g_i.setName(clone, newName);
-        if (g_i.nodeId) { *idBase = g_i.nodeId(base); *idClone = g_i.nodeId(clone); }
+        if (g_i.nodeId) {
+            *idBase = g_i.nodeId(base);
+            *idClone = g_i.nodeId(clone);
+        }
         *regOk = g_i.regTpl ? (g_i.regTpl(admin, clone) ? 1 : 0) : -1;
         if (g_i.nodeId) *idClone = g_i.nodeId(clone);   // nach dem Eintrag neu lesen (bei doppelter ID neu vergeben)
     } __except (EXCEPTION_EXECUTE_HANDLER) { return -3; }
@@ -481,11 +575,18 @@ int SafeCloneTemplate(void* admin, const void* baseName, const char* baseWanted,
     return 0;
 }
 bool SafeIdFromString(PropIdVal* out, const void* key) {
-    __try { g_i.idFromStr(out, key); out->count = 0; return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        g_i.idFromStr(out, key);
+        out->count = 0;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 // bCPropertyID als Text (fuer das Protokoll)
 bool SafeIdText(const void* id, void** text) {
-    __try { g_i.idText(id, text); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        g_i.idText(id, text);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 std::string IdToString(const void* id) {
     if (!id || !g_i.idText) return "?";
@@ -505,16 +606,23 @@ int EntAddItems(Entity& e, const SStr& name, int count) {
     // Rueckgabe: >= 0 ok; -1 Inventar nicht lesbar; -4 Funktionen fehlen; -5 Szenenverwaltung fehlt; -2 Item unbekannt; -3 Ausnahme
     void* inv = InventoryOf(e);
     int rc;
-    if (!inv || count <= 0) rc = -1;
-    else if (!g_i.create || !g_i.tplByName) rc = -4;
+    if (!inv || count <= 0)
+        rc = -1;
+    else if (!g_i.create || !g_i.tplByName)
+        rc = -4;
     else {
-        if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) { SStr mod("eCSceneAdmin"); g_e.sceneAdmin = SafeSceneAdmin(&mod); }
+        if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
+            SStr mod("eCSceneAdmin");
+            g_e.sceneAdmin = SafeSceneAdmin(&mod);
+        }
         rc = g_e.sceneAdmin ? SafeCreateItems(inv, g_e.sceneAdmin, &name, name.c_str(), count) : -5;
     }
     if (rc < 0 && ScriptHost::s_current) {
         char b[256];
-        std::snprintf(b, sizeof b, "AddItems(%s, %d) fehlgeschlagen: Code %d (Entity %p gueltig %d, Inventar %p, create %p, Vorlage-Suche %p, Szene %p)",
-                      name.c_str(), count, rc, e.p, int(EntIsValid(e)), inv, (void*)g_i.create, (void*)g_i.tplByName, g_e.sceneAdmin);
+        std::snprintf(b, sizeof b,
+                      "AddItems(%s, %d) fehlgeschlagen: Code %d (Entity %p gueltig %d, Inventar %p, create %p, Vorlage-Suche %p, Szene %p)",
+                      name.c_str(), count, rc, e.p, int(EntIsValid(e)), inv, reinterpret_cast<void*>(g_i.create),
+                      reinterpret_cast<void*>(g_i.tplByName), g_e.sceneAdmin);
         ScriptHost::s_current->Log(b);
     }
     return rc;
@@ -523,26 +631,36 @@ int EntAddItems(Entity& e, const SStr& name, int count) {
 // Die Kopie lebt nur im Speicher (nicht im Spielstand, GUID wechselt bei jedem Start).
 int CloneTemplate(const SStr& base, const SStr& newName) {
     int rc;
-    if (!ResolveInv()) rc = -4;
-    else if (!g_i.clone || !g_i.setName || !g_i.tplByName || newName.length() == 0) rc = -4;
+    if (!ResolveInv())
+        rc = -4;
+    else if (!g_i.clone || !g_i.setName || !g_i.tplByName || newName.length() == 0)
+        rc = -4;
     else {
-        if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) { SStr mod("eCSceneAdmin"); g_e.sceneAdmin = SafeSceneAdmin(&mod); }
+        if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
+            SStr mod("eCSceneAdmin");
+            g_e.sceneAdmin = SafeSceneAdmin(&mod);
+        }
         const void *idB = nullptr, *idC = nullptr;
         int regOk = -2;
         PropIdVal fixedId = {};
         bool haveFixed = false;
-        if (g_i.idFromStr && g_i.setId) {   // ID = MD5("OG3Clone:" + Name) -> bleibt ueber Neustarts gleich (Spielstand findet die Vorlage wieder)
+        if (g_i.idFromStr &&
+            g_i.setId) {   // ID = MD5("OG3Clone:" + Name) -> bleibt ueber Neustarts gleich (Spielstand findet die Vorlage wieder)
             const SStr key(std::string("OG3Clone:") + newName.c_str());
             haveFixed = SafeIdFromString(&fixedId, &key);
         }
-        rc = g_e.sceneAdmin ? SafeCloneTemplate(g_e.sceneAdmin, &base, base.c_str(), &newName, newName.c_str(), &idB, &idC, &regOk, haveFixed ? &fixedId : nullptr) : -5;
+        rc = g_e.sceneAdmin ? SafeCloneTemplate(g_e.sceneAdmin, &base, base.c_str(), &newName, newName.c_str(), &idB, &idC, &regOk,
+                                                haveFixed ? &fixedId : nullptr)
+                            : -5;
         if (rc == 0 && ScriptHost::s_current)
-            ScriptHost::s_current->Log("CloneTemplate: " + std::string(base.c_str()) + " -> " + newName.c_str() + ", ID Basis " + IdToString(idB) + ", ID Klon " +
-                                       IdToString(idC) + ", RegisterTemplateEntity " + std::to_string(regOk) + (haveFixed ? ", feste ID" : ", Zufalls-ID"));
+            ScriptHost::s_current->Log("CloneTemplate: " + std::string(base.c_str()) + " -> " + newName.c_str() + ", ID Basis " +
+                                       IdToString(idB) + ", ID Klon " + IdToString(idC) + ", RegisterTemplateEntity " +
+                                       std::to_string(regOk) + (haveFixed ? ", feste ID" : ", Zufalls-ID"));
     }
     if (ScriptHost::s_current) {
         char b[256];
-        std::snprintf(b, sizeof b, "CloneTemplate(%s -> %s): Code %d (clone %p, setName %p)", base.c_str(), newName.c_str(), rc, (void*)g_i.clone, (void*)g_i.setName);
+        std::snprintf(b, sizeof b, "CloneTemplate(%s -> %s): Code %d (clone %p, setName %p)", base.c_str(), newName.c_str(), rc,
+                      reinterpret_cast<void*>(g_i.clone), reinterpret_cast<void*>(g_i.setName));
         if (rc != 0 && rc != 1) ScriptHost::s_current->Log(b);
     }
     return rc;
@@ -557,7 +675,8 @@ typedef bool(__thiscall* WorldDestroyDynFn)(void*, void*);
 typedef void*(__stdcall* SectorForEntFn)(const void*);         // gCWorld::GetSectorForEntity(const eCEntity*) (statisch)
 typedef void*(__thiscall* WorldSysSectorFn)(void*);            // gCWorld::GetSystemSector() -> gCSector&
 typedef void(__thiscall* SetLocalRotFn)(void*, const void*);   // eCEntity::SetLocalRotation(const bCQuaternion&)
-std::map<void*, void*> g_spawned;   // von SpawnNPC erzeugte Entities -> Welt, in der sie erzeugt wurden (nur diese darf DestroyNPC entfernen)
+std::map<void*, void*>
+    g_spawned;   // von SpawnNPC erzeugte Entities -> Welt, in der sie erzeugt wurden (nur diese darf DestroyNPC entfernen)
 struct SpawnApi {
     bool tried = false;
     WorldCurFn current = nullptr;
@@ -573,10 +692,13 @@ bool ResolveSpawn() {
     if (!ResolveInv()) return false;
     g_sp.tried = true;
     g_sp.current = reinterpret_cast<WorldCurFn>(GetProcAddress(g_e.game, "?GetCurrentWorld@gCWorld@@SGPAV1@XZ"));
-    g_sp.createDyn = reinterpret_cast<WorldCreateDynFn>(GetProcAddress(g_e.game, "?CreateDynamicEntity@gCWorld@@QAEPAVeCDynamicEntity@@XZ"));
+    g_sp.createDyn =
+        reinterpret_cast<WorldCreateDynFn>(GetProcAddress(g_e.game, "?CreateDynamicEntity@gCWorld@@QAEPAVeCDynamicEntity@@XZ"));
     g_sp.fromTpl = reinterpret_cast<EntFromTplFn>(GetProcAddress(g_e.engine, "?CreateFromTemplate@eCEntity@@QAE_NABVeCTemplateEntity@@@Z"));
-    g_sp.destroyDyn = reinterpret_cast<WorldDestroyDynFn>(GetProcAddress(g_e.game, "?DestroyDynamicEntity@gCWorld@@QAE_NPAVeCDynamicEntity@@@Z"));
-    g_sp.sectorFor = reinterpret_cast<SectorForEntFn>(GetProcAddress(g_e.game, "?GetSectorForEntity@gCWorld@@SGPAVgCSector@@PBVeCEntity@@@Z"));
+    g_sp.destroyDyn =
+        reinterpret_cast<WorldDestroyDynFn>(GetProcAddress(g_e.game, "?DestroyDynamicEntity@gCWorld@@QAE_NPAVeCDynamicEntity@@@Z"));
+    g_sp.sectorFor =
+        reinterpret_cast<SectorForEntFn>(GetProcAddress(g_e.game, "?GetSectorForEntity@gCWorld@@SGPAVgCSector@@PBVeCEntity@@@Z"));
     g_sp.sysSector = reinterpret_cast<WorldSysSectorFn>(GetProcAddress(g_e.game, "?GetSystemSector@gCWorld@@QAEAAVgCSector@@XZ"));
     g_sp.setLocalRot = reinterpret_cast<SetLocalRotFn>(GetProcAddress(g_e.engine, "?SetLocalRotation@eCEntity@@QAEXABVbCQuaternion@@@Z"));
     return g_sp.current && g_sp.createDyn && g_sp.fromTpl;
@@ -608,16 +730,21 @@ int SafeSpawn(void* admin, const void* name, const char* wanted, const SVec3* po
 Entity SpawnNPC(const SStr& tplName, const SVec3& pos) {
     Entity result{nullptr};
     int rc;
-    if (!ResolveSpawn()) rc = -4;
+    if (!ResolveSpawn())
+        rc = -4;
     else {
-        if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) { SStr mod("eCSceneAdmin"); g_e.sceneAdmin = SafeSceneAdmin(&mod); }
+        if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
+            SStr mod("eCSceneAdmin");
+            g_e.sceneAdmin = SafeSceneAdmin(&mod);
+        }
         void* ent = nullptr;
         rc = g_e.sceneAdmin ? SafeSpawn(g_e.sceneAdmin, &tplName, tplName.c_str(), &pos, &ent) : -5;
         if (rc == 0) result.p = ent;
     }
     if (ScriptHost::s_current) {
         char b[256];
-        std::snprintf(b, sizeof b, "SpawnNPC(%s, %.0f %.0f %.0f): %s (Code %d, Entity %p)", tplName.c_str(), pos.x, pos.y, pos.z, rc == 0 ? "ok" : "fehlgeschlagen", rc, result.p);
+        std::snprintf(b, sizeof b, "SpawnNPC(%s, %.0f %.0f %.0f): %s (Code %d, Entity %p)", tplName.c_str(), pos.x, pos.y, pos.z,
+                      rc == 0 ? "ok" : "fehlgeschlagen", rc, result.p);
         ScriptHost::s_current->Log(b);
     }
     return result;
@@ -660,15 +787,31 @@ void* SafeFocusSet() {
         return reinterpret_cast<PSGetFn>(vt[59])(player, 0x3B);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-void* SafeCrosshair(void* fs) { __try { return g_crossFn(fs); } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; } }
-bool SafePick(void* fs, SVec3* out) { __try { std::memcpy(out, g_pickFn(fs), sizeof(SVec3)); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
+void* SafeCrosshair(void* fs) {
+    __try {
+        return g_crossFn(fs);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+bool SafePick(void* fs, SVec3* out) {
+    __try {
+        std::memcpy(out, g_pickFn(fs), sizeof(SVec3));
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
 typedef void(__thiscall* DrawCrossFn)(void*, const bool&);   // gCFocus_PS::SetDrawCrossHair(const bool&)
 DrawCrossFn g_drawCrossFn = nullptr;
-bool SafeDrawCross(void* fs, bool on) { __try { g_drawCrossFn(fs, on); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; } }
+bool SafeDrawCross(void* fs, bool on) {
+    __try {
+        g_drawCrossFn(fs, on);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
 bool ResolveCross() {
     if (!g_drawCrossFn) g_drawCrossFn = reinterpret_cast<DrawCrossFn>(GetProcAddress(g_e.game, "?SetDrawCrossHair@gCFocus_PS@@QAEXAB_N@Z"));
-    if (!g_crossFn) g_crossFn = reinterpret_cast<FocusEntFn>(GetProcAddress(g_e.game, "?GetCrossHairEntity@gCFocus_PS@@QAEPAVeCEntity@@XZ"));
-    if (!g_pickFn) g_pickFn = reinterpret_cast<FocusPosFn>(GetProcAddress(g_e.game, "?GetCurrentPickPosition@gCFocus_PS@@QBEABVbCVector@@XZ"));
+    if (!g_crossFn)
+        g_crossFn = reinterpret_cast<FocusEntFn>(GetProcAddress(g_e.game, "?GetCrossHairEntity@gCFocus_PS@@QAEPAVeCEntity@@XZ"));
+    if (!g_pickFn)
+        g_pickFn = reinterpret_cast<FocusPosFn>(GetProcAddress(g_e.game, "?GetCurrentPickPosition@gCFocus_PS@@QBEABVbCVector@@XZ"));
     return Resolve() && g_crossFn && g_pickFn;
 }
 Entity GetCrosshairEntity() {
@@ -728,7 +871,9 @@ AppInstFn g_appInst = nullptr;
 AppCamFn g_appCam = nullptr;
 PtToRayFn g_ptToRay = nullptr;
 TraceNearFn g_traceNear = nullptr;
-struct PickRay { float o[3], d[3]; };
+struct PickRay {
+    float o[3], d[3];
+};
 void* SafePickExcluding(int x, int y, const void* exclude, float maxDist, SVec3* hit) {
     __try {
         void* app = g_appInst();
@@ -745,18 +890,26 @@ void* SafePickExcluding(int x, int y, const void* exclude, float maxDist, SVec3*
         const float* p = reinterpret_cast<const float*>(report + 0x68);
         const float dx = p[0] - ray.o[0], dy = p[1] - ray.o[1], dz = p[2] - ray.o[2];
         if (maxDist > 0 && dx * dx + dy * dy + dz * dz > maxDist * maxDist) return nullptr;
-        hit->x = p[0]; hit->y = p[1]; hit->z = p[2];
+        hit->x = p[0];
+        hit->y = p[1];
+        hit->z = p[2];
         return ent;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
 bool ResolvePick() {
     if (!Resolve()) return false;
     if (!g_appInst) g_appInst = reinterpret_cast<AppInstFn>(GetProcAddress(g_e.engine, "?GetInstance@eCApplication@@SGAAV1@XZ"));
-    if (!g_appCam) g_appCam = reinterpret_cast<AppCamFn>(GetProcAddress(g_e.engine, "?GetCurrentCamera@eCApplication@@QAEAAVeCCameraBase@@XZ"));
-    if (!g_ptToRay) g_ptToRay = reinterpret_cast<PtToRayFn>(GetProcAddress(g_e.engine, "?PointToRay@eCCameraBase@@QBEXABVbCPoint@@AAVbCRay@@@Z"));
-    if (!g_traceNear) g_traceNear = reinterpret_cast<TraceNearFn>(GetProcAddress(g_e.engine, "?TraceRayNearestHit@eCPhysicsScene@@QAE_NABVbCVector@@0PBVeCEntity@@K1W4eEPropertySetType@@W4eEShapeGroup@@@Z"));
+    if (!g_appCam)
+        g_appCam = reinterpret_cast<AppCamFn>(GetProcAddress(g_e.engine, "?GetCurrentCamera@eCApplication@@QAEAAVeCCameraBase@@XZ"));
+    if (!g_ptToRay)
+        g_ptToRay = reinterpret_cast<PtToRayFn>(GetProcAddress(g_e.engine, "?PointToRay@eCCameraBase@@QBEXABVbCPoint@@AAVbCRay@@@Z"));
+    if (!g_traceNear)
+        g_traceNear = reinterpret_cast<TraceNearFn>(GetProcAddress(
+            g_e.engine, "?TraceRayNearestHit@eCPhysicsScene@@QAE_NABVbCVector@@0PBVeCEntity@@K1W4eEPropertySetType@@W4eEShapeGroup@@@Z"));
     if (!g_physInst) g_physInst = reinterpret_cast<PhysInstFn>(GetProcAddress(g_e.engine, "?GetInstance@eCPhysicsScene@@SGAAV1@XZ"));
-    if (!g_pickEnt) g_pickEnt = reinterpret_cast<PickEntFn>(GetProcAddress(g_e.engine, "?PickEntity@eCPhysicsScene@@QAEPAVeCEntity@@HHMAAVbCVector@@@Z"));
+    if (!g_pickEnt)
+        g_pickEnt =
+            reinterpret_cast<PickEntFn>(GetProcAddress(g_e.engine, "?PickEntity@eCPhysicsScene@@QAEPAVeCEntity@@HHMAAVbCVector@@@Z"));
     return g_physInst && g_pickEnt;
 }
 // Entity unter dem Bildschirmpixel (x, y), in Pixeln der Client-Flaeche des Spielfensters; der Trefferpunkt steht danach in GetPickPoint()
@@ -767,16 +920,25 @@ Entity PickScreen(int x, int y, float maxDist) {
     SVec3 hit{0, 0, 0};
     const float md = maxDist > 0 ? maxDist : 100000.0f;
     void* p = nullptr;
-    if (g_appInst && g_appCam && g_ptToRay && g_traceNear && g_physInst) p = SafePickExcluding(x, y, SafeHero(false), md, &hit);   // Held ausgeschlossen
-    else p = SafePickEntity(x, y, md, &hit);
-    if (p && Valid(p)) { r.p = p; g_lastPick = hit; g_lastPickHit = true; }
+    if (g_appInst && g_appCam && g_ptToRay && g_traceNear && g_physInst)
+        p = SafePickExcluding(x, y, SafeHero(false), md, &hit);   // Held ausgeschlossen
+    else
+        p = SafePickEntity(x, y, md, &hit);
+    if (p && Valid(p)) {
+        r.p = p;
+        g_lastPick = hit;
+        g_lastPickHit = true;
+    }
     return r;
 }
 // Entity im Mittelpunkt des Spielfensters (= unter dem Fadenkreuz)
 Entity PickCenter(float maxDist) {
     RECT rc{};
     HWND w = GameWindow();
-    if (!w || !GetClientRect(w, &rc)) { g_lastPickHit = false; return {nullptr}; }
+    if (!w || !GetClientRect(w, &rc)) {
+        g_lastPickHit = false;
+        return {nullptr};
+    }
     return PickScreen((rc.right - rc.left) / 2, (rc.bottom - rc.top) / 2, maxDist);
 }
 SVec3 GetPickPoint() { return g_lastPickHit ? g_lastPick : SVec3{0, 0, 0}; }
@@ -784,9 +946,15 @@ bool HasPickPoint() { return g_lastPickHit; }
 // Von SpawnNPC erzeugtes Entity wieder entfernen (gCWorld::DestroyDynamicEntity). Rueckgabe: true = entfernt; der Griff im Skript bleibt, ein zweiter Aufruf wird abgelehnt.
 // Fremde Entities (Welt-NPCs, Held) werden abgelehnt, ebenso Entities einer inzwischen anderen Welt.
 bool SafeDestroy(void* world, void* ent) {
-    __try { return g_sp.destroyDyn(world, ent); } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        return g_sp.destroyDyn(world, ent);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-void* SafeCurrentWorld() { __try { return g_sp.current(); } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; } }
+void* SafeCurrentWorld() {
+    __try {
+        return g_sp.current();
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
 // Gehoert das Entity zum Systemsektor der Welt (dort landen per SpawnNPC erzeugte Entities, auch nach Speichern und Laden)? Held/Spieler zaehlen nie.
 bool SafeInSystemSector(void* world, void* ent, void** sector, void** sysSector) {
     __try {
@@ -807,7 +975,8 @@ bool SafeHasNpcSet(void* ent) {
 }
 bool IsNpc(void* ent) {
     if (!g_psNpc) {
-        if (HMODULE script = GetModuleHandleA("Script.dll")) g_psNpc = reinterpret_cast<PSNpcCtorFn>(GetProcAddress(script, "??0PSNpc@@QAE@PAVeCEntity@@@Z"));
+        if (HMODULE script = GetModuleHandleA("Script.dll"))
+            g_psNpc = reinterpret_cast<PSNpcCtorFn>(GetProcAddress(script, "??0PSNpc@@QAE@PAVeCEntity@@@Z"));
     }
     return g_psNpc && ent && SafeHasNpcSet(ent);
 }
@@ -819,7 +988,7 @@ SStr EntCategory(const Entity& e) {
     if (IsNpc(e.p)) return SStr("NPC");
     const char* t = nullptr;
     std::string n = SafeName(e.p, &t) && t ? t : "";
-    for (char& c : n) c = char(tolower((unsigned char)c));
+    for (char& c : n) c = char(tolower(static_cast<unsigned char>(c)));
     if (n.empty()) return SStr("Unnamed");
     if (n.find("_house_") != std::string::npos) return SStr("Building");
     if (n.find("g3_object_") == 0) return SStr("Object");
@@ -844,14 +1013,19 @@ bool DestroyNPC(const Entity& e) {
     const char* why = nullptr;
     bool ok = false;
     auto it = g_spawned.find(e.p);
-    if (!e.p) why = "Entity ungueltig";
-    else if (!ResolveSpawn() || !g_sp.destroyDyn) why = "Funktion fehlt";
-    else if (e.p == SafeHero(false) || e.p == SafeHero(true)) why = "Held/Spieler";
+    if (!e.p)
+        why = "Entity ungueltig";
+    else if (!ResolveSpawn() || !g_sp.destroyDyn)
+        why = "Funktion fehlt";
+    else if (e.p == SafeHero(false) || e.p == SafeHero(true))
+        why = "Held/Spieler";
     else {
         void* world = SafeCurrentWorld();
         const bool mine = it != g_spawned.end() && it->second == world;
-        if (!world) why = "keine Welt";
-        else if (!IsNpc(e.p)) why = "kein NPC (DestroyNPC entfernt nur NPCs)";
+        if (!world)
+            why = "keine Welt";
+        else if (!IsNpc(e.p))
+            why = "kein NPC (DestroyNPC entfernt nur NPCs)";
         else if (mine || IsDynamicSpawn(e)) {
             ok = SafeDestroy(world, e.p);
             if (!ok) why = "DestroyDynamicEntity lieferte false";
@@ -872,14 +1046,21 @@ bool DestroyNPC(const Entity& e) {
 }
 // Entities nach Teilname suchen (Zaehlen + Index): z. B. alle "Diego"
 void* SceneAdminNow() {
-    if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) { SStr mod("eCSceneAdmin"); g_e.sceneAdmin = SafeSceneAdmin(&mod); }
+    if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
+        SStr mod("eCSceneAdmin");
+        g_e.sceneAdmin = SafeSceneAdmin(&mod);
+    }
     return g_e.sceneAdmin;
 }
 int SafeCountPart(void* admin, const void* part) {
-    __try { return g_i.countPart(admin, part, 0 /* Entity */); } __except (EXCEPTION_EXECUTE_HANDLER) { return 0; }
+    __try {
+        return g_i.countPart(admin, part, 0 /* Entity */);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return 0; }
 }
 void* SafeByPart(void* admin, const void* part, int index) {
-    __try { return g_i.byPart(admin, part, 0, index); } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+    __try {
+        return g_i.byPart(admin, part, 0, index);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
 int CountEntities(const SStr& part) {
     if (!ResolveInv() || !g_i.countPart) return 0;
@@ -895,7 +1076,10 @@ Entity GetEntityByPart(const SStr& part, int index) {
 }
 // Drehung: SetLocalRotation (fuer Entities direkt unter der Welt = Weltdrehung). Quaternion (x, y, z, w), Y ist oben.
 bool SafeSetRot(void* ent, const SQuat* q) {
-    __try { g_sp.setLocalRot(ent, q); return true; } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    __try {
+        g_sp.setLocalRot(ent, q);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 bool EntSetRotation(Entity& e, const SQuat& q) { return EntIsValid(e) && ResolveSpawn() && g_sp.setLocalRot && SafeSetRot(e.p, &q); }
 // Blickrichtung zu einem Ziel (nur um die Hochachse): Gier = atan2(dx, dz) in Grad plus Versatz (Standard 0; falls der NPC vom Ziel weg schaut: 180)
@@ -916,7 +1100,10 @@ bool SafeTemplateNames(void* admin, const void* part, int maxn, std::string* out
         for (int i = 0; i < n && i < maxn; ++i) {
             void* c = g_i.byPart(admin, part, 2, i);
             const char* nm = c ? g_sb.strGetText(g_e.getName(c)) : nullptr;
-            if (nm) { if (!out->empty()) *out += ";"; *out += nm; }
+            if (nm) {
+                if (!out->empty()) *out += ";";
+                *out += nm;
+            }
         }
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
@@ -924,7 +1111,10 @@ bool SafeTemplateNames(void* admin, const void* part, int maxn, std::string* out
 SStr FindTemplateNames(const SStr& part, int maxn) {
     std::string r;
     if (ResolveInv() && g_i.countPart && g_i.byPart) {
-        if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) { SStr mod("eCSceneAdmin"); g_e.sceneAdmin = SafeSceneAdmin(&mod); }
+        if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
+            SStr mod("eCSceneAdmin");
+            g_e.sceneAdmin = SafeSceneAdmin(&mod);
+        }
         if (g_e.sceneAdmin) SafeTemplateNames(g_e.sceneAdmin, &part, maxn < 1 ? 1 : maxn > 200 ? 200 : maxn, &r);
     }
     return SStr(r);
@@ -935,7 +1125,10 @@ int EntRemoveItems(Entity& e, const SStr& name, int count) {   // Rueckgabe: Zah
     return inv && count > 0 && SafeRemoveItems(inv, &name, count, &r) ? r : -1;
 }
 
-void* WorldClock() { ResolveStats(); return g_s.clockOk ? SafeWorldClock() : nullptr; }
+void* WorldClock() {
+    ResolveStats();
+    return g_s.clockOk ? SafeWorldClock() : nullptr;
+}
 int ClockGet(ClockGetFn StatsApi::*fn) {
     int v = -1;
     void* c = WorldClock();
@@ -987,7 +1180,8 @@ bool ResolveScreen() {
     g_g.colorDtor = reinterpret_cast<DtorFn>(B("??1bCByteAlphaColor@@QAE@XZ"));
     g_g.ok = g_g.screenCtrl && g_g.guiManager && g_g.print && g_g.gameMsg && g_g.activePage && g_g.uniCtor && g_g.uniDtor &&
              g_g.colorCtor && g_g.colorDtor;
-    if (!g_g.tried && ScriptHost::s_current) ScriptHost::s_current->Log(g_g.ok ? "Bildschirm-Bindings bereit" : "Bildschirm-Bindings: Exporte fehlen");
+    if (!g_g.tried && ScriptHost::s_current)
+        ScriptHost::s_current->Log(g_g.ok ? "Bildschirm-Bindings bereit" : "Bildschirm-Bindings: Exporte fehlen");
     g_g.tried = true;
     return g_g.ok;
 }
@@ -998,7 +1192,7 @@ bool SafePrint(const char* text, float seconds, int r, int g, int b) {
         void* ctrl = g_g.screenCtrl(g_e.sessionInstance());
         if (!ctrl) return false;
         g_g.uniCtor(uni, text);
-        g_g.colorCtor(col, (unsigned char)r, (unsigned char)g, (unsigned char)b, 0xff);
+        g_g.colorCtor(col, static_cast<unsigned char>(r), static_cast<unsigned char>(g), static_cast<unsigned char>(b), 0xff);
         g_g.print(ctrl, uni, col, seconds);
         g_g.colorDtor(col);
         g_g.uniDtor(uni);
@@ -1029,70 +1223,85 @@ bool PrintScreenText(const SStr& s, float seconds, int r, int g, int b) {
 bool PrintGameMessageText(const SStr& s, int type) { return ResolveScreen() && SafeGameMsg(s.c_str(), type); }
 int GetActivePage() { return ResolveScreen() ? SafeActivePage() : -1; }
 
-}  // namespace
+}   // namespace
 
 bool RegisterEngineBindings(asIScriptEngine* e) {
     bool ok = true;
-    auto R = [&](int r) { if (r < 0) ok = false; };
-    R(e->RegisterObjectType("Entity", sizeof(Entity), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Entity>()));
-    R(e->RegisterObjectBehaviour("Entity", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(EntConstruct), asCALL_CDECL_OBJLAST));
-    R(e->RegisterObjectMethod("Entity", "bool IsValid() const", asFUNCTION(EntIsValid), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bCString GetName() const", asFUNCTION(EntName), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bCVector GetPosition() const", asFUNCTION(EntPos), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bCString GetTemplateName() const", asFUNCTION(EntTemplateName), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bCVector GetBoundsMin() const", asFUNCTION(EntBoundsMin), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bCVector GetBoundsMax() const", asFUNCTION(EntBoundsMax), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "Entity GetParent() const", asFUNCTION(EntParent), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bCMatrix4 GetWorldMatrix() const", asFUNCTION(EntWorldMatrix), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bCQuaternion GetRotation() const", asFUNCTION(EntRot), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "float GetDistanceTo(const Entity &in) const", asFUNCTION(EntDist), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bool SetPosition(const bCVector &in)", asFUNCTION(EntSetPos), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bool opEquals(const Entity &in) const", asFUNCTION(EntEquals), asCALL_CDECL_OBJFIRST));
+    auto R = [&](int r) {
+        if (r < 0) ok = false;
+    };
+    OG3_REG(e->RegisterObjectType("Entity", sizeof(Entity), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Entity>()));
+    OG3_REG(e->RegisterObjectBehaviour("Entity", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(EntConstruct), asCALL_CDECL_OBJLAST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool IsValid() const", asFUNCTION(EntIsValid), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bCString GetName() const", asFUNCTION(EntName), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bCVector GetPosition() const", asFUNCTION(EntPos), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bCString GetTemplateName() const", asFUNCTION(EntTemplateName), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bCVector GetBoundsMin() const", asFUNCTION(EntBoundsMin), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bCVector GetBoundsMax() const", asFUNCTION(EntBoundsMax), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetParent() const", asFUNCTION(EntParent), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bCMatrix4 GetWorldMatrix() const", asFUNCTION(EntWorldMatrix), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bCQuaternion GetRotation() const", asFUNCTION(EntRot), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "float GetDistanceTo(const Entity &in) const", asFUNCTION(EntDist), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetPosition(const bCVector &in)", asFUNCTION(EntSetPos), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool opEquals(const Entity &in) const", asFUNCTION(EntEquals), asCALL_CDECL_OBJFIRST));
     // API 3: Attribute + Spieluhr (Fehler/kein Spiel: -1 bzw. false)
-    R(e->RegisterObjectMethod("Entity", "int GetAttribute(const bCString &in) const", asFUNCTION(EntAttr), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "int GetAttributeBase(const bCString &in) const", asFUNCTION(EntAttrBase), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "int GetAttributeMax(const bCString &in) const", asFUNCTION(EntAttrMax), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bool SetAttributeBase(const bCString &in, int)", asFUNCTION(EntSetAttrBase), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bool AddAttributeBase(const bCString &in, int)", asFUNCTION(EntAddAttrBase), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bool SetAttribute(const bCString &in, int)", asFUNCTION(EntSetAttr), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bool AddAttribute(const bCString &in, int)", asFUNCTION(EntAddAttr), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "int GetItemCount(const bCString &in) const", asFUNCTION(EntItemCount), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "int AddItems(const bCString &in, int)", asFUNCTION(EntAddItems), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "int RemoveItems(const bCString &in, int)", asFUNCTION(EntRemoveItems), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterGlobalFunction("int CloneTemplate(const bCString &in base, const bCString &in newName)", asFUNCTION(CloneTemplate), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("Entity SpawnNPC(const bCString &in templateName, const bCVector &in position)", asFUNCTION(SpawnNPC), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("Entity PickScreen(int x, int y, float maxDistance = 100000)", asFUNCTION(PickScreen), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("Entity PickCenter(float maxDistance = 100000)", asFUNCTION(PickCenter), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bCVector GetPickPoint()", asFUNCTION(GetPickPoint), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bool HasPickPoint()", asFUNCTION(HasPickPoint), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("Entity GetFocusedEntity()", asFUNCTION(GetFocusedEntity), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("Entity GetCrosshairEntity()", asFUNCTION(GetCrosshairEntity), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bool SetCrosshairVisible(bool)", asFUNCTION(SetCrosshairVisible), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bCVector GetPickPosition()", asFUNCTION(GetPickPosition), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bool DestroyNPC(const Entity &in)", asFUNCTION(DestroyNPC), asCALL_CDECL));
-    R(e->RegisterObjectMethod("Entity", "bCString GetCategory() const", asFUNCTION(EntCategory), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bool IsBuilding() const", asFUNCTION(EntIsBuilding), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterGlobalFunction("bool IsNPC(const Entity &in)", asFUNCTION(IsNPCScript), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bool IsDynamicSpawn(const Entity &in)", asFUNCTION(IsDynamicSpawn), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("int CountEntities(const bCString &in part)", asFUNCTION(CountEntities), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("Entity GetEntityByPart(const bCString &in part, int index)", asFUNCTION(GetEntityByPart), asCALL_CDECL));
-    R(e->RegisterObjectMethod("Entity", "bool SetRotation(const bCQuaternion &in)", asFUNCTION(EntSetRotation), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterObjectMethod("Entity", "bool LookAt(const Entity &in, float yawOffsetDegrees = 0)", asFUNCTION(EntLookAt), asCALL_CDECL_OBJFIRST));
-    R(e->RegisterGlobalFunction("bCString FindTemplateNames(const bCString &in part, int max = 20)", asFUNCTION(FindTemplateNames), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bool SetGameEvent(const bCString &in)", asFUNCTION(SetGameEvent), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bool ClearGameEvent(const bCString &in)", asFUNCTION(ClearGameEvent), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bool IsGameEventSet(const bCString &in)", asFUNCTION(IsGameEventSet), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("int GetGameDay()", asFUNCTION(GameDay), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("int GetGameHour()", asFUNCTION(GameHour), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("int GetGameMinute()", asFUNCTION(GameMinute), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bool SetGameTime(int day, int hour, int minute)", asFUNCTION(SetGameTime), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bool PrintScreen(const bCString &in, float seconds = 3, int r = 255, int g = 255, int b = 255)",
-                                asFUNCTION(PrintScreenText), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("bool PrintGameMessage(const bCString &in, int type = 0)", asFUNCTION(PrintGameMessageText), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("int GetActivePage()", asFUNCTION(GetActivePage), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("Entity GetHero()", asFUNCTION(GetHero), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("Entity GetPlayer()", asFUNCTION(GetPlayer), asCALL_CDECL));
-    R(e->RegisterGlobalFunction("Entity FindEntity(const bCString &in)", asFUNCTION(FindEntity), asCALL_CDECL));
+    OG3_REG(e->RegisterObjectMethod("Entity", "int GetAttribute(const bCString &in) const", asFUNCTION(EntAttr), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "int GetAttributeBase(const bCString &in) const", asFUNCTION(EntAttrBase),
+                                    asCALL_CDECL_OBJFIRST));
+    OG3_REG(
+        e->RegisterObjectMethod("Entity", "int GetAttributeMax(const bCString &in) const", asFUNCTION(EntAttrMax), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetAttributeBase(const bCString &in, int)", asFUNCTION(EntSetAttrBase),
+                                    asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool AddAttributeBase(const bCString &in, int)", asFUNCTION(EntAddAttrBase),
+                                    asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetAttribute(const bCString &in, int)", asFUNCTION(EntSetAttr), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool AddAttribute(const bCString &in, int)", asFUNCTION(EntAddAttr), asCALL_CDECL_OBJFIRST));
+    OG3_REG(
+        e->RegisterObjectMethod("Entity", "int GetItemCount(const bCString &in) const", asFUNCTION(EntItemCount), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "int AddItems(const bCString &in, int)", asFUNCTION(EntAddItems), asCALL_CDECL_OBJFIRST));
+    OG3_REG(
+        e->RegisterObjectMethod("Entity", "int RemoveItems(const bCString &in, int)", asFUNCTION(EntRemoveItems), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterGlobalFunction("int CloneTemplate(const bCString &in base, const bCString &in newName)", asFUNCTION(CloneTemplate),
+                                      asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("Entity SpawnNPC(const bCString &in templateName, const bCVector &in position)", asFUNCTION(SpawnNPC),
+                                      asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("Entity PickScreen(int x, int y, float maxDistance = 100000)", asFUNCTION(PickScreen), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("Entity PickCenter(float maxDistance = 100000)", asFUNCTION(PickCenter), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bCVector GetPickPoint()", asFUNCTION(GetPickPoint), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool HasPickPoint()", asFUNCTION(HasPickPoint), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("Entity GetFocusedEntity()", asFUNCTION(GetFocusedEntity), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("Entity GetCrosshairEntity()", asFUNCTION(GetCrosshairEntity), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool SetCrosshairVisible(bool)", asFUNCTION(SetCrosshairVisible), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bCVector GetPickPosition()", asFUNCTION(GetPickPosition), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool DestroyNPC(const Entity &in)", asFUNCTION(DestroyNPC), asCALL_CDECL));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bCString GetCategory() const", asFUNCTION(EntCategory), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool IsBuilding() const", asFUNCTION(EntIsBuilding), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterGlobalFunction("bool IsNPC(const Entity &in)", asFUNCTION(IsNPCScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool IsDynamicSpawn(const Entity &in)", asFUNCTION(IsDynamicSpawn), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("int CountEntities(const bCString &in part)", asFUNCTION(CountEntities), asCALL_CDECL));
+    OG3_REG(
+        e->RegisterGlobalFunction("Entity GetEntityByPart(const bCString &in part, int index)", asFUNCTION(GetEntityByPart), asCALL_CDECL));
+    OG3_REG(
+        e->RegisterObjectMethod("Entity", "bool SetRotation(const bCQuaternion &in)", asFUNCTION(EntSetRotation), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool LookAt(const Entity &in, float yawOffsetDegrees = 0)", asFUNCTION(EntLookAt),
+                                    asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterGlobalFunction("bCString FindTemplateNames(const bCString &in part, int max = 20)", asFUNCTION(FindTemplateNames),
+                                      asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool SetGameEvent(const bCString &in)", asFUNCTION(SetGameEvent), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool ClearGameEvent(const bCString &in)", asFUNCTION(ClearGameEvent), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool IsGameEventSet(const bCString &in)", asFUNCTION(IsGameEventSet), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("int GetGameDay()", asFUNCTION(GameDay), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("int GetGameHour()", asFUNCTION(GameHour), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("int GetGameMinute()", asFUNCTION(GameMinute), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool SetGameTime(int day, int hour, int minute)", asFUNCTION(SetGameTime), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool PrintScreen(const bCString &in, float seconds = 3, int r = 255, int g = 255, int b = 255)",
+                                      asFUNCTION(PrintScreenText), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool PrintGameMessage(const bCString &in, int type = 0)", asFUNCTION(PrintGameMessageText),
+                                      asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("int GetActivePage()", asFUNCTION(GetActivePage), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("Entity GetHero()", asFUNCTION(GetHero), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("Entity GetPlayer()", asFUNCTION(GetPlayer), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("Entity FindEntity(const bCString &in)", asFUNCTION(FindEntity), asCALL_CDECL));
     if (!RegisterQuestBindings(e)) ok = false;
     if (!RegisterDialogBindings(e)) ok = false;
     return ok;
@@ -1101,7 +1310,10 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
 // Name der Template-Entity zu einer Property-ID (GUID), z. B. eines Items; leer, wenn unbekannt
 std::string TemplateNameForId(const void* pid) {
     if (!pid || !Resolve() || !g_e.byId) return std::string();
-    if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) { SStr mod("eCSceneAdmin"); g_e.sceneAdmin = SafeSceneAdmin(&mod); }
+    if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
+        SStr mod("eCSceneAdmin");
+        g_e.sceneAdmin = SafeSceneAdmin(&mod);
+    }
     void* tpl = nullptr;
     if (!g_e.sceneAdmin || !SafeById(g_e.sceneAdmin, pid, &tpl) || !tpl || !Valid(tpl)) return std::string();
     const char* t = nullptr;
@@ -1117,4 +1329,4 @@ bool AdjustHeroHitPoints(const void* ent, int delta) {
     return AttrSet(e, hp, delta, &StatsApi::addValue);
 }
 
-}  // namespace og3p
+}   // namespace og3p

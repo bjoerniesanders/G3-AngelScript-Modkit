@@ -1,0 +1,22 @@
+# Stil des OG3-Patches (clang-format). Aufruf: clang-format -i src/*.cpp src/*.h tools/*.cpp tests/*.cpp
+Language: Cpp
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 140
+BreakBeforeBraces: Attach
+AccessModifierOffset: -4
+NamespaceIndentation: None
+PointerAlignment: Left
+# Kurze Funktionen, Schleifen und if-Anweisungen duerfen in einer Zeile stehen (wie bisher im Code)
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Always
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortLambdasOnASingleLine: All
+# Reihenfolge der Includes nicht anfassen (windows.h muss vor anderen Windows-Headern stehen)
+SortIncludes: Never
+# Lange deutsche Kommentare nicht umbrechen
+ReflowComments: false
+SpacesBeforeTrailingComments: 3
+AlignTrailingComments: true

@@ -110,6 +110,8 @@ bool Anlegen() {
 // Ladevorgang des Spiels: Quests/Infos werden aus den ini-Dateien neu aufgebaut. Unsere muessen DANN schon da sein, bevor das Spiel die
 // gespeicherten Daten (Status, Questlog, "Info gegeben") einliest.
 void OnQuestsLoaded() {
+    // Im Hauptmenue ist der Quest-Manager leer (GetQuestCount() = -1, auch die Quests des Spiels fehlen): hier nichts anlegen, das Spiel baut ihn beim Laden neu auf.
+    if (GetQuestCount() < 0) { print("OnQuestsLoaded: Quest-Manager noch nicht lesbar (Hauptmenue), uebersprungen"); return; }
     selbstErzeugt = false;   // neuer Quest-Manager: war die Quest vorher schon da, stammt sie aus dem Archiv
     bool imArchiv = QuestExists(QUEST);
     QuestVorbereiten();

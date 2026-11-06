@@ -1,5 +1,5 @@
 # Aktualisiert die Kopie in graphify-modding aus den Quellen (AngelScript-Teil) und baut den Graphen inkrementell neu:
-#   powershell -NoProfile -File og3-patch	ools\graphify_modding_sync.ps1   (danach im Ordner graphify-modding: /graphify . --update)
+#   powershell -NoProfile -File og3-patch\tools\graphify_modding_sync.ps1   (danach im Ordner graphify-modding: /graphify . --update)
 $src = Split-Path -Parent $PSScriptRoot; $dst = Join-Path $src 'graphify-modding'
 New-Item -ItemType Directory -Force "$dst\src_patch","$dst\mods","$dst\docs" | Out-Null
 Copy-Item "$src\src\*" "$dst\src_patch" -Recurse -Force

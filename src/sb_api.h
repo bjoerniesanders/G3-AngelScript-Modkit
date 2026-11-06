@@ -76,7 +76,7 @@ struct SbApi {
     void(__cdecl* geInfo)(const char*, ...) = nullptr;
 
     HMODULE module = nullptr;
-    std::string missing;   // nicht gefundene Exporte (Leerzeichen-getrennt)
+    std::string missing;                // nicht gefundene Exporte (Leerzeichen-getrennt)
     bool Resolve(HMODULE sharedBase);   // false, wenn bCString-Grundfunktionen fehlen
 };
 extern SbApi g_sb;
@@ -89,21 +89,43 @@ public:
     SStr(const std::string& s) { g_sb.strCtorText(this, s.c_str()); }
     SStr(const SStr& o) { g_sb.strCopy(this, &o); }
     ~SStr() { g_sb.strDtor(this); }
-    SStr& operator=(const SStr& o) { g_sb.strAssign(this, &o); return *this; }
-    SStr& operator+=(const SStr& o) { g_sb.strAddAssign(this, &o); return *this; }
-    const char* c_str() const { const char* t = g_sb.strGetText(this); return t ? t : ""; }
+    SStr& operator=(const SStr& o) {
+        g_sb.strAssign(this, &o);
+        return *this;
+    }
+    SStr& operator+=(const SStr& o) {
+        g_sb.strAddAssign(this, &o);
+        return *this;
+    }
+    const char* c_str() const {
+        const char* t = g_sb.strGetText(this);
+        return t ? t : "";
+    }
     int length() const { return g_sb.strGetLength(this); }
+
 private:
     void* p_;
 };
 static_assert(sizeof(SStr) == 4 || sizeof(void*) == 8, "bCString-Layout");
 
-struct SVec2 { float x, y; };
-struct SVec3 { float x, y, z; };
-struct SVec4 { float x, y, z, w; };
-struct SQuat { float x, y, z, w; };
-struct SMat4 { float m[16]; };   // bCMatrix: zeilenweise (Element i = Zeile i/4, Spalte i%4)
-struct SMat3 { float m[9]; };   // zeilenweise (Element i = Zeile i/3, Spalte i%3)
+struct SVec2 {
+    float x, y;
+};
+struct SVec3 {
+    float x, y, z;
+};
+struct SVec4 {
+    float x, y, z, w;
+};
+struct SQuat {
+    float x, y, z, w;
+};
+struct SMat4 {
+    float m[16];
+};   // bCMatrix: zeilenweise (Element i = Zeile i/4, Spalte i%4)
+struct SMat3 {
+    float m[9];
+};   // zeilenweise (Element i = Zeile i/3, Spalte i%3)
 static_assert(sizeof(SVec3) == 12 && sizeof(SQuat) == 16 && sizeof(SMat3) == 36 && sizeof(SMat4) == 64, "Layouts");
 
-}  // namespace og3p
+}   // namespace og3p

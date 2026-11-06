@@ -15,7 +15,7 @@ Dieselbe Regel gilt für alle Hersteller (Community-Patch, Union Starter, wir):
 | 3 | **`.mod`, `.m00`, `.m01`, ...** | Mods, werden immer geladen |
 | 4 | **`.nod`, `.n00`, ...** | Mods nur bei aktivem „Alternativen Balancing“ |
 
-- Spätere Archive **überschreiben** frühere, auch Dateien des Originals (so beschreibt es die Anleitung des Community-Patches; im Spiel nicht bestätigt, siehe „Grenzen“).
+- Spätere Archive **überschreiben** frühere, auch Dateien des Originals (so beschreibt es die Anleitung des Community-Patches; bei unseren Tests mit Quest-Dateien **nicht** eingetreten, siehe „Grenzen“).
 - Die Nummerierung muss **lückenlos** sein: Die Engine hört bei der ersten fehlenden Nummer auf (`.m00`, `.m02` ohne `.m01` lädt nur `.m00`).
 - Der **Archivname** bestimmt das Volume: `Quests.mod` enthält Dateien wie `G3_World_01/Abbas_Artefakt_quest_G3_World_01.quest`, `Templates.mod` Dateien wie
   `CMB/BodyParts/Male/HERO/CMB_MaleBody.lrtpl`. Pfade im Archiv sind relativ zum Volume.
@@ -89,6 +89,7 @@ Das Format entspricht `G3PakDir`: Kopf mit `G3V0` und `G3PD`, Pfade relativ mit 
 - **Lesen komprimierter Einträge** (`list` zeigt sie, den Inhalt nicht): nötig für `Strings.pak\stringtable.ini`, siehe [Patches](patches.md).
 - **Unsere Datei-Patches kennen die Mod-Schichten noch nicht:** Sie lesen als Basis nur das `.pak`. Hat ein anderes Mod-Archiv (`.mod`, `.m00`, ...) dieselbe Datei ersetzt, patcht der Diff die Fassung aus dem `.pak`.
 - **Im Spiel bestätigt (Stand 2026-11-05):** Eine **neue** Datei aus einem von `og3_packmod` geschriebenen Archiv (`Quests.m00`: die Quest `OG3_Jens_Wolfsfell`) wird gelesen, die Quest kommt aus dem Archiv und läuft durch.
-- **Noch nicht bestätigt:** dass ein Archiv eine **vorhandene** Datei des Spiels überschreibt. Im Test blieb `Agenak_ArenaDefeatDimitar` bei 300 XP, obwohl `Quests.mod` die Datei mit 4242 XP enthielt. Das Dateisystem-Modul (im Differenztest
-  gegen das Original geprüft) lässt das später gemountete Archiv gewinnen; offen ist, ob die Engine `Quests.mod` überhaupt mountet oder ob die Quest-Verwaltung vorhandene Namen auslässt. Ein Gegentest mit `Quests.m01` läuft.
-  Bis dahin: eigene Dateien als **neue Namen** anlegen, vorhandene Dateien des Spiels mit [Datei-Patches](patches.md) ändern.
+- **Bei uns nicht gelungen:** dass ein Archiv eine **vorhandene** Datei des Spiels überschreibt. In zwei Tests (`Quests.mod` und `Quests.m01`, beide mit der Datei `Agenak_ArenaDefeatDimitar`, 4242 XP statt 300) blieb die Quest bei 300 XP, das Original. Warum, ist offen:
+  Das Dateisystem-Modul (im Differenztest gegen das Original geprüft) lässt das später eingehängte Archiv gewinnen, und neue Dateien werden ja gelesen. Möglich ist, dass die Quest-Verwaltung vorhandene Namen auslässt oder dass die Engine Dateien des `.pak` vorrangig liefert.
+  Bis das geklärt ist: eigene Dateien als **neue Namen** anlegen, vorhandene Dateien des Spiels mit [Datei-Patches](patches.md) ändern.
+- **Hauptmenü:** Beim ersten `OnQuestsLoaded` (im Hauptmenü) ist der Quest-Manager leer: `GetQuestCount()` meldet -1 und auch die Quests des Spiels fehlen. Das hat nichts mit dem Archiv zu tun. Skripte legen dann nichts an (Prüfung `GetQuestCount() < 0`); der echte Aufbau folgt beim Laden eines Spielstands.

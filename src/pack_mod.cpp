@@ -17,8 +17,8 @@
 namespace og3p {
 namespace {
 
-constexpr uint32_t kProduct = 0x30563347;      // 'G3V0'
-constexpr uint32_t kReservedG3PD = 0x44503347; // 'G3PD' (G3PakDir >= 0.0.0.9)
+constexpr uint32_t kProduct = 0x30563347;        // 'G3V0'
+constexpr uint32_t kReservedG3PD = 0x44503347;   // 'G3PD' (G3PakDir >= 0.0.0.9)
 constexpr uint32_t kAttrDir = 0x10, kAttrDeleted = 0x8000, kAttrPacked = 0x20000, kAttrStream = 0x40000, kAttrCompressed = 0x800;
 constexpr uint32_t kSettable = 0x1 | 0x2 | 0x4 | 0x20;   // ReadOnly, Hidden, System, Archive: werden aus dem Dateisystem uebernommen
 
@@ -33,7 +33,8 @@ struct Node {
 };
 
 std::string Lower(std::string s) {
-    for (char& c : s) if (c >= 'A' && c <= 'Z') c = char(c + 32);
+    for (char& c : s)
+        if (c >= 'A' && c <= 'Z') c = char(c + 32);
     return s;
 }
 bool EndsWithNoCase(const std::string& s, const char* suffix) {
@@ -41,7 +42,8 @@ bool EndsWithNoCase(const std::string& s, const char* suffix) {
     return s.size() >= n && Lower(s.substr(s.size() - n)) == suffix;
 }
 std::string WinPath(std::string s) {
-    for (char& c : s) if (c == '/') c = '\\';
+    for (char& c : s)
+        if (c == '/') c = '\\';
     return s;
 }
 bool IsDirectory(const std::string& p) {
@@ -55,7 +57,10 @@ bool FileExists(const std::string& p) {
 
 // rel = Pfad des Ordners im Archiv ("" oder "A/B/")
 bool Scan(const std::string& root, const std::string& rel, const PackOptions& o, Node* parent, std::string* err, int depth) {
-    if (depth > 64) { *err = "Ordner zu tief verschachtelt: " + rel; return false; }
+    if (depth > 64) {
+        *err = "Ordner zu tief verschachtelt: " + rel;
+        return false;
+    }
     const std::string dir = rel.empty() ? root : root + "\\" + WinPath(rel.substr(0, rel.size() - 1));
     WIN32_FIND_DATAA fd;
     HANDLE h = FindFirstFileA((dir + "\\*").c_str(), &fd);
@@ -73,14 +78,21 @@ bool Scan(const std::string& root, const std::string& rel, const PackOptions& o,
             Node d;
             d.name = rel + n + "/";
             d.attr = kAttrDir;
-            d.c = fd.ftCreationTime; d.a = fd.ftLastAccessTime; d.w = fd.ftLastWriteTime;
-            if (!Scan(root, d.name, o, &d, err, depth + 1)) { ok = false; break; }
+            d.c = fd.ftCreationTime;
+            d.a = fd.ftLastAccessTime;
+            d.w = fd.ftLastWriteTime;
+            if (!Scan(root, d.name, o, &d, err, depth + 1)) {
+                ok = false;
+                break;
+            }
             parent->dirs.push_back(std::move(d));
         } else {
             if (Lower(n) == "desktop.ini") continue;
             Node f;
             f.path = dir + "\\" + n;
-            f.c = fd.ftCreationTime; f.a = fd.ftLastAccessTime; f.w = fd.ftLastWriteTime;
+            f.c = fd.ftCreationTime;
+            f.a = fd.ftLastAccessTime;
+            f.w = fd.ftLastWriteTime;
             f.size = (uint64_t(fd.nFileSizeHigh) << 32) | fd.nFileSizeLow;
             f.attr = fd.dwFileAttributes & kSettable;
             if (o.deletions && EndsWithNoCase(n, ".deleted") && n.size() > 8) {
@@ -117,23 +129,34 @@ struct Writer {
     void U64(uint64_t v) { Raw(&v, 8); }
     void Str(const std::string& s) {
         U32(uint32_t(s.size()));
-        if (!s.empty()) { info.append(s); info.push_back('\0'); }
+        if (!s.empty()) {
+            info.append(s);
+            info.push_back('\0');
+        }
     }
     void Header(const Node& n, uint32_t attr) {
-        Raw(&n.c, 8); Raw(&n.a, 8); Raw(&n.w, 8);
-        U64(0);                      // FileSizeHigh/Low (G3PakDir schreibt Null)
+        Raw(&n.c, 8);
+        Raw(&n.a, 8);
+        Raw(&n.w, 8);
+        U64(0);   // FileSizeHigh/Low (G3PakDir schreibt Null)
         U32(attr | kAttrPacked);
     }
     bool CopyFile(const Node& f) {
         FILE* in = nullptr;
-        if (fopen_s(&in, f.path.c_str(), "rb") != 0 || !in) { err = "Datei nicht lesbar: " + f.path; return false; }
+        if (fopen_s(&in, f.path.c_str(), "rb") != 0 || !in) {
+            err = "Datei nicht lesbar: " + f.path;
+            return false;
+        }
         char buf[1 << 16];
         uint64_t left = f.size;
         bool ok = true;
         while (left > 0) {
             const size_t want = size_t(std::min<uint64_t>(left, sizeof buf));
             const size_t got = std::fread(buf, 1, want, in);
-            if (got != want || std::fwrite(buf, 1, got, data) != got) { ok = false; break; }
+            if (got != want || std::fwrite(buf, 1, got, data) != got) {
+                ok = false;
+                break;
+            }
             left -= got;
         }
         std::fclose(in);
@@ -146,9 +169,13 @@ struct Writer {
             Header(n, kAttrDir);
             Str(root ? std::string() : n.name);
             U32(uint32_t(n.dirs.size()));
-            for (const Node& d : n.dirs) { if (!Save(d, false)) return false; ++st->dirs; }
+            for (const Node& d : n.dirs) {
+                if (!Save(d, false)) return false;
+                ++st->dirs;
+            }
             U32(uint32_t(n.files.size()));
-            for (const Node& f : n.files) if (!Save(f, false)) return false;
+            for (const Node& f : n.files)
+                if (!Save(f, false)) return false;
             return true;
         }
         Header(n, n.attr);
@@ -162,9 +189,11 @@ struct Writer {
             st->bytes += n.size;
             ++st->files;
         }
-        U64(off); U64(bytes); U64(size);
-        U32(0);                                  // Verschluesselung: keine
-        U32(0);                                  // Komprimierung: gespeichert
+        U64(off);
+        U64(bytes);
+        U64(size);
+        U32(0);   // Verschluesselung: keine
+        U32(0);   // Komprimierung: gespeichert
         Str(n.name);
         Str(opt->comments && !n.deleted ? n.path : std::string());
         return true;
@@ -176,7 +205,7 @@ bool Fail(PackStats* st, const std::string& msg) {
     return false;
 }
 
-}  // namespace
+}   // namespace
 
 bool PackFolder(const std::string& srcDirIn, const std::string& outFile, const PackOptions& opt, PackStats* statsOut) {
     PackStats local;
@@ -196,7 +225,13 @@ bool PackFolder(const std::string& srcDirIn, const std::string& outFile, const P
     if (!Scan(src, std::string(), opt, &root, &err, 0)) return Fail(st, err);
 
     // leerer Baum: nichts zu packen
-    struct Count { static size_t Files(const Node& n) { size_t c = n.files.size(); for (const Node& d : n.dirs) c += Files(d); return c; } };
+    struct Count {
+        static size_t Files(const Node& n) {
+            size_t c = n.files.size();
+            for (const Node& d : n.dirs) c += Files(d);
+            return c;
+        }
+    };
     if (Count::Files(root) == 0) return Fail(st, "Der Ordner enthaelt keine Dateien: " + src);
 
     const std::string tmp = outFile + ".tmp";
@@ -217,18 +252,30 @@ bool PackFolder(const std::string& srcDirIn, const std::string& outFile, const P
         const uint32_t zero = 0;
         ok = std::fwrite(w.info.data(), 1, w.info.size(), f) == w.info.size() && std::fwrite(&zero, 4, 1, f) == 1;
         if (ok) {
-            hdr[0] = 0; hdr[1] = kProduct; hdr[2] = 0; hdr[3] = 0;
-            hdr[4] = 0;                                   // Komprimierung: keine
+            hdr[0] = 0;
+            hdr[1] = kProduct;
+            hdr[2] = 0;
+            hdr[3] = 0;
+            hdr[4] = 0;   // Komprimierung: keine
             hdr[5] = kReservedG3PD;
-            hdr[6] = uint32_t(infoOff); hdr[7] = uint32_t(infoOff >> 32);
-            hdr[8] = uint32_t(infoOff); hdr[9] = uint32_t(infoOff >> 32);
-            hdr[10] = uint32_t(volOff); hdr[11] = uint32_t(volOff >> 32);
+            hdr[6] = uint32_t(infoOff);
+            hdr[7] = uint32_t(infoOff >> 32);
+            hdr[8] = uint32_t(infoOff);
+            hdr[9] = uint32_t(infoOff >> 32);
+            hdr[10] = uint32_t(volOff);
+            hdr[11] = uint32_t(volOff >> 32);
             ok = std::fseek(f, 0, SEEK_SET) == 0 && std::fwrite(hdr, 4, 12, f) == 12;
         }
         if (!ok) err = "Schreibfehler";
     }
-    if (std::fclose(f) != 0 && ok) { ok = false; err = "Schreibfehler beim Schliessen"; }
-    if (!ok) { DeleteFileA(tmp.c_str()); return Fail(st, err); }
+    if (std::fclose(f) != 0 && ok) {
+        ok = false;
+        err = "Schreibfehler beim Schliessen";
+    }
+    if (!ok) {
+        DeleteFileA(tmp.c_str());
+        return Fail(st, err);
+    }
     if (!MoveFileExA(tmp.c_str(), outFile.c_str(), MOVEFILE_REPLACE_EXISTING)) {
         DeleteFileA(tmp.c_str());
         return Fail(st, "Zieldatei nicht ersetzbar: " + outFile);
@@ -252,13 +299,20 @@ std::string NextGenerationFile(const std::string& dataDir, const std::string& vo
     return std::string();
 }
 
-std::string PackMod(const std::string& srcDir, const std::string& dataDir, const std::string& volume, char kind, const PackOptions& opt, PackStats* stats) {
+std::string PackMod(const std::string& srcDir, const std::string& dataDir, const std::string& volume, char kind, const PackOptions& opt,
+                    PackStats* stats) {
     PackStats local;
     PackStats* st = stats ? stats : &local;
     *st = PackStats();
-    if (!IsDirectory(dataDir)) { st->error = "Data-Ordner nicht gefunden: " + dataDir; return std::string(); }
+    if (!IsDirectory(dataDir)) {
+        st->error = "Data-Ordner nicht gefunden: " + dataDir;
+        return std::string();
+    }
     const std::string out = NextGenerationFile(dataDir, volume, kind);
-    if (out.empty()) { st->error = "Kein freier Platz fuer '" + volume + "' (ungueltiger Name oder alle Generationen belegt)"; return std::string(); }
+    if (out.empty()) {
+        st->error = "Kein freier Platz fuer '" + volume + "' (ungueltiger Name oder alle Generationen belegt)";
+        return std::string();
+    }
     return PackFolder(srcDir, out, opt, st) ? out : std::string();
 }
 
@@ -268,25 +322,49 @@ struct Meta {
     std::string m;
     size_t pos = 0;
     bool bad = false;
-    uint32_t U32() { uint32_t v = 0; if (pos + 4 <= m.size()) std::memcpy(&v, &m[pos], 4); else bad = true; pos += 4; return v; }
-    uint64_t U64() { uint64_t v = 0; if (pos + 8 <= m.size()) std::memcpy(&v, &m[pos], 8); else bad = true; pos += 8; return v; }
+    uint32_t U32() {
+        uint32_t v = 0;
+        if (pos + 4 <= m.size())
+            std::memcpy(&v, &m[pos], 4);
+        else
+            bad = true;
+        pos += 4;
+        return v;
+    }
+    uint64_t U64() {
+        uint64_t v = 0;
+        if (pos + 8 <= m.size())
+            std::memcpy(&v, &m[pos], 8);
+        else
+            bad = true;
+        pos += 8;
+        return v;
+    }
     std::string Str() {
         const uint32_t n = U32();
         std::string s;
-        if (pos + n <= m.size() && n < (1u << 20)) s.assign(&m[pos], n); else bad = true;
+        if (pos + n <= m.size() && n < (1u << 20))
+            s.assign(&m[pos], n);
+        else
+            bad = true;
         pos += n;
         if (n) pos += 1;
         return s;
     }
     void Rec(int depth, std::vector<ArchiveEntry>* out) {
-        if (depth > 64 || bad || pos + 0x24 > m.size()) { bad = true; return; }
+        if (depth > 64 || bad || pos + 0x24 > m.size()) {
+            bad = true;
+            return;
+        }
         uint32_t h[9];
         std::memcpy(h, &m[pos], 0x24);
         pos += 0x24;
         ArchiveEntry e;
         e.attrs = h[8];
         if (!(h[8] & kAttrDir)) {
-            e.offset = U64(); e.stored = U64(); e.size = U64();
+            e.offset = U64();
+            e.stored = U64();
+            e.size = U64();
             U32();
             const uint32_t comp = U32();
             e.compressed = comp != 0;
@@ -306,12 +384,15 @@ struct Meta {
         }
     }
 };
-}  // namespace
+}   // namespace
 
 bool ListArchive(const std::string& file, std::vector<ArchiveEntry>* out, std::string* error) {
     out->clear();
     FILE* f = nullptr;
-    if (fopen_s(&f, file.c_str(), "rb") != 0 || !f) { if (error) *error = "Datei nicht lesbar: " + file; return false; }
+    if (fopen_s(&f, file.c_str(), "rb") != 0 || !f) {
+        if (error) *error = "Datei nicht lesbar: " + file;
+        return false;
+    }
     uint32_t h[12];
     bool ok = std::fread(h, 4, 12, f) == 12 && h[1] == kProduct;
     int64_t size = 0;
@@ -328,9 +409,15 @@ bool ListArchive(const std::string& file, std::vector<ArchiveEntry>* out, std::s
         }
     }
     std::fclose(f);
-    if (!ok) { if (error) *error = "Kein G3V0-Archiv: " + file; return false; }
+    if (!ok) {
+        if (error) *error = "Kein G3V0-Archiv: " + file;
+        return false;
+    }
     meta.Rec(0, out);
-    if (meta.bad) { if (error) *error = "Verzeichnis beschaedigt: " + file; return false; }
+    if (meta.bad) {
+        if (error) *error = "Verzeichnis beschaedigt: " + file;
+        return false;
+    }
     if (!out->empty()) out->erase(out->begin());   // Wurzel (leerer Name)
     return true;
 }
@@ -346,4 +433,4 @@ bool ReadArchiveEntry(const std::string& file, const ArchiveEntry& e, std::strin
     return ok;
 }
 
-}  // namespace og3p
+}   // namespace og3p
