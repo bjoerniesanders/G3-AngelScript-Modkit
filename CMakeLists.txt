@@ -73,3 +73,11 @@ add_executable(og3_packmod tools/packmod_main.cpp src/pack_mod.cpp)
 foreach(t og3_patch og3_patch_test og3_packmod)
     set_target_properties(${t} PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/patch)
 endforeach()
+
+# Schlanker Loader: Ersatz-dbghelp.dll, die og3_patch.dll laedt (eigenstaendig, ohne den Proxy des Hauptrepos). Ausgabe: build32/loader/dbghelp.dll
+add_library(og3_loader SHARED src/loader/loader.cpp src/loader/loader.def)
+set_target_properties(og3_loader PROPERTIES OUTPUT_NAME dbghelp MSVC_RUNTIME_LIBRARY MultiThreaded
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/loader RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/loader
+    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/loader)
+add_executable(og3_loader_test tests/loader_test.cpp)
+set_target_properties(og3_loader_test PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/patch)

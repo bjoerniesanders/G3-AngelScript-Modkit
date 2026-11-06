@@ -199,12 +199,65 @@ void* SlotItem(void* ent, int slot) {
         return ps ? g_stackFromSlot(ps, slot) : nullptr;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-// Waffe, die der Angreifer fuehrt: rechte Hand (Nahkampf; bei Tieren das Item "Fist"), sonst linke Hand (Bogen). Gemessen 2026-11-06: gezogene Waffe liegt in
-// der rechten Hand, der gezogene Bogen in der linken, der weggesteckte im Slot Bogen (7).
+// Name eines Entity in einen Puffer kopieren (SEH: keine C++-Objekte mit Destruktor in dieser Funktion)
+typedef const void*(__thiscall* FnEntName)(const void*);
+FnEntName g_entName = nullptr;
+bool EntNameBuf(const void* ent, char* buf, size_t n) {
+    buf[0] = 0;
+    if (!ent || !g_entName || !ReadableMem(ent, 0x20)) return false;
+    __try {
+        const char* t = g_sb.strGetText(g_entName(ent));
+        if (!t) return false;
+        size_t i = 0;
+        for (; i + 1 < n && t[i]; ++i) buf[i] = t[i];
+        buf[i] = 0;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        buf[0] = 0;
+        return false;
+    }
+}
+bool NameHasBow(const void* ent) {   // Bogen/Armbrust: Name enthaelt "bow" (It_Bow_Ranger, ...Crossbow...); Zauber ("It_Spell_*") und Nahkampfwaffen nicht
+    char nm[64];
+    if (!EntNameBuf(ent, nm, sizeof nm)) return false;
+    for (char* p = nm; *p; ++p) *p = static_cast<char>(tolower(static_cast<unsigned char>(*p)));
+    return std::strstr(nm, "bow") != nullptr;
+}
+// Was der Angreifer dem Opfer "ins Feld fuehrt" (inflictor, beim Helden als Opfer): Nahkampf = die Waffe in der rechten Hand (bei Tieren das Item "Fist"), Zauber = das
+// Zauber-Item. Fernkampf = ein Bogen in der linken Hand: dann das Geschoss, also das Munitions-Item (Slot 14, "Arrow"), damit der Held wie ein NPC-Opfer (dort liefert
+// die Engine das Geschoss) den Pfeil als inflictor bekommt; ohne Munitions-Item der Bogen. Gemessen 2026-11-06: gezogene Waffe rechte Hand, gezogener Bogen linke Hand,
+// weggesteckter Bogen Slot 7. Hinweis: das Munitions-Item ist der Pfeil im Koecher, nicht das fliegende Geschoss (gleicher Name, anderes Entity).
 void* HeldWeapon(void* owner) {
     if (!owner) return nullptr;
-    void* w = SlotItem(owner, 1);
-    return w ? w : SlotItem(owner, 2);
+    if (void* w = SlotItem(owner, 1)) return w;
+    void* w = SlotItem(owner, 2);
+    if (w && NameHasBow(w)) {
+        if (void* ammo = SlotItem(owner, 14)) return ammo;
+    }
+    return w;
+}
+
+// Art des Treffers (gEDamageType: 1 Impact, 2 Blade, 3 Missile, 4 Fire, 5 Ice, 6 Lightning, 7 Physics) aus dem angreifenden Item: gCDamage_PS (eEPropertySetType_Damage = 51)
+// des Inflictors, Zugriff ueber gCDamage_PS::AccessDamageType (Container: 4 Byte Kopf, dann der Wert; aus dem Assembler: Container bei this+0x14, Wert bei +0x18).
+// Der Wert im Schadensempfaenger des Opfers (frueher als "type" gemeldet) ist dagegen eine Eigenschaft des Opfers und war bei NPCs immer 2.
+typedef void*(__thiscall* FnDmgTypeAcc)(void*);
+FnDmgTypeAcc g_dmgTypeAcc = nullptr;
+bool SafeDamageType(void* ent, int* out) {
+    if (!ent || !g_getPS || !g_dmgTypeAcc || !ReadableMem(ent, 8)) return false;
+    __try {
+        void* ps = g_getPS(ent, 51);
+        if (!ps) return false;
+        void* c = g_dmgTypeAcc(ps);
+        if (!c) return false;
+        *out = *reinterpret_cast<int*>(static_cast<char*>(c) + 4);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+int HitDamageType(void* inflictor, int fallback) {
+    int t = 0;
+    // Gemessen 2026-11-06: Keule 1 (Impact), Schwert/Hellebarde/Speer 2 (Blade), Pfeil 3 (Missile, auch das Munitions-Item), Mis_Fireball 4 (Fire). Nicht lesbar: kein Inflictor
+    // und das Zauber-Item in der Hand des Zaubernden (It_Spell_*), dann gilt der Rueckfall.
+    return SafeDamageType(inflictor, &t) && t >= 0 && t <= 7 ? t : fallback;
 }
 
 // Wahrer Verursacher eines Treffers (API 25, Parameter "owner"): ist der Verursacher (Waffe/Geschoss/Zauber) selbst ein NPC, dieser; sonst der aktuelle Gegner
@@ -258,7 +311,7 @@ void __fastcall HSetHP(void* self, void*, const long* v) {
     void* victim = SafeCall0(g_psEntity, self);
     void* attacker = SafeCall0(g_proxyEntity, ps + 0x38);
     const long amount = alt - neu;
-    const int type = *reinterpret_cast<int*>(ps + 0x30);
+    const int type = HitDamageType(attacker, *reinterpret_cast<int*>(ps + 0x30));   // Art aus dem angreifenden Item, sonst der Wert des Schadensempfaengers
     bool called = false;
     g_inDamage = true;
     DamageDispatch(
@@ -328,10 +381,11 @@ bool __fastcall HPMSetBase(void* self, void*, const void* tag, int v) {
     if (!hero || !IsPlayerEntity(hero)) return o_pmSetBase(self, tag, v);
     const int amount = alt - v;
     void* owner = IsScriptNested() ? nullptr : DamageOwner(hero, nullptr);
+    void* weapon = HeldWeapon(owner);
     bool res = true, called = false;
     g_inDamage = true;
     DamageDispatch(
-        hero, HeldWeapon(owner), owner, amount, 0,
+        hero, weapon, owner, amount, HitDamageType(weapon, 0),
         [&](int m) {
             int neu = m == amount ? v : alt - m;
             if (neu < 0) neu = 0;
@@ -560,6 +614,8 @@ int InstallGameHooks(ScriptHost& host) {
         g_lastAtk = reinterpret_cast<FnGetRef>(GetProcAddress(game, "?GetLastAttackerEntity@gCNPC_PS@@QBEABVeCEntityProxy@@XZ"));
         g_curAtk = reinterpret_cast<FnGetRef>(GetProcAddress(game, "?GetCurrentAttackerEntity@gCNPC_PS@@QBEABVeCEntityProxy@@XZ"));
         g_pmGetBase = reinterpret_cast<FnPMGetBase>(GetProcAddress(game, "?GetBaseValue@gCPlayerMemory_PS@@QBEHABVbCString@@@Z"));
+        g_dmgTypeAcc = reinterpret_cast<FnDmgTypeAcc>(GetProcAddress(game, "?AccessDamageType@gCDamage_PS@@QAEAAV?$bTPropertyContainer@W4gEDamageType@@@@XZ"));
+        g_entName = reinterpret_cast<FnEntName>(GetProcAddress(eng, "?GetName@eCEntity@@QBEABVbCString@@XZ"));
         g_stackFromSlot = reinterpret_cast<FnStackFromSlot>(GetProcAddress(game, "?GetStackFromSlot@gCInventory_PS@@QBEPAVeCEntity@@W4gESlot@@@Z"));
     }
     n += Hook(game, "?SetHitPoints@gCDamageReceiver_PS@@QAEXABJ@Z", reinterpret_cast<void*>(&HSetHP), reinterpret_cast<void**>(&o_setHP),
