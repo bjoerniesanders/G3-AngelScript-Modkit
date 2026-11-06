@@ -29,6 +29,9 @@ struct EvArg {
     static EvArg U(unsigned v) { return {UInt, nullptr, v}; }
 };
 
+void SetPrintToGameLog(bool on);   // ini [patch] printgame
+void SetLoadDefaultOffMods(bool on);   // auch Mods mit mod.ini enabled=0 laden (Testprogramm)
+
 class ScriptHost {
 public:
     using LogFn = std::function<void(const std::string&)>;
@@ -147,6 +150,7 @@ bool IsPlayerEntity(const void* p);
 void* CurrentAttackerOf(void* ent);
 // Item (eCEntity*) im Ausruestungs-Slot eines Entity oder nullptr (game_hooks.cpp)
 void* SlotItemOf(void* ent, int slot);
+void SetScriptHurt(bool on);   // HurtHitPoints: der Schaden-Hook meldet den naechsten Abzug ohne Angreifer
 bool AdjustHeroHitPoints(const void* ent, int delta);
 
 // Spielereignisse (game_hooks.cpp): Hooks auf Game.dll einhaengen; Rueckgabe = Zahl aktiver Hooks

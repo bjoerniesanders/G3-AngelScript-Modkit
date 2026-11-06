@@ -2,6 +2,8 @@
 
 Die fertigen Mods liegen im Repository unter `examples/mods/` und werden mit `tools/install_patch.ps1` bzw. durch Kopieren nach `<Gothic 3>\og3\mods\` benutzt.
 
+**Alle Beispiele sind standardmäßig aus** (`mod.ini` mit `[mod] enabled=0` im Mod-Ordner). Zum Testen einen Mod in `og3\mods\load_order.txt` mit `+Name` zuschalten, z. B. `+lifesteal_demo`. Ein Spielstand, der mit einem Mod gespeichert wurde, braucht ihn beim Laden unter Umständen weiter (z. B. `perk_lifesteal`, siehe [Einschränkungen](limitations.md)).
+
 ## 1. Protokoll aller Ereignisse (`ereignisse`)
 
 Zeigt, was das Spiel meldet. Gut, um Namen von NPCs, Items und Zaubern herauszufinden.
@@ -115,9 +117,15 @@ bzw. links). Schlägt der Held mit einer so markierten Waffe in der Hand zu, bek
 Zeigt `OnDamage` mit `owner` und `inflictor`, Qualität pro Slot lesen und setzen, einen eigenen Text über die Mod-Stringtabelle und einen Eingriff im Kampf. Der angerichtete Schaden ist die Menge von
 `OnDamage`, bei einem tödlichen Treffer also nur der Rest der Lebenspunkte des Opfers. Abschalten mit `-lifesteal_demo` in `load_order.txt`.
 
+## 8. Talent mit Kachel und Heilung (`perk_lifesteal`) und Klaue Beliars (`beliars_klaue`)
+
+`perk_lifesteal` baut ein eigenes Bonustalent „Lebensraub“ für den Orkschlächter (Talent-Vorlage klonen, Lern-Item klonen und per `SetTemplateRef` verweisen, Stapel dem Helden geben, `ActivateSkill2` der Waffe setzen) samt Kachel im Charakterbogen und Heilung in `OnDamage`. Schalter `ENTFERNEN` nimmt den Stapel vor dem Abschalten der Mod wieder heraus (sonst Absturz im Charakterbogen), siehe [Einschränkungen](limitations.md).
+
+`beliars_klaue` löst bei einem **starken** Treffer mit dem Orkschlächter (mindestens `MIN_TREFFER` = 55 Schaden) gegen einen **Gegner** (Haltung `AttitudeToPlayer2` feindlich oder Raubtier, bei Tieren auch verärgert) mit `CHANCE_PROZENT` = 30 % Chance einen Blitz aus: `Smn_Lightning` am Opfer erzeugen, den Helden mit `SetEntityRef(..., "gCInteraction_PS", "Owner", hero)` als Besitzer eintragen (nur dann läuft der Schaden durch die echte Kette: Quelle `Smn_Lightning`, Besitzer Held, Art 6) und den Blitz mit `StartEffect("eff_magic_summonlightning_target_01", opfer)` sichtbar machen. Gemessen: Der Blitz macht 17 bis über 500 Schaden (das Skript `ZS_Lightning` rechnet selbst) und kann Umstehende treffen. Zwischen zwei Blitzen liegen mindestens 4 Sekunden.
+
 ## Tastenbelegung der Beispiel-Mods
 
-Die Mods teilen sich die Tasten, ohne sich zu überschneiden. **Nicht benutzt werden Tasten, die das Spiel selbst belegt:** Numblock 7, 8, 9 (Debug-Zähler), F1 bis F4, F6 bis F9 (Zeitlupe, Spieler zurücksetzen, Schnellladen) und F12,
+Die Mods werden einzeln zum Testen zugeschaltet; einige teilen sich Tasten (`spawn_demo` mit `lifesteal_demo` bei `*` und mit `reference_dump` bei `/`), dann nicht beide gleichzeitig zuschalten. **Nicht benutzt werden Tasten, die das Spiel selbst belegt:** Numblock 7, 8, 9 (Debug-Zähler), F1 bis F4, F6 bis F9 (Zeitlupe, Spieler zurücksetzen, Schnellladen) und F12,
 dazu Strg+Numblock 1-6. Frei sind außerdem Pos1, Bild hoch/runter, Einfg, Entf und die Rollen-Taste (ohne Strg). Pause fehlt auf vielen Tastaturen; Ende und Strg+Ende kamen im Test nicht beim Skript an (im Protokoll stand stattdessen Tastencode 3, Ursache nicht geklärt) und werden nicht benutzt.
 
 | Mod | Tasten |
@@ -130,6 +138,7 @@ dazu Strg+Numblock 1-6. Frei sind außerdem Pos1, Bild hoch/runter, Einfg, Entf 
 | `property_inspect` | Strg + Ziffernblock / (Eigenschaften des Items in der Hand oder unter dem Fadenkreuz ins Protokoll) |
 | `reference_dump` | Ziffernblock / (Referenz-Dump ins Protokoll) |
 | `lifesteal_demo` | Ziffernblock \* (Lebensraub an der geführten Waffe umschalten) |
+| `blitz_test` | Strg + Ziffernblock - (Blitz auf den anvisierten NPC, Messmod) |
 | `examples/scripts/main.as` | F10, F11 |
 | `index.md` Schnellstart | Rollen-Taste |
 
@@ -138,4 +147,4 @@ dazu Strg+Numblock 1-6. Frei sind außerdem Pos1, Bild hoch/runter, Einfg, Entf 
 - Zuerst mit `print()` herausfinden, welche Namen das Spiel verwendet, dann die Namen im Mod fest eintragen.
 - Eigene Mods klein anfangen und ein Ereignis nach dem anderen hinzufügen. Hot-Reload macht das schnell: speichern, 1 Sekunde warten, testen.
 - Ziffernblock-Tasten als Test-Auslöser verwenden, sie sind im Spiel unbelegt.
-- Mod abschalten: `-Name` in `og3\mods\load_order.txt`.
+- Mod abschalten: `-Name` in `og3\mods\load_order.txt`; Beispiel-Mods zuschalten: `+Name`.

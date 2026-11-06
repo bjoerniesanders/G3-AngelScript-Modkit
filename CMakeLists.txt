@@ -52,7 +52,9 @@ list(APPEND OG3_AS_SRCS ${OG3_AS_DIR}/add_on/scriptbuilder/scriptbuilder.cpp ${O
                         ${OG3_AS_DIR}/add_on/scriptmath/scriptmath.cpp)
 add_library(og3_angelscript STATIC ${OG3_AS_SRCS})
 target_include_directories(og3_angelscript PUBLIC ${OG3_AS_DIR}/angelscript/include ${OG3_AS_DIR}/add_on)
-target_compile_definitions(og3_angelscript PRIVATE _CRT_SECURE_NO_WARNINGS)
+# CLEAR_FPU_STACK=emms: AngelScript setzt vor jedem C++-Aufruf sonst per fninit das x87-Steuerwort zurueck (037F statt Genome 007F = 24 Bit).
+# Folge war: verwaschene Gebaeude-Texturen nach dem Laden (gefunden 2026-11-06). emms leert nur den FPU-Stapel und laesst das Steuerwort stehen.
+target_compile_definitions(og3_angelscript PRIVATE _CRT_SECURE_NO_WARNINGS CLEAR_FPU_STACK=emms)
 set_target_properties(og3_angelscript PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded)
 
 enable_language(C)

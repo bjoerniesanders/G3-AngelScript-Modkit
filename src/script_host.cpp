@@ -305,9 +305,10 @@ SQuat M4Quaternion(const SMat4& m) {
 }
 
 // ---------------------------------------------------------------- globale Funktionen
+bool g_printToGameLog = true;   // ini [patch] printgame=0: print() schreibt nur ins eigene Protokoll, nicht zusaetzlich ins Spielprotokoll (geInfo)
 void Print(const SStr& s) {
     if (ScriptHost::s_current) ScriptHost::s_current->Log(std::string("[") + ScriptHost::s_current->CurrentMod() + "] " + s.c_str());
-    if (g_sb.geInfo) g_sb.geInfo("og3-Skript: %s", s.c_str());
+    if (g_printToGameLog && g_sb.geInfo) g_sb.geInfo("og3-Skript: %s", s.c_str());
 }
 SStr ToStringInt(int v) {
     char b[32];
@@ -593,6 +594,8 @@ unsigned long long FileTime(const std::string& p) {
 
 }   // namespace
 
+void SetPrintToGameLog(bool on) { g_printToGameLog = on; }
+
 HWND GameWindow() { return FindGameWindow(); }
 
 bool ReadableMem(const void* p, size_t n) {
@@ -721,8 +724,52 @@ bool ScriptHost::Load(const std::string& path) {
     return AddScript("main", path);
 }
 
+// Gleitkomma-Zustand der Engine schuetzen (gefunden 2026-11-06): Genome rechnet mit x87-Steuerwort 007F (24 Bit Genauigkeit, bCFPUAdmin). Beim ersten Skriptaufruf,
+// der in C++ springt, setzt etwas im Patch die x87-Einheit auf den Windows-Standard 037F (64 Bit) zurueck. Ohne Schutz rechnete die Engine danach die ganze Sitzung
+// mit falscher Genauigkeit weiter: Gebaeude-Texturen blieben nach dem Laden verwaschen. Jeder Skriptaufruf stellt deshalb x87-Steuerwort und MXCSR danach wieder her.
+namespace {
+unsigned short FpuControlWord() {
+    unsigned short cw;
+    __asm fnstcw cw
+    return cw;
+}
+void FpuLoadControlWord(unsigned short cw) { __asm fldcw cw }
+unsigned FpuMxcsr() {
+    unsigned v;
+    __asm stmxcsr v
+    return v;
+}
+void FpuLoadMxcsr(unsigned v) { __asm ldmxcsr v }
+struct FpuRestore {
+    ScriptHost* host;
+    const asIScriptFunction* fn;
+    unsigned short cw;
+    unsigned mx;
+    FpuRestore(ScriptHost* h, const asIScriptFunction* f) : host(h), fn(f), cw(FpuControlWord()), mx(FpuMxcsr()) {}
+    ~FpuRestore() {
+        // MXCSR-Bits 0-5 sind Merkbits fuer Ausnahmen, die normale Rechnungen setzen (z. B. "ungenau"): nur die Steuerbits vergleichen und zuruecksetzen
+        const unsigned kFlags = 0x3F;
+        const unsigned short cw2 = FpuControlWord();
+        const unsigned mx2 = FpuMxcsr();
+        const bool cwChanged = cw2 != cw, mxChanged = (mx2 & ~kFlags) != (mx & ~kFlags);
+        if (!cwChanged && !mxChanged) return;
+        if (cwChanged) FpuLoadControlWord(cw);
+        if (mxChanged) FpuLoadMxcsr((mx & ~kFlags) | (mx2 & kFlags));
+        static int reported = 0;
+        if (reported < 8 && host) {
+            ++reported;
+            char b[300];
+            std::snprintf(b, sizeof b, "Gleitkomma-Zustand nach %s wiederhergestellt (x87 %04X -> %04X, MXCSR %08X -> %08X)", fn ? fn->GetDeclaration() : "?", cw, cw2, mx,
+                          mx2);
+            host->Log(b);
+        }
+    }
+};
+}   // namespace
+
 bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const bool* argBool, const EvArg* ev, int nev, bool* retBool) {
     asIScriptFunction* f = static_cast<asIScriptFunction*>(fp);
+    FpuRestore fpu(this, f);
     const bool nested = ctx_->GetState() == asEXECUTION_ACTIVE;   // Ereignis feuert, waehrend ein Skript laeuft
     if (nested && ctx_->PushState() < 0) return false;
     struct Pop {
@@ -922,8 +969,12 @@ static std::string ModStringTablePath(const std::string& modBase) {
 }
 
 // Mod-Namen in Ladereihenfolge (load_order.txt, dann alphabetisch), abgeschaltete weggelassen
+// Beispiel- und Test-Mods sind standardmaessig aus: <Mod>\mod.ini mit [mod] enabled=0. Sie werden nur geladen, wenn load_order.txt sie mit "+name"
+// zuschaltet. Mods ohne mod.ini (oder mit enabled=1) laden wie bisher, ausser "-name" schaltet sie ab. Das Testprogramm laedt alle (SetLoadDefaultOffMods).
+static bool g_loadDefaultOff = false;
+void SetLoadDefaultOffMods(bool on) { g_loadDefaultOff = on; }
 static std::vector<std::string> DiscoverMods(const std::string& dir, bool withPatchOnly = false, bool withStrings = false) {
-    std::vector<std::string> found, order, off, result;
+    std::vector<std::string> found, order, off, on, defaultOff, result;
     WIN32_FIND_DATAA fd;
     HANDLE h = FindFirstFileA((dir + "\\*").c_str(), &fd);
     if (h != INVALID_HANDLE_VALUE) {
@@ -933,8 +984,10 @@ static std::vector<std::string> DiscoverMods(const std::string& dir, bool withPa
             const DWORD pa = withPatchOnly ? GetFileAttributesA((base + "\\ScriptPatches").c_str())
                                            : INVALID_FILE_ATTRIBUTES;   // Mod nur mit Datei-Patches, ohne Skript
             if (FileTime(base + "\\main.as") || (pa != INVALID_FILE_ATTRIBUTES && (pa & FILE_ATTRIBUTE_DIRECTORY)) ||
-                (withStrings && !ModStringTablePath(base).empty()))
+                (withStrings && !ModStringTablePath(base).empty())) {
                 found.push_back(fd.cFileName);
+                if (GetPrivateProfileIntA("mod", "enabled", 1, (base + "\\mod.ini").c_str()) == 0) defaultOff.push_back(fd.cFileName);
+            }
         } while (FindNextFileA(h, &fd));
         FindClose(h);
     }
@@ -951,7 +1004,10 @@ static std::vector<std::string> DiscoverMods(const std::string& dir, bool withPa
             t = t.substr(b);
             if (t[0] == '-')
                 off.push_back(t.substr(1));
-            else
+            else if (t[0] == '+') {
+                on.push_back(t.substr(1));
+                order.push_back(t.substr(1));
+            } else
                 order.push_back(t);
         }
         std::fclose(f);
@@ -961,10 +1017,11 @@ static std::vector<std::string> DiscoverMods(const std::string& dir, bool withPa
             if (_stricmp(x.c_str(), n.c_str()) == 0) return true;
         return false;
     };
+    auto enabled = [&](const std::string& n) { return !has(off, n) && (g_loadDefaultOff || !has(defaultOff, n) || has(on, n)); };
     for (const std::string& n : order)
-        if (has(found, n) && !has(off, n) && !has(result, n)) result.push_back(n);
+        if (has(found, n) && enabled(n) && !has(result, n)) result.push_back(n);
     for (const std::string& n : found)
-        if (!has(off, n) && !has(result, n)) result.push_back(n);
+        if (enabled(n) && !has(result, n)) result.push_back(n);
     return result;
 }
 

@@ -1479,7 +1479,7 @@ bool SafeSetRef(void* ps, AccessProxyFn access, ProxySetEntityFn setEntity, cons
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 bool SetTemplateRefScript(const Entity& e, const SStr& set, const SStr& prop, const SStr& target) {
-    if (!EntIsValid(e) || !ResolveInv()) return false;
+    if (!EntIsValid(e) || !ResolveInv() || !ResolveProps()) return false;   // ResolveProps: PropSetFor braucht die Eigenschafts-Funktionen
     char mangled[200];
     // set ist hier der Klassenname (gCItem_PS, gCSkill_PS, gCArmorSet_PS ...)
     std::snprintf(mangled, sizeof mangled, "?Access%s@%s@@QAEAAVeCTemplateEntityProxy@@XZ", prop.c_str(), set.c_str());
@@ -1494,6 +1494,57 @@ bool SetTemplateRefScript(const Entity& e, const SStr& set, const SStr& prop, co
     }
     void* tpl = g_e.sceneAdmin ? SafeFindTemplate(g_e.sceneAdmin, &target, target.c_str()) : nullptr;
     return tpl && SafeSetRef(ps, access, setEntity, tpl);
+}
+// Entity-Verweis (eCEntityProxy, z. B. gCInteraction_PS.Owner) auf ein Entity setzen: gCxxx_PS::Access<Eigenschaft>() liefert den Proxy, eCEntityProxy::SetEntity(eCEntity const*) setzt das Ziel.
+bool SetEntityRefScript(const Entity& e, const SStr& set, const SStr& prop, const Entity& target) {
+    if (!EntIsValid(e) || !EntIsValid(target) || !ResolveInv() || !ResolveProps()) return false;
+    char mangled[200];
+    std::snprintf(mangled, sizeof mangled, "?Access%s@%s@@QAEAAVeCEntityProxy@@XZ", prop.c_str(), set.c_str());
+    auto access = reinterpret_cast<AccessProxyFn>(GetProcAddress(g_e.game, mangled));
+    auto setEntity = reinterpret_cast<ProxySetEntityFn>(GetProcAddress(g_e.engine, "?SetEntity@eCEntityProxy@@QAEXPBVeCEntity@@@Z"));
+    if (!access || !setEntity) return false;
+    void* ps = PropSetFor(e, set);
+    return ps && SafeSetRef(ps, access, setEntity, target.p);
+}
+// Effekte (API 30): Script.dll EffectSystem::ExistsEffect(Name) und StartEffect(Name, Entity) starten einen benannten Effekt (z. B. "eff_magic_summonlightning_target_01", der Blitz
+// des Zaubers "Blitz beschwoeren") am Entity. Der Effekt-Handle (Effect, 4 Byte, Rueckgabe per Zeiger) wird nicht aufbewahrt; die Effektverwaltung beendet ihn selbst.
+typedef bool(__stdcall* EffectExistsFn)(const void*);
+typedef void*(__stdcall* EffectStartFn)(void*, const void*, const void*);
+bool SafeEffectExists(EffectExistsFn fn, const void* name) {
+    __try {
+        return fn(name);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool SafeEffectStart(EffectStartFn fn, const void* name, const void* ent) {
+    __try {
+        void* handle = nullptr;
+        fn(&handle, name, ent);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+struct EffectApi {
+    bool tried = false;
+    EffectExistsFn exists = nullptr;
+    EffectStartFn start = nullptr;
+};
+EffectApi& Effects() {
+    static EffectApi a;
+    if (!a.tried) {
+        a.tried = true;
+        if (HMODULE script = GetModuleHandleA("Script.dll")) {
+            a.exists = reinterpret_cast<EffectExistsFn>(GetProcAddress(script, "?ExistsEffect@EffectSystem@@SG_NABVbCString@@@Z"));
+            a.start = reinterpret_cast<EffectStartFn>(GetProcAddress(script, "?StartEffect@EffectSystem@@SG?AVEffect@@ABVbCString@@ABVEntity@@@Z"));
+        }
+    }
+    return a;
+}
+bool EffectExistsScript(const SStr& name) {
+    EffectApi& a = Effects();
+    return a.exists && SafeEffectExists(a.exists, &name);
+}
+bool StartEffectScript(const SStr& name, const Entity& at) {
+    EffectApi& a = Effects();
+    return a.start && a.exists && EntIsValid(at) && SafeEffectExists(a.exists, &name) && SafeEffectStart(a.start, &name, &at);
 }
 // Vorlage (Template-Entity) nach genauem Namen; ungueltig, wenn es sie nicht gibt. Ihre Eigenschaftssets lassen sich wie bei einem Entity lesen (und fuer eigene Vorlagen schreiben)
 Entity GetTemplateEntityScript(const SStr& name) {
@@ -1689,6 +1740,62 @@ int EntDeleteItemStack(Entity& e, const SStr& name) {
     return inv && SafeDeleteStacks(inv, &name, &r) ? r : -1;
 }
 
+// Schaden verursachen (API 30): Script.dll Entity::DoDamage(victim, amount, gEDamageType) ruft gCEntity::DoDamage mit diesem Entity als Angreifer (this) auf.
+// Der Treffer geht durch die Schadensberechnung des Spiels (OnDamage mit owner = this). Entity in Script.dll = Zeiger auf eCEntity, wie unsere Struktur Entity.
+typedef void(__thiscall* DoDamageFn)(const Entity*, const Entity*, unsigned, int);
+bool SafeDoDamage(DoDamageFn fn, const Entity& attacker, const Entity& victim, int amount, int type) {
+    __try {
+        fn(&attacker, &victim, unsigned(amount), type);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool EntDoDamage(const Entity& attacker, const Entity& victim, int amount, int type) {
+    static DoDamageFn fn = nullptr;
+    static bool tried = false;
+    if (!tried) {
+        tried = true;
+        if (HMODULE script = GetModuleHandleA("Script.dll")) fn = reinterpret_cast<DoDamageFn>(GetProcAddress(script, "?DoDamage@Entity@@QAEXABV1@KW4gEDamageType@@@Z"));
+    }
+    if (!fn || !EntIsValid(attacker) || !EntIsValid(victim) || amount <= 0) return false;
+    return SafeDoDamage(fn, attacker, victim, amount, type);
+}
+
+// Lebenspunkte eines NPC direkt aendern (API 30): gCDamageReceiver_PS::GetHitPoints/SetHitPoints. Das ist die Stelle, an der das Spiel Schaden anwendet; unser Schaden-Hook
+// sitzt auf SetHitPoints, die Aenderung erscheint also als normaler Treffer in OnDamage (owner dann ohne Angreifer-Kontext). Rueckgabe: neue HP, -1 bei Fehler
+typedef const long&(__thiscall* GetHPFn)(const void*);
+typedef void(__thiscall* SetHPFn)(void*, const long&);
+int SafeHurt(void* ps, GetHPFn get, SetHPFn set, int amount, int minHp) {
+    __try {
+        long hp = get(ps);
+        if (hp <= minHp) return int(hp);   // schon an oder unter der Untergrenze: nichts schreiben (sonst wuerde das Anheben auf minHp heilen)
+        long neu = hp - amount;
+        if (neu < minHp) neu = minHp;
+        SetScriptHurt(true);   // der Schaden-Hook meldet diesen Abzug ohne Angreifer (LastInflictor am Opfer ist hier ein alter Wert)
+        set(ps, neu);
+        SetScriptHurt(false);
+        return int(neu);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        SetScriptHurt(false);
+        return -1;
+    }
+}
+int EntHurtHP(const Entity& e, int amount, int minHp) {
+    static GetHPFn get = nullptr;
+    static SetHPFn set = nullptr;
+    static bool tried = false;
+    if (!tried) {
+        tried = true;
+        if (HMODULE game = GetModuleHandleA("Game.dll")) {
+            get = reinterpret_cast<GetHPFn>(GetProcAddress(game, "?GetHitPoints@gCDamageReceiver_PS@@QBEABJXZ"));
+            set = reinterpret_cast<SetHPFn>(GetProcAddress(game, "?SetHitPoints@gCDamageReceiver_PS@@QAEXABJ@Z"));
+        }
+    }
+    if (!get || !set || !EntIsValid(e) || amount <= 0 || !ResolveProps()) return -1;
+    SStr cls("gCDamageReceiver_PS");
+    void* ps = PropSetFor(e, cls);
+    return ps ? SafeHurt(ps, get, set, amount, minHp) : -1;
+}
+
 void* WorldClock() {
     ResolveStats();
     return g_s.clockOk ? SafeWorldClock() : nullptr;
@@ -1832,6 +1939,8 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterObjectMethod("Entity", "bool IsSkillActive(const bCString &in) const", asFUNCTION(EntIsSkillActive), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "int GetSkillActivationCount(const bCString &in) const", asFUNCTION(EntSkillActivationCount), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "int DeleteItemStack(const bCString &in)", asFUNCTION(EntDeleteItemStack), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool DoDamage(const Entity &in attacker, int amount, int type)", asFUNCTION(EntDoDamage), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "int HurtHitPoints(int amount, int minHp = 0)", asFUNCTION(EntHurtHP), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterGlobalFunction("int CloneTemplate(const bCString &in base, const bCString &in newName)", asFUNCTION(CloneTemplate),
                                       asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("Entity SpawnNPC(const bCString &in templateName, const bCVector &in position)", asFUNCTION(SpawnNPC),
@@ -1883,6 +1992,9 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("bCString GetProperty(const Entity &in, const bCString &in set, const bCString &in prop)", asFUNCTION(GetPropertyText), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool SetProperty(const Entity &in, const bCString &in set, const bCString &in prop, const bCString &in value)", asFUNCTION(SetPropertyText), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool SetTemplateRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const bCString &in target)", asFUNCTION(SetTemplateRefScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool SetEntityRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const Entity &in target)", asFUNCTION(SetEntityRefScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool EffectExists(const bCString &in name)", asFUNCTION(EffectExistsScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool StartEffect(const bCString &in name, const Entity &in at)", asFUNCTION(StartEffectScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("Entity GetTemplateEntity(const bCString &in name)", asFUNCTION(GetTemplateEntityScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bCString ListProperties(const Entity &in, const bCString &in set, int max = 200)", asFUNCTION(ListPropertyTexts), asCALL_CDECL));
     OG3_REG(e->RegisterObjectMethod("Entity", "bool IsBuilding() const", asFUNCTION(EntIsBuilding), asCALL_CDECL_OBJFIRST));

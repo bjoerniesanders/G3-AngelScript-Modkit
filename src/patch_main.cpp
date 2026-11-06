@@ -11,10 +11,12 @@
 // ini [patch]: enable=0|1, script=og3\scripts\main.as (relativ zum Spielordner), hotreload=1
 // Protokoll: <Spielordner>\og3_patch.log
 #include <windows.h>
+#include <xmmintrin.h>
 
 #include <atomic>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 #include "sb_api.h"
 #include "script_host.h"
@@ -33,20 +35,78 @@ bool g_logLockInit = false;
 std::atomic<bool> g_initDone{false};
 bool g_mainRan = false;
 
-void Log(const std::string& s) {
-    if (!g_logLockInit) {
-        InitializeCriticalSection(&g_logLock);
-        g_logLockInit = true;
-    }
-    EnterCriticalSection(&g_logLock);
-    SYSTEMTIME t;
-    GetLocalTime(&t);
+// Protokoll. Standard: sofort schreiben. Optional asynchron (ini [patch] asynclog=1): Der aufrufende Thread legt die Zeile nur in eine Warteschlange, ein
+// Hintergrund-Thread schreibt og3_patch.log und reicht die Zeilen an den Loader (og3_loader.log) weiter. Entstanden beim Suchen der verwaschenen Texturen;
+// das Schreiben war nicht die Ursache (die war fninit in der AngelScript-Aufrufbruecke, siehe CMakeLists.txt CLEAR_FPU_STACK).
+bool g_asyncLog = false;
+bool g_logWrite = true;   // ini [patch] logwrite=0: nach dem Start (main gelaufen) keine Protokollzeilen mehr (nur fuer Tests)
+// Eine Meldung: Dateizeile mit Zeitstempel und Zeile fuer den Loader (ohne Zeitstempel, ganze Meldung wie frueher)
+struct LogItem {
+    std::string fileLine, hostLine;
+};
+std::vector<LogItem> g_logQueue;   // nur asynchron, geschuetzt durch g_logLock
+CRITICAL_SECTION g_writeLock;       // serialisiert das Schreiben (Aufrufer, Hintergrund-Thread, FlushLog)
+HANDLE g_logEvent = nullptr;
+bool g_logThread = false;
+void InitLogLocks() {
+    if (g_logLockInit) return;
+    InitializeCriticalSection(&g_logLock);
+    InitializeCriticalSection(&g_writeLock);
+    g_logLockInit = true;
+}
+// Schreibt die Datei unter g_writeLock; den Loader ruft sie danach ausserhalb der Sperre auf
+void WriteItems(const std::vector<LogItem>& items) {
+    if (items.empty()) return;
+    EnterCriticalSection(&g_writeLock);
     if (g_log) {
-        std::fprintf(g_log, "%02d:%02d:%02d.%03d %s\n", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, s.c_str());
+        for (const LogItem& it : items) std::fputs(it.fileLine.c_str(), g_log);
         std::fflush(g_log);
     }
+    LeaveCriticalSection(&g_writeLock);
+    if (g_hostLog)
+        for (const LogItem& it : items) g_hostLog(it.hostLine.c_str());
+}
+DWORD WINAPI LogWriter(void*) {
+    for (;;) {
+        WaitForSingleObject(g_logEvent, 200);
+        std::vector<LogItem> batch;
+        EnterCriticalSection(&g_logLock);
+        batch.swap(g_logQueue);
+        LeaveCriticalSection(&g_logLock);
+        WriteItems(batch);
+    }
+}
+void Log(const std::string& s) {
+    if (!g_logWrite && g_mainRan) return;
+    InitLogLocks();
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    char stamp[24];
+    std::snprintf(stamp, sizeof stamp, "%02d:%02d:%02d.%03d ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+    LogItem it{std::string(stamp) + s + "\n", "og3_patch: " + s};
+    if (!g_asyncLog) {
+        WriteItems(std::vector<LogItem>{std::move(it)});
+        return;
+    }
+    EnterCriticalSection(&g_logLock);
+    g_logQueue.push_back(std::move(it));
+    if (!g_logThread) {
+        g_logThread = true;
+        g_logEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
+        if (HANDLE h = CreateThread(nullptr, 0, LogWriter, nullptr, 0, nullptr)) CloseHandle(h);
+    }
     LeaveCriticalSection(&g_logLock);
-    if (g_hostLog) g_hostLog(("og3_patch: " + s).c_str());
+    if (g_logEvent) SetEvent(g_logEvent);
+}
+// Restliche Zeilen sofort schreiben. Nur beim Entladen per FreeLibrary aufrufen, NICHT beim Prozessende: dann sind die anderen Threads schon beendet,
+// einer koennte mitten in einer Sperre gestorben sein, und das Warten darauf liesse das Spiel beim Schliessen haengen.
+void FlushLog() {
+    if (!g_logLockInit) return;
+    std::vector<LogItem> batch;
+    EnterCriticalSection(&g_logLock);
+    batch.swap(g_logQueue);
+    LeaveCriticalSection(&g_logLock);
+    WriteItems(batch);
 }
 
 // ---------------------------------------------------------------- Bildzeit aus der Engine
@@ -76,6 +136,22 @@ const char* kHookNames[kHookCount] = {"?OnPostInitializeModules@eCApplication@@M
 VoidMethod g_orig[kHookCount] = {};
 void** g_slot[kHookCount] = {};
 
+// Gleitkomma-Zustand der Engine (Diagnose): Genome rechnet mit x87-Steuerwort 007F (24 Bit, bCFPUAdmin). Geschuetzt wird er zentral in
+// ScriptHost::Execute (script_host.cpp); hier nur feste Messpunkte im Protokoll ("FPU-Zustand ..."), um eine Abweichung zu sehen.
+unsigned short FpuCw() {
+    unsigned short cw;
+    __asm fnstcw cw
+    return cw;
+}
+unsigned Mxcsr() { return _mm_getcsr(); }
+
+// Zustand protokollieren (fester Messpunkt): x87-Steuerwort und MXCSR
+void FpuState(const char* where) {
+    char b[160];
+    std::snprintf(b, sizeof b, "FPU-Zustand %s: x87-Steuerwort %04X, MXCSR %08X", where, FpuCw(), Mxcsr());
+    Log(b);
+}
+
 void RunMainOnce() {
     if (g_mainRan) return;
     g_mainRan = true;
@@ -83,7 +159,9 @@ void RunMainOnce() {
     g_host.AddScript("main", g_scriptPath);   // Einzelskript (ini script=), falls vorhanden
     g_host.SetModsDir(g_modsDir);
     g_host.ScanMods();
+    FpuState("vor main");
     g_host.CallMain();
+    FpuState("nach main");
 }
 void __fastcall HPostInit(void* self, void*) {
     g_orig[kPostInit](self);
@@ -126,18 +204,72 @@ void InstallQuietMenu() {
     Log("Menuetaste stumm (F10/Alt ohne Windows-Piepton)");
 }
 
+// Speichermessung (Diagnose, ini [patch] memlog=1, Standard aus): alle 30 s freier Speicher und Adressraum wie von GlobalMemoryStatusEx (das auch die Engine liest)
+// ins Protokoll, Zeilen "Speicher: ..." (nur Lesen, aendert nichts).
+bool g_memLog = false;
+void MemoryProbe() {
+    if (!g_memLog) return;
+    static unsigned last = 0;
+    static bool intro = false;
+    const unsigned now = GetTickCount();
+    if (intro && now - last < 30000) return;
+    last = now;
+    MEMORYSTATUSEX m = {sizeof m};
+    if (!GlobalMemoryStatusEx(&m)) return;
+    char b[320];
+    if (!intro) {
+        intro = true;
+        auto* base = reinterpret_cast<unsigned char*>(GetModuleHandleA(nullptr));
+        auto* nt = reinterpret_cast<IMAGE_NT_HEADERS*>(base + reinterpret_cast<IMAGE_DOS_HEADER*>(base)->e_lfanew);
+        const bool laa = (nt->FileHeader.Characteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE) != 0;
+        std::snprintf(b, sizeof b, "Speicher: Exe Large-Address-Aware=%s, Adressraum gesamt %llu MB", laa ? "ja" : "nein", m.ullTotalVirtual >> 20);
+        Log(b);
+    }
+    const unsigned long long freeV = m.ullAvailVirtual >> 20;
+    std::snprintf(b, sizeof b, "Speicher: physisch frei %llu von %llu MB, Adressraum frei %llu von %llu MB, Auslastung %lu %%%s", m.ullAvailPhys >> 20, m.ullTotalPhys >> 20, freeV,
+                  m.ullTotalVirtual >> 20, m.dwMemoryLoad, freeV < 400 ? "  <-- Adressraum knapp" : "");
+    Log(b);
+}
+// Ladepause (ini [patch] loadpause=<Sekunden>, 0 = aus): Waehrend eine Welt geladen wird (OnWorldDeactivate bis OnWorldActivate) und bis loadpause Sekunden
+// nach dem letzten OnWorldActivate wird OnFrame der Skripte nicht aufgerufen. Test fuer "verwaschene Gebaeude-Texturen nach dem Laden": Der Lader holt die
+// Gebaeude in dieser Zeit nach; jeder Skriptaufruf in C++ hat sie gestoert (gemessen 2026-11-06).
+unsigned g_loadPauseMs = 0;
+bool g_inWorldLoad = false;
+unsigned g_lastActivate = 0;
+bool g_pauseActive = false;
+bool InLoadPause() {
+    if (!g_loadPauseMs) return false;
+    const bool p = g_inWorldLoad || (g_lastActivate && GetTickCount() - g_lastActivate < g_loadPauseMs);
+    if (p != g_pauseActive) {
+        g_pauseActive = p;
+        Log(p ? "Ladepause: OnFrame der Skripte ausgesetzt" : "Ladepause: OnFrame der Skripte wieder an");
+    }
+    return p;
+}
 void __fastcall HProcess(void* self, void*) {
     g_orig[kProcess](self);
+    MemoryProbe();
     InstallQuietMenu();
     if (!g_mainRan) RunMainOnce();   // falls OnPostInitializeModules vor dem Einhaengen lief
     if (g_hotReload) g_host.CheckReload();
+    static bool firstFrame = true;
+    if (firstFrame) {
+        firstFrame = false;
+        FpuState("erstes Bild");
+    }
+    if (InLoadPause()) return;
     g_host.CallFrame(FrameTime());
 }
 void __fastcall HWorldActivate(void* self, void*) {
     g_orig[kWorldActivate](self);
+    FpuState("Welt aktiviert");
+    g_inWorldLoad = false;
+    g_lastActivate = GetTickCount();
+    if (!g_lastActivate) g_lastActivate = 1;
     g_host.CallSimple("void OnWorldActivate()");
 }
 void __fastcall HWorldDeactivate(void* self, void*) {
+    g_inWorldLoad = true;
     g_host.CallSimple("void OnWorldDeactivate()");
     g_orig[kWorldDeactivate](self);
 }
@@ -224,6 +356,7 @@ bool InitCommon(HMODULE sb, const char* gameDir, void (*hostLog)(const char*)) {
 
 // Fuer Tests: Host ohne Spiel-Hooks anlegen
 extern "C" __declspec(dllexport) int og3_patch_init(HMODULE sharedBase, const char* logDir, void (*hostLog)(const char*)) {
+    SetLoadDefaultOffMods(true);   // Testprogramm: auch Beispiel-Mods mit mod.ini enabled=0 laden (Kompilierpruefung aller Beispiele)
     return InitCommon(sharedBase, logDir, hostLog) ? 1 : 0;
 }
 
@@ -317,6 +450,11 @@ extern "C" __declspec(dllexport) int og3_patch_start(HMODULE sharedBase, const c
         g_gameHooks = GetPrivateProfileIntA("patch", "hooks", 1, ini) != 0;
         SetGameHookOptions(GetPrivateProfileIntA("patch", "navevents", 0, ini) != 0);
         g_filePatches = GetPrivateProfileIntA("patch", "filepatches", 1, ini) != 0;
+        SetPrintToGameLog(GetPrivateProfileIntA("patch", "printgame", 1, ini) != 0);
+        g_asyncLog = GetPrivateProfileIntA("patch", "asynclog", 0, ini) != 0;
+        g_logWrite = GetPrivateProfileIntA("patch", "logwrite", 1, ini) != 0;
+        g_loadPauseMs = unsigned(GetPrivateProfileIntA("patch", "loadpause", 0, ini)) * 1000u;
+        g_memLog = GetPrivateProfileIntA("patch", "memlog", 0, ini) != 0;
         GetPrivateProfileStringA("patch", "mods", modsRel, modsRel, MAX_PATH, ini);
     }
     g_modsDir = (modsRel[1] == ':' || modsRel[0] == '\\') ? std::string(modsRel) : g_gameDir + modsRel;
@@ -336,5 +474,6 @@ extern "C" __declspec(dllexport) int og3_patch_start(HMODULE sharedBase, const c
 BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, void* reserved) {
     if (reason == DLL_PROCESS_ATTACH) DisableThreadLibraryCalls(h);
     if (reason == DLL_PROCESS_DETACH && !reserved && g_initDone) { Log("Ende"); }
+    if (reason == DLL_PROCESS_DETACH && !reserved) FlushLog();   // nur beim Entladen per FreeLibrary, nicht beim Prozessende (siehe FlushLog)
     return TRUE;
 }

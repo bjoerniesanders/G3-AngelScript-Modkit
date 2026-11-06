@@ -46,11 +46,13 @@ Jeder Mod ist ein **eigenes AngelScript-Modul**: globale Variablen und Funktione
 basis_mod
 mein_mod
 -kaputter_mod        # Minuszeichen davor schaltet einen Mod ab
++lifesteal_demo      # Pluszeichen schaltet einen standardmaessig abgeschalteten Mod zu
 ```
 
 - Je Zeile ein Modname. Die genannten Mods laden in dieser Reihenfolge.
 - Nicht genannte Mods folgen alphabetisch.
 - `-Name` schaltet den Mod ab (er wird nicht geladen, bzw. im laufenden Spiel entladen).
+- Ein Mod mit `mod.ini` und `[mod] enabled=0` im eigenen Ordner ist **standardmäßig aus** (so sind alle Beispiel-Mods ausgeliefert). Er lädt nur, wenn `+Name` in `load_order.txt` steht; `+Name` legt zugleich seine Stelle in der Reihenfolge fest. Mods ohne `mod.ini` laden wie bisher.
 - Das Einzelskript `main` läuft immer zuerst.
 - Jedes Ereignis geht der Reihe nach an alle Mods.
 

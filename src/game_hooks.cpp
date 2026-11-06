@@ -157,6 +157,7 @@ typedef void*(__thiscall* FnGetEnt)(void*);
 FnSetHP o_setHP = nullptr;
 FnGetEnt g_psEntity = nullptr, g_proxyEntity = nullptr;
 bool g_inDamage = false;   // Schutz: SetHitPoints aus dem Skript heraus (Override) nicht erneut als Treffer melden
+bool g_scriptHurt = false;   // Entity.HurtHitPoints laeuft gerade: Abzug ohne Angreifer melden (LastInflictor waere ein alter Wert)
 void* SafeCall0(FnGetEnt f, void* obj) {
     if (!f || !obj || !ReadableMem(obj, sizeof(void*))) return nullptr;
     __try {
@@ -309,13 +310,14 @@ void __fastcall HSetHP(void* self, void*, const long* v) {
         return;
     }
     void* victim = SafeCall0(g_psEntity, self);
-    void* attacker = SafeCall0(g_proxyEntity, ps + 0x38);
+    void* attacker = g_scriptHurt ? nullptr : SafeCall0(g_proxyEntity, ps + 0x38);
+    void* owner = g_scriptHurt ? nullptr : DamageOwner(victim, attacker);
     const long amount = alt - neu;
     const int type = HitDamageType(attacker, *reinterpret_cast<int*>(ps + 0x30));   // Art aus dem angreifenden Item, sonst der Wert des Schadensempfaengers
     bool called = false;
     g_inDamage = true;
     DamageDispatch(
-        victim, attacker, DamageOwner(victim, attacker), static_cast<int>(amount), type,
+        victim, attacker, owner, static_cast<int>(amount), type,
         [&](int mi) {
             long neuHp = neu;
             const long m = static_cast<long>(mi);
@@ -807,6 +809,7 @@ int InstallGameHooks(ScriptHost& host) {
 }
 
 void* SlotItemOf(void* ent, int slot) { return SlotItem(ent, slot); }
+void SetScriptHurt(bool on) { g_scriptHurt = on; }
 
 void* CurrentAttackerOf(void* ent) {
     void *l, *c;
