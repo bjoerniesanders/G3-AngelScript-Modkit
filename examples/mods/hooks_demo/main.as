@@ -48,7 +48,7 @@ int letzteHP = -1;
 int hpLog = 0;
 
 bool Override_Damage(Entity victim, Entity inflictor, Entity owner, int amount, int type) {
-    if (schadenLog < 40) {
+    if (schadenLog < 300) {
         schadenLog++;
         print("Schaden: '" + victim.GetName() + "' <- '" + owner.GetName() + "' mit '" + inflictor.GetName() + "', Menge " + amount + ", Typ " + type);
     }
@@ -60,12 +60,33 @@ bool Override_Damage(Entity victim, Entity inflictor, Entity owner, int amount, 
     return Super();
 }
 
+// Statuseffekte (ab API 27): OnStatusEffect meldet jede Aenderung (Krankheit, Gift, Feuer, ...). Zum Messen wird die Ausdauer des Betroffenen mit ausgegeben ("SP" ist laut
+// Attribut-Kennungen vermutlich die Ausdauer; ungueltige Kennungen liefern -1).
+int statusLog = 0;
+void OnStatusEffect(Entity npc, int effect, int enabled) {
+    if (statusLog >= 200) return;
+    statusLog++;
+    print("Statuseffekt " + effect + (enabled == 1 ? " AN" : " AUS") + " bei '" + npc.GetName() + "' (Maske " + npc.GetStatusEffects() + ", SP " + npc.GetAttribute("SP") + ")");
+}
+
 // Fallschaden und andere Verluste ohne Treffer: der Held verliert dabei "HP", ohne dass gCEntity::OnDamage oder Override_Damage etwas melden (gemessen: Sturz
 // 176 -> 145 und 176 -> 0). Das Attribut wird nicht ueber gCPlayerMemory_PS gesenkt, daher vergleicht das Skript die Lebenspunkte jedes Bild. Mit HELD_SCHADEN_HALB
 // bekommt der Held die Haelfte des Verlusts zurueck; ein toedlicher Sturz (HP 0) laesst sich so nicht mehr abfangen (der Tod ist im selben Bild schon gemeldet).
+// Ausdauer-Messung (Krankheit sperrt laut Spielerbeobachtung die Ausdauer-Regeneration): alle 2 Sekunden "SP" und den Krankheitsstatus protokollieren, hoechstens 150 Zeilen.
+float spZeit = 0;
+int spLog = 0;
+void SpMessen(Entity hero, float dt) {
+    spZeit += dt;
+    if (spZeit < 2.0f || spLog >= 150) return;
+    spZeit = 0;
+    spLog++;
+    print("Ausdauer-Messung: SP " + hero.GetAttribute("SP") + " / " + hero.GetAttributeMax("SP") + ", krank " + (hero.HasStatusEffect(STATUS_DISEASED) ? "ja" : "nein") + ", HP " + hero.GetAttribute("HP"));
+}
+
 void OnFrame(float dt) {
     Entity hero = GetHero();
     if (!hero.IsValid()) { letzteHP = -1; return; }
+    SpMessen(hero, dt);
     int hp = hero.GetAttribute("HP");
     if (heldGetroffen) { heldGetroffen = false; letzteHP = hp; return; }
     if (letzteHP >= 0 && hp < letzteHP && hpLog < 40) {

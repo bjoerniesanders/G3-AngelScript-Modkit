@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#define OG3_SCRIPT_API_VERSION 26
+#define OG3_SCRIPT_API_VERSION 30
 
 class asIScriptEngine;
 class asIScriptContext;
@@ -145,6 +145,8 @@ void SetGameHookOptions(bool navEvents);
 bool IsPlayerEntity(const void* p);
 // Aktueller Gegner eines NPCs/Helden (gCNPC_PS::CurrentAttackerEntity); nullptr, wenn keiner oder kein NPC (game_hooks.cpp)
 void* CurrentAttackerOf(void* ent);
+// Item (eCEntity*) im Ausruestungs-Slot eines Entity oder nullptr (game_hooks.cpp)
+void* SlotItemOf(void* ent, int slot);
 bool AdjustHeroHitPoints(const void* ent, int delta);
 
 // Spielereignisse (game_hooks.cpp): Hooks auf Game.dll einhaengen; Rueckgabe = Zahl aktiver Hooks

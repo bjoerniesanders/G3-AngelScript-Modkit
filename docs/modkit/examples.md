@@ -101,10 +101,24 @@ void OnKey(int vk, bool down) {
 Numblock 1-6 und Bild hoch/runter, Einfg steuern die Demo-Quest `OG3_DemoQuest` (Numblock 1-6: Status zeigen, anlegen und starten, erfolgreich, fehlgeschlagen, entfernen, XP;
 Bild hoch: alle Quests auflisten, Bild runter: Infos ansehen, Einfg: Quest-Dateien neu laden). Zum Ausprobieren der Quest-Funktionen und zum Herausfinden von Statuswerten.
 
+## 7. Eigenschaften ansehen (`property_inspect`)
+
+Strg + Ziffernblock `/` schreibt alle Eigenschaften des Items in der rechten Hand (sonst linke Hand, Rücken, sonst das Entity unter dem Fadenkreuz) mit ihren Werten ins Protokoll, getrennt nach den Sets
+`Item`, `Damage` und `Interaction`. Damit lässt sich herausfinden, was ein Item im Spiel wirklich enthält (Wert, Voraussetzungen, `RequiredSkill`, `ActivateSkill`, `ModAttrib…`, Schadensart und -menge). Nur Lesen.
+Die Funktionen dahinter sind `GetProperty` und `ListProperties` ([API](api-reference.md)).
+
+## 6. Lebensraub (`lifesteal_demo`)
+
+„Lebensraub“ ist eine **Eigenschaft der Waffe** wie „geschärft“ oder „gesegnet“: ein eigenes Qualitätsbit (`QUALITY_LIFESTEAL`), das in der Beschreibung der Waffe als Zeile `(20 %) Lebensraub` erscheint
+(Text aus `stringtable.ini`, Schlüssel `HUD_Quality_Lifesteal`) und mit dem Spielstand gespeichert wird. **Ziffernblock \*** setzt oder entfernt die Eigenschaft an der Waffe des Helden (rechte Hand, sonst Rücken rechts
+bzw. links). Schlägt der Held mit einer so markierten Waffe in der Hand zu, bekommt er 20 % des angerichteten Schadens als Lebenspunkte zurück (höchstens bis zum Maximum) und sieht `Lebensraub: +N HP`.
+Zeigt `OnDamage` mit `owner` und `inflictor`, Qualität pro Slot lesen und setzen, einen eigenen Text über die Mod-Stringtabelle und einen Eingriff im Kampf. Der angerichtete Schaden ist die Menge von
+`OnDamage`, bei einem tödlichen Treffer also nur der Rest der Lebenspunkte des Opfers. Abschalten mit `-lifesteal_demo` in `load_order.txt`.
+
 ## Tastenbelegung der Beispiel-Mods
 
 Die Mods teilen sich die Tasten, ohne sich zu überschneiden. **Nicht benutzt werden Tasten, die das Spiel selbst belegt:** Numblock 7, 8, 9 (Debug-Zähler), F1 bis F4, F6 bis F9 (Zeitlupe, Spieler zurücksetzen, Schnellladen) und F12,
-dazu Strg+Numblock 1-6. Frei sind außerdem Pos1, Ende, Bild hoch/runter, Einfg, Entf und die Rollen-Taste (ohne Strg). Pause fehlt auf vielen Tastaturen; Ende und Strg+Ende kamen im Test nicht beim Skript an (im Protokoll stand stattdessen Tastencode 3, Ursache nicht geklärt) und werden nicht benutzt.
+dazu Strg+Numblock 1-6. Frei sind außerdem Pos1, Bild hoch/runter, Einfg, Entf und die Rollen-Taste (ohne Strg). Pause fehlt auf vielen Tastaturen; Ende und Strg+Ende kamen im Test nicht beim Skript an (im Protokoll stand stattdessen Tastencode 3, Ursache nicht geklärt) und werden nicht benutzt.
 
 | Mod | Tasten |
 |---|---|
@@ -113,6 +127,9 @@ dazu Strg+Numblock 1-6. Frei sind außerdem Pos1, Ende, Bild hoch/runter, Einfg,
 | `spawn_demo` | Numblock `+` (Vorlagen suchen), `,` (NPC erzeugen: am Zielpunkt des Fadenkreuzes, sonst neben dem Helden), `-` (letzten entfernen), `*` (alle dieser Sitzung), `/` (alle erzeugten Diegos, auch aus früheren Sitzungen) |
 | `focus_demo` | Pos1 (Fokus/Fadenkreuz/Zielpunkt melden), Entf (erzeugten NPC unter dem Fadenkreuz entfernen) |
 | `jens_quest` | Rollen-Taste (Wolfsfell abgeben; Mod ist standardmäßig abgeschaltet) |
+| `property_inspect` | Strg + Ziffernblock / (Eigenschaften des Items in der Hand oder unter dem Fadenkreuz ins Protokoll) |
+| `reference_dump` | Ziffernblock / (Referenz-Dump ins Protokoll) |
+| `lifesteal_demo` | Ziffernblock \* (Lebensraub an der geführten Waffe umschalten) |
 | `examples/scripts/main.as` | F10, F11 |
 | `index.md` Schnellstart | Rollen-Taste |
 

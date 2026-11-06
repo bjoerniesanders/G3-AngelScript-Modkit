@@ -467,6 +467,173 @@ bool Hook(HMODULE game, const char* name, void* detour, void** original, ScriptH
     return true;
 }
 
+// ---- Statuseffekte als Ereignis (API 27): OnStatusEffect(npc, effect, enabled) bei jeder Aenderung der Bitmaske gCNPC_PS::m_u32StatusEffects. Zwei Wege aendern sie:
+// EnableStatusEffect(effect, an) und SetStatusEffects(maske); beide werden gehookt, ein Zaehler verhindert doppelte Meldungen, wenn der eine den anderen aufruft.
+// Gemeldet wird je geaendertes Bit, nur wenn sich der Wert wirklich aendert (das Spiel ruft EnableStatusEffect auch dauernd mit unveraendertem Wert auf).
+typedef void(__thiscall* FnEnableSE)(void*, int, bool);
+typedef void(__thiscall* FnSetSE)(void*, const unsigned long*);
+typedef const unsigned long&(__thiscall* FnGetSE)(const void*);
+FnEnableSE o_enableSE = nullptr;
+FnSetSE o_setSE = nullptr;
+FnGetSE g_getSE = nullptr;
+volatile LONG g_seDepth = 0;
+bool SafeStatusMask(void* ps, unsigned* out) {
+    if (!g_getSE || !ps || !ReadableMem(ps, 8)) return false;
+    __try {
+        *out = static_cast<unsigned>(g_getSE(ps));
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+void ReportStatusChange(void* ps, unsigned before, unsigned after) {
+    const unsigned diff = before ^ after;
+    if (!diff || !g_host) return;
+    void* npc = SafeCall0(g_psEntity, ps);
+    for (int bit = 0; bit < 32; ++bit) {
+        const unsigned m = 1u << bit;
+        if (!(diff & m)) continue;
+        EvArg a[] = {EvArg::Ent(npc), EvArg::U(m), EvArg::U((after & m) ? 1u : 0u)};
+        g_host->CallEvent("void OnStatusEffect(Entity, int, int)", a, 3);
+    }
+}
+void __fastcall HEnableSE(void* self, void*, int effect, bool on) {
+    unsigned before = 0;
+    const bool top = InterlockedIncrement(&g_seDepth) == 1;
+    if (top) SafeStatusMask(self, &before);
+    o_enableSE(self, effect, on);
+    unsigned after = before;
+    if (top && SafeStatusMask(self, &after)) ReportStatusChange(self, before, after);
+    InterlockedDecrement(&g_seDepth);
+}
+void __fastcall HSetSE(void* self, void*, const unsigned long* v) {
+    unsigned before = 0;
+    const bool top = InterlockedIncrement(&g_seDepth) == 1;
+    if (top) SafeStatusMask(self, &before);
+    o_setSE(self, v);
+    unsigned after = before;
+    if (top && SafeStatusMask(self, &after)) ReportStatusChange(self, before, after);
+    InterlockedDecrement(&g_seDepth);
+}
+
+// ---- Eigene Item-Qualitaet "Lebensraub" in der Beschreibung (API 28) ----
+// Das Spiel baut die Qualitaetszeilen der Item-Beschreibung (Vergiftet, Scharf, Gesegnet, ...) in einer Funktion bei Game.dll+0xA3DF0: eax = gCItem_PS* (Qualitaet bei +0x18), ecx = Inventarstapel
+// oder 0 (Qualitaet bei +0x40), ein Stapelparameter = Tooltip-Objekt (ret 4), Rueckgabe eax = Zahl der Zeilen. Je gesetztem Bit holt sie den Text ueber eCLocString(Schluessel).GetString(), baut einen
+// Praefix ("(+10)") und ruft den Zeilen-Helfer bei Game.dll+0xA48B0 (eax = Art 5, ecx = Tooltip, Stapel: Symbol, &Praefix, &Text; ret 0xC). Danach folgt eine Trennzeile (Art 6), wenn Zeilen da waren.
+// Dieser Hook ruft zuerst unsere Zeile (falls das Bit gesetzt ist) und dann das Original; hatte das Original keine Zeilen, kommt die Trennzeile von uns. Text: Schluessel
+// HUD_Quality_Lifesteal aus der Stringtabelle eines Mods. Absicherung: Bytepruefung der Funktion vor dem Einhaengen, SEH um alle Aufrufe in die Engine.
+const unsigned kQualityLifesteal = 512;
+const DWORD kTipFuncRva = 0xA3DF0, kTipLineRva = 0xA48B0;
+typedef void*(__thiscall* FnUniCtor)(void*, const char*);
+typedef void(__thiscall* FnUniDtor)(void*);
+typedef void*(__thiscall* FnLocCtor)(void*, const void*);
+typedef void*(__thiscall* FnLocGet)(void*, void*);
+typedef void(__thiscall* FnLocDtor)(void*);
+FnUniCtor g_uniCtor = nullptr;
+FnUniDtor g_uniDtor = nullptr;
+FnLocCtor g_locCtor = nullptr;
+FnLocGet g_locGet = nullptr;
+FnLocDtor g_locDtor = nullptr;
+char* g_tipLine = nullptr;      // Zeilen-Helfer
+void* o_tipFunc = nullptr;      // Original der Beschreibungsfunktion
+volatile long g_tipLogged = 0;
+
+__declspec(naked) void __cdecl CallTipLine(void* fn, void* tooltip, void* text, void* prefix, int icon, int kind) {
+    __asm {
+        push ebp
+        mov ebp, esp
+        push dword ptr [ebp+24]   // Symbol
+        push dword ptr [ebp+20]   // Praefix
+        push dword ptr [ebp+16]   // Text
+        mov ecx, dword ptr [ebp+12]
+        mov eax, dword ptr [ebp+28]
+        call dword ptr [ebp+8]
+        pop ebp
+        ret
+    }
+}
+__declspec(naked) int __cdecl CallTipOrig(void* orig, void* item, void* stack, void* tooltip) {
+    __asm {
+        mov eax, dword ptr [esp+8]
+        mov ecx, dword ptr [esp+12]
+        push dword ptr [esp+16]
+        call dword ptr [esp+8]
+        ret
+    }
+}
+// Zeile "(20 %) <Text zum Schluessel>" mit Symbol 2 (das der Segnung); false bei Fehler. Keine C++-Objekte mit Destruktor (SEH).
+bool TipAddLifestealLine(void* tooltip, const void* keyStr) {
+    char prefix[32] = {}, text[32] = {}, loc[32] = {};
+    __try {
+        g_uniCtor(prefix, "(20 %)");
+        g_locCtor(loc, keyStr);
+        g_locGet(loc, text);
+        CallTipLine(g_tipLine, tooltip, text, prefix, 2, 5);
+        g_uniDtor(text);
+        g_locDtor(loc);
+        g_uniDtor(prefix);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool TipAddSeparator(void* tooltip) {
+    char a[32] = {}, b[32] = {};
+    __try {
+        g_uniCtor(a, "");
+        g_uniCtor(b, "");
+        CallTipLine(g_tipLine, tooltip, b, a, -1, 6);
+        g_uniDtor(b);
+        g_uniDtor(a);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool TipHasLifesteal(const char* item, const char* stack) {
+    unsigned q = 0;
+    if (item && ReadableMem(item + 0x18, 4)) q |= *reinterpret_cast<const unsigned*>(item + 0x18);
+    if (stack && ReadableMem(stack + 0x40, 4)) q |= *reinterpret_cast<const unsigned*>(stack + 0x40);
+    return (q & kQualityLifesteal) != 0;
+}
+int __cdecl TipDetour(void* item, void* stack, void* tooltip) {
+    int added = 0;
+    if (tooltip && TipHasLifesteal(static_cast<const char*>(item), static_cast<const char*>(stack))) {
+        SStr key("HUD_Quality_Lifesteal");
+        added = TipAddLifestealLine(tooltip, &key) ? 1 : 0;
+        if (!added && g_host && InterlockedIncrement(&g_tipLogged) <= 3) g_host->Log("Qualitaets-Tooltip: Zeile 'Lebensraub' konnte nicht angelegt werden");
+    }
+    const int lines = CallTipOrig(o_tipFunc, item, stack, tooltip);
+    if (added && lines == 0) TipAddSeparator(tooltip);
+    return lines + added;
+}
+__declspec(naked) void TipStub() {
+    __asm {
+        push dword ptr [esp+4]   // Tooltip
+        push ecx                 // Stapel
+        push eax                 // Item
+        call TipDetour
+        add esp, 12
+        ret 4
+    }
+}
+void InstallQualityTooltip(HMODULE game, ScriptHost& host) {
+    HMODULE sb = GetModuleHandleA("SharedBase.dll"), eng = GetModuleHandleA("Engine.dll");
+    if (!game || !sb || !eng) return;
+    g_uniCtor = reinterpret_cast<FnUniCtor>(GetProcAddress(sb, "??0bCUnicodeString@@QAE@PBD@Z"));
+    g_uniDtor = reinterpret_cast<FnUniDtor>(GetProcAddress(sb, "??1bCUnicodeString@@QAE@XZ"));
+    g_locCtor = reinterpret_cast<FnLocCtor>(GetProcAddress(eng, "??0eCLocString@@QAE@ABVbCString@@@Z"));
+    g_locGet = reinterpret_cast<FnLocGet>(GetProcAddress(eng, "?GetString@eCLocString@@QBE?BVbCUnicodeString@@XZ"));
+    g_locDtor = reinterpret_cast<FnLocDtor>(GetProcAddress(eng, "??1eCLocString@@QAE@XZ"));
+    if (!g_uniCtor || !g_uniDtor || !g_locCtor || !g_locGet || !g_locDtor) {
+        host.Log("Qualitaets-Tooltip: Engine-Funktionen fehlen - nicht eingehaengt");
+        return;
+    }
+    char* target = reinterpret_cast<char*>(game) + kTipFuncRva;
+    static const unsigned char kSig[] = {0x83, 0xEC, 0x10, 0x8B, 0x40, 0x18, 0x53, 0x56, 0x33, 0xDB, 0x85, 0xC9};   // sub esp,10h / mov eax,[eax+18h] / push ebx / push esi / xor ebx,ebx / test ecx,ecx
+    if (!ReadableMem(target, sizeof kSig) || std::memcmp(target, kSig, sizeof kSig) != 0) {
+        host.Log("Qualitaets-Tooltip: Funktion bei Game.dll+0xA3DF0 hat nicht die erwarteten Bytes (andere Spielversion?) - nicht eingehaengt");
+        return;
+    }
+    g_tipLine = reinterpret_cast<char*>(game) + kTipLineRva;
+    const bool ok = MH_CreateHook(target, reinterpret_cast<void*>(&TipStub), &o_tipFunc) == MH_OK && MH_EnableHook(target) == MH_OK;
+    host.Log(std::string("Qualitaets-Tooltip (Lebensraub): ") + (ok ? "eingehaengt" : "FEHLER beim Einhaengen"));
+}
+
 // ---- Laden/Speichern: Quests und Infos werden beim Laden neu aus den ini-Dateien aufgebaut; eigene (per Skript angelegte) Quests/Infos muessen schon DA sein,
 // bevor das Spiel die gespeicherten Laufzeitdaten (Status, Questlog) einliest. Die Hooks melden das Ende des Aufbaus an die Skripte:
 //   OnQuestsLoaded()  nach gCQuestManager_PS::LoadQuestsFromInis        OnInfosLoaded()  nach gCInfoManager_PS::LoadInfosFromInis
@@ -626,10 +793,20 @@ int InstallGameHooks(ScriptHost& host) {
     char b[96];
     std::snprintf(b, sizeof b, "Spielereignisse: %d von 8 Hooks aktiv (Game.dll, gCQuestManager_PS, gCDamageReceiver_PS::SetHitPoints)", n);
     host.Log(b);
+    g_getSE = reinterpret_cast<FnGetSE>(GetProcAddress(game, "?GetStatusEffects@gCNPC_PS@@QBEABKXZ"));
+    {
+        int ns = 0;
+        ns += Hook(game, "?EnableStatusEffect@gCNPC_PS@@QAEXW4gEStatusEffect@@_N@Z", reinterpret_cast<void*>(&HEnableSE), reinterpret_cast<void**>(&o_enableSE), host);
+        ns += Hook(game, "?SetStatusEffects@gCNPC_PS@@QAEXABK@Z", reinterpret_cast<void*>(&HSetSE), reinterpret_cast<void**>(&o_setSE), host);
+        host.Log("Statuseffekt-Hooks: " + std::to_string(ns) + " von 2 aktiv (OnStatusEffect)");
+    }
+    InstallQualityTooltip(game, host);
     InstallInfoHook(host);
     InstallSaveHooks(game, host);
     return n;
 }
+
+void* SlotItemOf(void* ent, int slot) { return SlotItem(ent, slot); }
 
 void* CurrentAttackerOf(void* ent) {
     void *l, *c;

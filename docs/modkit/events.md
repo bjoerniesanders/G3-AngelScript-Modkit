@@ -28,6 +28,7 @@ Das Originalverhalten läuft zuerst, dann deine Funktion.
 | `void OnLeave(Entity who, const bCString &in area)` | Jemand verlässt einen Bereich |
 | `void OnSpellCast(Entity caster, Entity target, const bCString &in spell)` | Ein Zauber wird gewirkt (`Spl_Fireball`, `Spl_HealOther`, ...) |
 | `void OnDamage(Entity victim, Entity inflictor, Entity owner, int amount, int type)` | Ein Treffer hat Lebenspunkte gekostet (nach dem Original). `inflictor` = Waffe/Geschoss (kann leer sein), `owner` = Verursacher, siehe `Override_Damage` (ab Version 25) |
+| `void OnStatusEffect(Entity npc, int effect, int enabled)` (ab Version 27) | Ein Statuseffekt hat sich geändert (`effect` = `STATUS_…`, `enabled` 1 = an, 0 = aus). Je geändertes Bit ein Aufruf, nur bei echter Änderung (das Spiel setzt Effekte auch ständig mit unverändertem Wert neu). Gilt für NPCs und den Helden, auch wenn ein Mod den Effekt selbst setzt |
 | `void OnDamage(Entity victim, Entity attacker, int amount, int type)` | Alte Form ohne `owner`, weiter unterstützt; `attacker` ist dasselbe wie `inflictor` |
 
 Hinweise aus dem Spieltest:

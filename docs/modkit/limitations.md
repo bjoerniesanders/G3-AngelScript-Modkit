@@ -1,6 +1,6 @@
 # Grenzen und Stand
 
-Stand: 2026-11-02, Skript-Schnittstelle Version 26.
+Stand: 2026-11-02, Skript-Schnittstelle Version 28.
 
 ## Im Spiel geprüft
 
@@ -31,11 +31,18 @@ Stand: 2026-11-02, Skript-Schnittstelle Version 26.
 
 | Funktion | Zustand |
 |---|---|
-| **Weitere Einstiegspunkte** | Override gibt es für die sieben Quest-/Dialog-Funktionen ([Hooks](hooks.md)); Zahlenargumente lassen sich mit `SetOverrideArg` ändern (ohne Spiel getestet, im Spiel zu bestätigen mit `hooks_demo`). Schaden/Treffer gibt es noch nicht. |
+| **Talente (Perks)** | Eigenes Talent mit Kachel im Charakterbogen und Bonustalent an einer Waffe geht (Beispiel `perk_lifesteal`): Talent-Vorlage klonen (`CloneTemplate` + Tag, Name über `FO_It_Perk_<Tag>`), Lern-Item `It_Perk_<Name>` klonen und dessen `Skill`-Verweis mit `SetTemplateRef` auf das neue Talent setzen, den Item-Stapel dem Helden geben (`AddItems`; der Bogen listet die Lern-Item-Stapel im Inventar, ausgegraut wenn nicht gelernt) und `ActivateSkill2` der Waffe auf das Talent setzen (die Engine zählt es dann beim Ausrüsten mit). Zustand lesen: `HasLearnedSkill`, `IsSkillActive`, `GetSkillActivationCount`. **Zu beachten:** Der Stapel steht im Spielstand; ohne die Mod zeigt er auf eine fehlende Vorlage, und das Spiel **stürzt beim Öffnen des Charakterbogens ab** (gemessen). Zum Abschalten die Mod einmal mit `ENTFERNEN = true` laufen lassen (nimmt Talent und Stapel mit `DeleteItemStack` heraus; `RemoveItems` genügt nicht, weil Lern-Items `Permanent` sind und ein leerer Stapel bleibt), speichern, dann die Mod abschalten. Getestet: Spielstand danach ohne Mod laden und den Charakterbogen öffnen läuft ohne Absturz. Es gibt noch kein Ereignis vor dem Speichern, mit dem sich das automatisch machen ließe. `LearnSkill` am Klon liefert `false` (Voraussetzungen des Originals). Die Wirkung eines eigenen Talents muss die Mod selbst herstellen (z. B. `OnDamage`) |
+| **Weitere Einstiegspunkte** | Override gibt es für die sieben Quest-/Dialog-Funktionen ([Hooks](hooks.md)); Zahlenargumente lassen sich mit `SetOverrideArg` ändern (ohne Spiel getestet, im Spiel zu bestätigen mit `hooks_demo`). Schaden, Treffer, Statuseffekte und Item-Qualität sind inzwischen vorhanden ([Hooks](hooks.md), [Referenz](reference.md)). |
 | **Entities erzeugen / NPCs spawnen** | `SpawnNPC` ist gebaut (Version 23), im Spiel aber noch nicht bestätigt. Offen: Tagesablauf/Routine, Speichern der erzeugten NPCs, Aufräumen. |
 | **Bedingungen von Infos** | Items, Reputation, Fähigkeiten als Bedingung einer eigenen Info: die Listen (`CondItems`, ...) sind noch nicht schreibbar. Bedingungen prüfst du in `OnInfoFinished` im Skript. |
-| **Mod-Archive (`PackMod`)** | Schreiben ist gebaut und gegen echte Community-Archive geprüft ([Mod-Archive](archives.md)); das Laden im Spiel ist erst mit `packmod_demo` zu bestätigen. Offen: Komprimierung, komprimierte Einträge lesen, Datei-Patches auf die Schichten `.mod`/`.m00` ausdehnen. |
+| **Mod-Archive (`PackMod`)** | Schreiben ist gebaut und gegen echte Community-Archive geprüft ([Mod-Archive](archives.md)); das Laden und das Überschreiben vorhandener Dateien sind im Spiel bestätigt (mit der Einschränkung zu den vom Spiel angelegten Kopien, siehe Archive). Offen: Komprimierung, komprimierte Einträge lesen, Datei-Patches auf die Schichten `.mod`/`.m00` ausdehnen. |
 | **Questlog selbst schreiben** | Einträge entstehen über Dialogzeilen (`SetInfoQuest`); direkt in das Log schreiben geht nicht. |
+| **Truhen und Schlösser** | Inhalt (zufällig über Schatzsets oder fest), Schlosshärte (offen bis schwer, nur mit Schlüssel), Schlüssel; auch für Türen. Idee aus dem Editor AdanosEdit, nichts verbindlich. |
+| **Tagesabläufe (Routinen) von NPCs** | Arbeit, Freizeit, Schlaf mit Routinepunkten; mehrere Abläufe pro NPC, per Dialog umschaltbar (damit ein NPC nach einer Quest bleibt). Idee aus AdanosEdit. |
+| **Eigene Zonen und die Navigationskarte** | Nötig, damit `OnEnter`/`OnLeave` auch eigene Bereiche erkennen: Gothic 3 erkennt Zonen nur, wenn sie in der Navigationskarte der Mod stehen. Mods mit eigener Navigationskarte dürfen nur einzeln integriert werden. Idee aus AdanosEdit. |
+| **NPC-Aussehen und -Ausstattung** | Kopf, Haare, Bart, Kleidung, Gruppe und Enklave, Händlerwaren, Waffen, Beute, Taschendiebstahl. Idee aus AdanosEdit. |
+| **Quest-Vorlagen** | Ein Katalog gängiger Quest-Arten mit automatisch erzeugten Dialogen: Gegenstände bringen, etwas ausrichten, töten, besiegen (Zweikampf), jemanden zu einer Person bringen, jemandem folgen, vertreiben, Arenakampf, Ort erreichen, Truhe ausrauben. Eher ein Baustein für spätere Mods als für das Kit selbst. Idee aus AdanosEdit. |
+| **Eigenschaften schreiben** | Lesen geht (`GetProperty`, `ListProperties`), Schreiben nicht. Damit ließe sich zum Beispiel das „Bonustalent“ (`ActivateSkill2` ist bei Waffen frei) für eigene Eigenschaften nutzen: mit einer geklonten Talent-Vorlage (`CloneTemplate` von `Perk_OrcSlayer`) und einem Schreibzugriff auf `ActivateSkill`. Unklar, ob das für Item-Instanzen speichert und stapelt; nicht untersucht. |
 | **Spielseiten** | `GetActivePage()` liefert Zahlen (-1, 4, 5, 6, 17), die Bedeutung ist nur teilweise bekannt. |
 
 ## Vergleich mit dem G1R-Modkit

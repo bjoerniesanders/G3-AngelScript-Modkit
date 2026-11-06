@@ -627,6 +627,59 @@ int EntAddItems(Entity& e, const SStr& name, int count) {
     }
     return rc;
 }
+// ---- Talente (API 30): Das Inventar des Helden kennt gelernte Talente und fuehrt je Talent einen Aktivierungszaehler (Waffen mit ActivateSkill1/2 zaehlen ihn
+// hoch, solange sie gefuehrt werden). gCInventory_PS::LearnSkill/ActivateSkill/DeactivateSkill/HasLearnedSkill/IsSkillActive/GetSkillActivationCount
+// nehmen die Talent-Vorlage (eCTemplateEntity). Ersatz fuer das nicht schreibbare ActivateSkill2 (Referenzen lassen sich nicht per Text setzen).
+typedef bool(__thiscall* SkillBoolFn)(void*, const void*);
+typedef int(__thiscall* SkillCountFn)(const void*, const void*);
+struct SkillApi {
+    bool tried = false;
+    SkillBoolFn learn = nullptr, activate = nullptr, deactivate = nullptr, hasLearned = nullptr, isActive = nullptr;
+    SkillCountFn count = nullptr;
+} g_sk;
+
+bool ResolveSkills() {
+    if (g_sk.tried) return g_sk.learn != nullptr;
+    if (!ResolveInv()) return false;
+    g_sk.tried = true;
+    auto G = [](const char* n) { return reinterpret_cast<void*>(GetProcAddress(g_e.game, n)); };
+    g_sk.learn = reinterpret_cast<SkillBoolFn>(G("?LearnSkill@gCInventory_PS@@QAE_NPBVeCTemplateEntity@@@Z"));
+    g_sk.activate = reinterpret_cast<SkillBoolFn>(G("?ActivateSkill@gCInventory_PS@@QAE_NPBVeCTemplateEntity@@@Z"));
+    g_sk.deactivate = reinterpret_cast<SkillBoolFn>(G("?DeactivateSkill@gCInventory_PS@@QAE_NPBVeCTemplateEntity@@@Z"));
+    g_sk.hasLearned = reinterpret_cast<SkillBoolFn>(G("?HasLearnedSkill@gCInventory_PS@@QBE_NPBVeCTemplateEntity@@@Z"));
+    g_sk.isActive = reinterpret_cast<SkillBoolFn>(G("?IsSkillActive@gCInventory_PS@@QBE_NPBVeCTemplateEntity@@@Z"));
+    g_sk.count = reinterpret_cast<SkillCountFn>(G("?GetSkillActivationCount@gCInventory_PS@@QBEHPBVeCTemplateEntity@@@Z"));
+    return g_sk.learn && g_sk.activate && g_sk.deactivate && g_sk.hasLearned && g_sk.isActive && g_sk.count;
+}
+// op: 0 lernen, 1 aktivieren, 2 deaktivieren, 3 gelernt?, 4 aktiv?, 5 Aktivierungszaehler. Rueckgabe -1 Fehler/unbekannt (auch Ausnahme)
+int SafeSkillOp(void* inv, const void* tpl, int op) {
+    __try {
+        switch (op) {
+            case 0: return g_sk.learn(inv, tpl) ? 1 : 0;
+            case 1: return g_sk.activate(inv, tpl) ? 1 : 0;
+            case 2: return g_sk.deactivate(inv, tpl) ? 1 : 0;
+            case 3: return g_sk.hasLearned(inv, tpl) ? 1 : 0;
+            case 4: return g_sk.isActive(inv, tpl) ? 1 : 0;
+            default: return g_sk.count(inv, tpl);
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+int SkillOp(const Entity& e, const SStr& skill, int op) {
+    void* inv = InventoryOf(e);
+    if (!inv || !ResolveSkills()) return -1;
+    if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
+        SStr mod("eCSceneAdmin");
+        g_e.sceneAdmin = SafeSceneAdmin(&mod);
+    }
+    void* tpl = g_e.sceneAdmin ? SafeFindTemplate(g_e.sceneAdmin, &skill, skill.c_str()) : nullptr;
+    return tpl ? SafeSkillOp(inv, tpl, op) : -1;
+}
+bool EntLearnSkill(const Entity& e, const SStr& s) { return SkillOp(e, s, 0) == 1; }
+bool EntActivateSkill(const Entity& e, const SStr& s) { return SkillOp(e, s, 1) == 1; }
+bool EntDeactivateSkill(const Entity& e, const SStr& s) { return SkillOp(e, s, 2) == 1; }
+bool EntHasLearnedSkill(const Entity& e, const SStr& s) { return SkillOp(e, s, 3) == 1; }
+bool EntIsSkillActive(const Entity& e, const SStr& s) { return SkillOp(e, s, 4) == 1; }
+int EntSkillActivationCount(const Entity& e, const SStr& s) { return SkillOp(e, s, 5); }
 // Globale Skriptfunktion: CloneTemplate("It_Wolf_Fur", "OG3_Fell") -> 0 angelegt, 1 vorhanden, <0 Fehler (Protokoll). Danach hero.AddItems("OG3_Fell", n).
 // Die Kopie lebt nur im Speicher (nicht im Spielstand, GUID wechselt bei jedem Start).
 int CloneTemplate(const SStr& base, const SStr& newName) {
@@ -997,6 +1050,480 @@ SStr EntCategory(const Entity& e) {
     return SStr("Other");
 }
 Entity EntCurrentAttacker(const Entity& e) { return {EntIsValid(e) ? CurrentAttackerOf(e.p) : nullptr}; }
+// ---- Statuseffekte (API 27): gCNPC_PS des NPCs (der Halter aus PSNpc(eCEntity*) ist das Eigenschaftsset, wie bei den Attributen). gEStatusEffect ist eine Bitmaske:
+// 1 Burning, 2 Frozen, 4 Poisoned, 8 Diseased, 16 Transformed, 64 Nebel, 128 Geist, 256 Magiebarriere, 512 Seelenreise. Krankheit/Gift werden auch ueber PSNpc::EnableDiseased/
+// EnablePoisoned gesetzt (Zeitstempel TimeStampDiseased/Poisoned im Set); hier wird nur die Bitmaske gelesen und geschrieben.
+typedef bool(__thiscall* HasSEFn)(void*, int);
+typedef void(__thiscall* EnableSEFn)(void*, int, bool);
+typedef const unsigned long&(__thiscall* MaskSEFn)(const void*);
+struct StatusApi {
+    bool tried = false, ok = false;
+    HasSEFn has = nullptr;
+    EnableSEFn enable = nullptr;
+    MaskSEFn mask = nullptr;
+} g_se;
+bool ResolveStatus() {
+    if (g_se.tried) return g_se.ok;
+    HMODULE game = GetModuleHandleA("Game.dll");
+    if (!game) return false;
+    g_se.tried = true;
+    g_se.has = reinterpret_cast<HasSEFn>(GetProcAddress(game, "?HasStatusEffect@gCNPC_PS@@QBE_NW4gEStatusEffect@@@Z"));
+    g_se.enable = reinterpret_cast<EnableSEFn>(GetProcAddress(game, "?EnableStatusEffect@gCNPC_PS@@QAEXW4gEStatusEffect@@_N@Z"));
+    g_se.mask = reinterpret_cast<MaskSEFn>(GetProcAddress(game, "?GetStatusEffects@gCNPC_PS@@QBEABKXZ"));
+    g_se.ok = g_se.has && g_se.enable && g_se.mask;
+    if (ScriptHost::s_current) ScriptHost::s_current->Log(std::string("Statuseffekt-Bindings ") + (g_se.ok ? "bereit" : "fehlen"));
+    return g_se.ok;
+}
+void* SafeNpcSet(void* ent) {
+    __try {
+        void* holder = nullptr;
+        g_psNpc(&holder, ent);
+        return holder && Valid(holder) ? holder : nullptr;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+void* NpcSetOf(const Entity& e) {
+    if (!EntIsValid(e) || !IsNpc(e.p) || !ResolveStatus()) return nullptr;
+    return SafeNpcSet(e.p);
+}
+bool SafeMaskSE(void* ps, unsigned* out) {
+    __try {
+        *out = static_cast<unsigned>(g_se.mask(ps));
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool SafeEnableSE(void* ps, int effect, bool on) {
+    __try {
+        g_se.enable(ps, effect, on);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+// Bitmaske der Statuseffekte (0 bei ungueltigem Entity oder Nicht-NPC)
+unsigned EntStatusMask(const Entity& e) {
+    void* ps = NpcSetOf(e);
+    unsigned m = 0;
+    return ps && SafeMaskSE(ps, &m) ? m : 0;
+}
+bool EntHasStatus(const Entity& e, int effect) { return effect > 0 && (EntStatusMask(e) & static_cast<unsigned>(effect)) != 0; }
+bool EntSetStatus(Entity& e, int effect, bool on) {
+    void* ps = NpcSetOf(e);
+    return ps && effect > 0 && SafeEnableSE(ps, effect, on);
+}
+
+// ---- Item-Qualitaet (API 28): Bitmaske des Inventarstapels in einem Ausruestungs-Slot (gCInventory_PS::FindStack(gESlot), gCInventoryStack::Get/SetQuality).
+// Bits: 2 Krank, 4 Vergiftet, 8 Brennend, 16 Gefroren, 32 Scharf, 64 Gesegnet, 128 Selbstgeschmiedet, 256 Abgenutzt; 512 = Lebensraub (eigenes Bit dieses Patches, wird von der Beschreibung
+// der Waffe angezeigt, siehe game_hooks.cpp). Die Qualitaet gehoert zum Stapel: verschiedene Qualitaeten sind verschiedene Stapel und werden mit dem Spielstand gespeichert.
+// Slots (gESlot): 1 rechte Hand, 2 linke Hand, 5 Ruecken links, 6 Ruecken rechts, 7 Bogen, 14 Munition.
+typedef void*(__thiscall* PSGetFn2)(void*, int);
+typedef const void*(__thiscall* FindStackSlotFn)(const void*, int);
+typedef const int&(__thiscall* StackGetQFn)(const void*);
+typedef void(__thiscall* StackSetQFn)(void*, const int*);
+struct QualityApi {
+    bool tried = false, ok = false;
+    PSGetFn2 getPS = nullptr;
+    FindStackSlotFn find = nullptr;
+    StackGetQFn get = nullptr;
+    StackSetQFn set = nullptr;
+} g_qa;
+bool ResolveQuality() {
+    if (g_qa.tried) return g_qa.ok;
+    HMODULE game = GetModuleHandleA("Game.dll"), eng = GetModuleHandleA("Engine.dll");
+    if (!game || !eng) return false;
+    g_qa.tried = true;
+    g_qa.getPS = reinterpret_cast<PSGetFn2>(GetProcAddress(eng, "?GetPropertySet@eCEntity@@UAEPAVeCEntityPropertySet@@W4eEPropertySetType@@@Z"));
+    g_qa.find = reinterpret_cast<FindStackSlotFn>(GetProcAddress(game, "?FindStack@gCInventory_PS@@QBEPBVgCInventoryStack@@W4gESlot@@@Z"));
+    g_qa.get = reinterpret_cast<StackGetQFn>(GetProcAddress(game, "?GetQuality@gCInventoryStack@@QBEABHXZ"));
+    g_qa.set = reinterpret_cast<StackSetQFn>(GetProcAddress(game, "?SetQuality@gCInventoryStack@@QAEXABH@Z"));
+    g_qa.ok = g_qa.getPS && g_qa.find && g_qa.get && g_qa.set;
+    if (ScriptHost::s_current) ScriptHost::s_current->Log(std::string("Qualitaets-Bindings ") + (g_qa.ok ? "bereit" : "fehlen"));
+    return g_qa.ok;
+}
+// Stapel im Slot (nullptr, wenn leer); SEH, ohne C++-Objekte
+void* SafeSlotStack(void* ent, int slot) {
+    __try {
+        void* inv = g_qa.getPS(ent, 31);   // eEPropertySetType_Inventory
+        return inv ? const_cast<void*>(g_qa.find(inv, slot)) : nullptr;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+bool SafeStackQuality(void* stack, int* out) {
+    __try {
+        *out = g_qa.get(stack);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool SafeSetStackQuality(void* stack, int q) {
+    __try {
+        g_qa.set(stack, &q);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+unsigned EntSlotQuality(const Entity& e, int slot) {
+    if (!EntIsValid(e) || !ResolveQuality()) return 0;
+    void* st = SafeSlotStack(e.p, slot);
+    int q = 0;
+    return st && SafeStackQuality(st, &q) ? static_cast<unsigned>(q) : 0;
+}
+bool EntSetSlotQuality(Entity& e, int slot, unsigned bits) {
+    if (!EntIsValid(e) || !ResolveQuality()) return false;
+    void* st = SafeSlotStack(e.p, slot);
+    return st && SafeSetStackQuality(st, static_cast<int>(bits));
+}
+Entity EntSlotItem(const Entity& e, int slot) { return {EntIsValid(e) ? SlotItemOf(e.p, slot) : nullptr}; }
+// ---- Eigenschaften lesen (API 29): allgemeiner Eigenschaftszugriff der Engine (SharedBase bCAccessorProperty, 12 Byte) auf das Eigenschaftsset eines Entities
+// (eCEntity::GetPropertySet(eEPropertySetType)). Der Accessor laeuft ueber alle Eigenschaften des Sets und seiner Basisklassen (++), ConvertValueToString liefert den Wert als Text.
+// Nur Lesen. Alle Aufrufe in die Engine sind mit SEH gekapselt; Accessor-Objekte liegen in Puffern und werden von Hand zerstoert.
+struct PsName {
+    const char* name;
+    int id;
+};
+static const PsName kPsNames[] = {
+    {"Unknown", 0},
+    {"Base", 1},
+    {"MeshVisual", 2},
+    {"DummyVisual", 3},
+    {"Advanced", 4},
+    {"Navigation", 5},
+    {"DynamicCollisionCircle", 6},
+    {"CollisionCircle", 7},
+    {"NavZone", 8},
+    {"NegZone", 9},
+    {"NavPath", 10},
+    {"PrefPath", 11},
+    {"NavHelper", 12},
+    {"RigidBody", 13},
+    {"CollisionShape", 14},
+    {"DynamicLight", 15},
+    {"DirectionalLight", 16},
+    {"PointLight", 17},
+    {"SpotLight", 18},
+    {"Hemisphere", 19},
+    {"MovementBase", 20},
+    {"CharacterMovement", 21},
+    {"CharacterControl", 22},
+    {"CharacterSensor", 23},
+    {"CameraAI", 24},
+    {"Editor", 25},
+    {"AIHelper", 26},
+    {"AIHelperFreePoint", 27},
+    {"AIHelperSpawnPoint", 28},
+    {"AIHelperPlayerStart", 29},
+    {"NPC", 30},
+    {"Inventory", 31},
+    {"Clock", 32},
+    {"Effect", 33},
+    {"ParticleEffect", 34},
+    {"EventFilter", 35},
+    {"EventDebugger", 36},
+    {"EventLogic", 37},
+    {"EventScript", 38},
+    {"Trigger", 39},
+    {"TriggerList", 40},
+    {"TriggerCombiner", 41},
+    {"Skydome", 42},
+    {"EditorVisual", 43},
+    {"EngineCaps", 44},
+    {"ScriptRoutine", 45},
+    {"SpeedTree", 46},
+    {"SpeedTreeWind", 47},
+    {"Item", 48},
+    {"Interaction", 49},
+    {"TouchDamage", 50},
+    {"Damage", 51},
+    {"DamageReceiver", 52},
+    {"QuestManager", 53},
+    {"Quest", 54},
+    {"InfoManager", 55},
+    {"Info", 56},
+    {"InfoScript", 57},
+    {"InfoScriptLine", 58},
+    {"Focus", 59},
+    {"PlayerMemory", 60},
+    {"NavOffset", 61},
+    {"Enclave", 62},
+    {"Arena", 63},
+    {"Area", 64},
+    {"Vegetation", 65},
+    {"VegetationBrush", 66},
+    {"VegetationRubber", 67},
+    {"Dialog", 68},
+    {"Lock", 69},
+    {"Door", 70},
+    {"StaticLight", 71},
+    {"StaticPointLight", 72},
+    {"StaticSpotLight", 73},
+    {"Illuminated", 74},
+    {"Statistics", 75},
+    {"PhysicScene", 76},
+    {"Party", 77},
+    {"Anchor", 78},
+    {"Letter", 79},
+    {"Book", 80},
+    {"Map", 81},
+    {"LinkContainer", 82},
+    {"Projectile", 83},
+    {"Sound", 84},
+    {"Strip", 85},
+    {"ForceField", 86},
+    {"Particle", 87},
+    {"ParticleSystem", 88},
+    {"ParticleEmitter", 89},
+    {"SpriteEmitter", 90},
+    {"BeamEmitter", 91},
+    {"SparkEmitter", 92},
+    {"MeshEmitter", 93},
+    {"AIZone", 94},
+    {"AudioEmitter", 95},
+    {"Effect2", 96},
+    {"LightStreaks", 97},
+    {"WeatherZone", 98},
+    {"Precipitation", 99},
+    {"Animation", 100},
+    {"Magic", 101},
+    {"Skill", 102},
+    {"Mover", 103},
+    {"Teleporter", 104},
+    {"ArmorSet", 105},
+    {"SectorPersistence", 106},
+    {"Flock", 107},
+    {"TreasureSet", 108},
+    {"Recipe", 109},
+    {"WaterZone", 110},
+    {"DistanceTrigger", 111},
+    {"TimeZone", 112},
+    {"Decal", 113},
+    {"MagicBarrier", 114}
+};
+typedef void*(__thiscall* AccCtorFn)(void*, const void*);
+typedef void*(__thiscall* AccIndexFn)(void*, void*, const void*);
+typedef void*(__thiscall* AccConvFn)(void*, void*);
+typedef bool(__thiscall* AccValidFn)(const void*);
+typedef void(__thiscall* AccDtorFn)(void*);
+typedef const void*(__thiscall* AccNameFn)(const void*);
+typedef void*(__thiscall* AccIncFn)(void*);
+typedef void*(__thiscall* PsGetFn3)(void*, int);
+typedef void*(__thiscall* PsGetByNameFn)(void*, const void*);   // eCEntity::GetPropertySet(const bCString& Klassenname)
+typedef void(__thiscall* AccConvStrFn)(void*, const void*, int);   // ConvertStringToValue(const bCString&, eEOperandValue)
+struct PropApi {
+    bool tried = false, ok = false;
+    AccCtorFn ctor = nullptr;
+    AccIndexFn index = nullptr;
+    AccConvFn conv = nullptr;
+    AccValidFn valid = nullptr;
+    AccDtorFn dtor = nullptr;
+    AccNameFn name = nullptr;
+    AccIncFn inc = nullptr;
+    PsGetFn3 getPS = nullptr;
+    PsGetByNameFn getPSByName = nullptr;   // optional
+    AccConvStrFn convStr = nullptr;        // optional (Schreiben)
+} g_pa;
+bool ResolveProps() {
+    if (g_pa.tried) return g_pa.ok;
+    HMODULE sb = GetModuleHandleA("SharedBase.dll"), eng = GetModuleHandleA("Engine.dll");
+    if (!sb || !eng) return false;
+    g_pa.tried = true;
+    g_pa.ctor = reinterpret_cast<AccCtorFn>(GetProcAddress(sb, "??0bCAccessorProperty@@QAE@PBVbCObjectRefBase@@@Z"));
+    g_pa.index = reinterpret_cast<AccIndexFn>(GetProcAddress(sb, "??AbCAccessorProperty@@QAE?AV0@ABVbCString@@@Z"));
+    g_pa.conv = reinterpret_cast<AccConvFn>(GetProcAddress(sb, "?ConvertValueToString@bCAccessorProperty@@QAE?AVbCString@@XZ"));
+    g_pa.valid = reinterpret_cast<AccValidFn>(GetProcAddress(sb, "?IsValid@bCAccessorProperty@@QBE_NXZ"));
+    g_pa.dtor = reinterpret_cast<AccDtorFn>(GetProcAddress(sb, "??1bCAccessorProperty@@QAE@XZ"));
+    g_pa.name = reinterpret_cast<AccNameFn>(GetProcAddress(sb, "?GetPropertyName@bCAccessorProperty@@QBEABVbCString@@XZ"));
+    g_pa.inc = reinterpret_cast<AccIncFn>(GetProcAddress(sb, "??EbCAccessorProperty@@QAEAAV0@XZ"));
+    g_pa.getPS = reinterpret_cast<PsGetFn3>(GetProcAddress(eng, "?GetPropertySet@eCEntity@@UAEPAVeCEntityPropertySet@@W4eEPropertySetType@@@Z"));
+    g_pa.getPSByName = reinterpret_cast<PsGetByNameFn>(GetProcAddress(eng, "?GetPropertySet@eCEntity@@QAEPAVeCEntityPropertySet@@ABVbCString@@@Z"));
+    g_pa.convStr = reinterpret_cast<AccConvStrFn>(GetProcAddress(sb, "?ConvertStringToValue@bCAccessorProperty@@QAEXABVbCString@@W4eEOperandValue@1@@Z"));
+    g_pa.ok = g_pa.ctor && g_pa.index && g_pa.conv && g_pa.valid && g_pa.dtor && g_pa.name && g_pa.inc && g_pa.getPS;
+    if (ScriptHost::s_current) ScriptHost::s_current->Log(std::string("Eigenschaften-Bindings ") + (g_pa.ok ? "bereit" : "fehlen"));
+    return g_pa.ok;
+}
+// Name eines Eigenschaftssets -> eEPropertySetType: "Item", "gCItem_PS", "eCRigidBody_PS" (Gross-/Kleinschreibung egal), -1 = unbekannt
+int PsTypeId(const char* text) {
+    std::string n = text ? text : "";
+    for (char& c : n) c = char(tolower(static_cast<unsigned char>(c)));
+    if (n.size() > 2 && (n.compare(0, 2, "gc") == 0 || n.compare(0, 2, "ec") == 0)) n.erase(0, 2);
+    if (n.size() > 3 && n.compare(n.size() - 3, 3, "_ps") == 0) n.erase(n.size() - 3);
+    for (const PsName& p : kPsNames) {
+        std::string t = p.name;
+        for (char& c : t) c = char(tolower(static_cast<unsigned char>(c)));
+        if (t == n) return p.id;
+    }
+    return -1;
+}
+void* SafePropSet(void* ent, int id) {
+    __try {
+        return g_pa.getPS(ent, id);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+void* SafePropSetByName(void* ent, const void* nameStr) {
+    __try {
+        return g_pa.getPSByName(ent, nameStr);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+// Eigenschaftsset eines Entities: Typname aus eEPropertySetType ("Item", "gCItem_PS") oder, wenn der nicht bekannt ist, der Klassenname ("gCSkill_PS", ...) ueber GetPropertySet(bCString)
+void* PropSetFor(const Entity& e, const SStr& set) {
+    const int id = PsTypeId(g_sb.strGetText(&set));
+    if (id >= 0) return SafePropSet(e.p, id);
+    return g_pa.getPSByName ? SafePropSetByName(e.p, &set) : nullptr;
+}
+// Wert einer Eigenschaft als Text; 1 gelesen, 0 Eigenschaft unbekannt, -1 Fehler
+int SafePropOne(void* ps, const void* nameStr, std::string* out) {
+    char acc[32] = {}, sub[32] = {}, ret[32] = {};
+    __try {
+        g_pa.ctor(acc, ps);
+        g_pa.index(acc, sub, nameStr);
+        int r = 0;
+        if (g_pa.valid(sub)) {
+            g_pa.conv(sub, ret);
+            const char* t = g_sb.strGetText(ret);
+            out->assign(t ? t : "");
+            g_sb.strDtor(ret);
+            r = 1;
+        }
+        g_pa.dtor(sub);
+        g_pa.dtor(acc);
+        return r;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+// Liste: Accessor anlegen / Schritt (aktuelle Eigenschaft anhaengen und weiter) / aufraeumen
+bool SafePropStart(void* ps, void* acc) {
+    __try {
+        g_pa.ctor(acc, ps);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool SafePropValid(void* acc) {
+    __try {
+        return g_pa.valid(acc);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+// Name der aktuellen Eigenschaft in einen Puffer kopieren
+bool SafePropName(void* acc, char* buf, size_t n) {
+    buf[0] = 0;
+    __try {
+        const char* t = g_sb.strGetText(g_pa.name(acc));
+        size_t i = 0;
+        for (; t && i + 1 < n && t[i]; ++i) buf[i] = t[i];
+        buf[i] = 0;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { buf[0] = 0; return false; }
+}
+// Wert der aktuellen Eigenschaft als Text in einen Puffer (abgeschnitten)
+bool SafePropValue(void* acc, char* buf, size_t n) {
+    char ret[32] = {};
+    buf[0] = 0;
+    __try {
+        g_pa.conv(acc, ret);
+        const char* t = g_sb.strGetText(ret);
+        size_t i = 0;
+        for (; t && i + 1 < n && t[i]; ++i) buf[i] = t[i];
+        buf[i] = 0;
+        g_sb.strDtor(ret);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { buf[0] = 0; return false; }
+}
+bool SafePropInc(void* acc) {
+    __try {
+        g_pa.inc(acc);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+void SafePropEnd(void* acc) {
+    __try {
+        g_pa.dtor(acc);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+std::string PropClean(std::string s, size_t maxlen) {
+    for (char& c : s)
+        if (c == ';' || c == '\r' || c == '\n' || c == '\t') c = ' ';
+    if (s.size() > maxlen) s.resize(maxlen);
+    return s;
+}
+// Wert aus Text schreiben (ConvertStringToValue, Zuweisen); 1 geschrieben, 0 Eigenschaft unbekannt, -1 Fehler
+int SafePropWrite(void* ps, const void* nameStr, const void* valueStr) {
+    char acc[32] = {}, sub[32] = {};
+    __try {
+        g_pa.ctor(acc, ps);
+        g_pa.index(acc, sub, nameStr);
+        int r = 0;
+        if (g_pa.valid(sub)) {
+            g_pa.convStr(sub, valueStr, 0);
+            r = 1;
+        }
+        g_pa.dtor(sub);
+        g_pa.dtor(acc);
+        return r;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+SStr GetPropertyText(const Entity& e, const SStr& set, const SStr& prop) {
+    if (!EntIsValid(e) || !ResolveProps()) return SStr();
+    void* ps = PropSetFor(e, set);
+    std::string r;
+    if (!ps || SafePropOne(ps, &prop, &r) != 1) return SStr();
+    if (r.size() > 3000) r.resize(3000);
+    return SStr(r);
+}
+// Eigenschaft aus Text setzen. Aendert Spieldaten: nur fuer Vorlagen und Entities verwenden, die der Mod selbst angelegt hat. Eine falsche Textform kann zu falschen Werten fuehren.
+bool SetPropertyText(const Entity& e, const SStr& set, const SStr& prop, const SStr& value) {
+    if (!EntIsValid(e) || !ResolveProps() || !g_pa.convStr) return false;
+    void* ps = PropSetFor(e, set);
+    return ps && SafePropWrite(ps, &prop, &value) == 1;
+}
+// Verweis-Eigenschaft (eCTemplateEntityProxy, z. B. Item.ActivateSkill2, Item.Skill, gCSkill_PS.ReqSkill1) auf eine Vorlage setzen. Per Text (ConvertStringToValue) geht das nicht
+// (Formtest 2026-11-06). Statt dessen: gCxxx_PS::Access<Eigenschaft>() liefert den Proxy, eCTemplateEntityProxy::SetEntity(eCTemplateEntity const*) setzt das Ziel.
+typedef void*(__thiscall* AccessProxyFn)(void*);
+typedef void(__thiscall* ProxySetEntityFn)(void*, const void*);
+bool SafeSetRef(void* ps, AccessProxyFn access, ProxySetEntityFn setEntity, const void* tpl) {
+    __try {
+        void* proxy = access(ps);
+        if (!proxy) return false;
+        setEntity(proxy, tpl);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool SetTemplateRefScript(const Entity& e, const SStr& set, const SStr& prop, const SStr& target) {
+    if (!EntIsValid(e) || !ResolveInv()) return false;
+    char mangled[200];
+    // set ist hier der Klassenname (gCItem_PS, gCSkill_PS, gCArmorSet_PS ...)
+    std::snprintf(mangled, sizeof mangled, "?Access%s@%s@@QAEAAVeCTemplateEntityProxy@@XZ", prop.c_str(), set.c_str());
+    auto access = reinterpret_cast<AccessProxyFn>(GetProcAddress(g_e.game, mangled));
+    auto setEntity = reinterpret_cast<ProxySetEntityFn>(GetProcAddress(g_e.engine, "?SetEntity@eCTemplateEntityProxy@@QAEXPBVeCTemplateEntity@@@Z"));
+    if (!access || !setEntity) return false;
+    void* ps = PropSetFor(e, set);
+    if (!ps) return false;
+    if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
+        SStr mod("eCSceneAdmin");
+        g_e.sceneAdmin = SafeSceneAdmin(&mod);
+    }
+    void* tpl = g_e.sceneAdmin ? SafeFindTemplate(g_e.sceneAdmin, &target, target.c_str()) : nullptr;
+    return tpl && SafeSetRef(ps, access, setEntity, tpl);
+}
+// Vorlage (Template-Entity) nach genauem Namen; ungueltig, wenn es sie nicht gibt. Ihre Eigenschaftssets lassen sich wie bei einem Entity lesen (und fuer eigene Vorlagen schreiben)
+Entity GetTemplateEntityScript(const SStr& name) {
+    if (!ResolveInv()) return {nullptr};
+    if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
+        SStr mod("eCSceneAdmin");
+        g_e.sceneAdmin = SafeSceneAdmin(&mod);
+    }
+    return {g_e.sceneAdmin ? SafeFindTemplate(g_e.sceneAdmin, &name, name.c_str()) : nullptr};
+}
+// "Name=Wert; Name=Wert; ..." fuer alle Eigenschaften des Sets (und seiner Basisklassen), hoechstens max Stueck; ';' in Werten wird zu Leerzeichen
+SStr ListPropertyTexts(const Entity& e, const SStr& set, int maxn) {
+    if (!EntIsValid(e) || !ResolveProps()) return SStr();
+    void* ps = PropSetFor(e, set);
+    if (!ps) return SStr();
+    char acc[32] = {};
+    if (!SafePropStart(ps, acc)) return SStr();
+    std::string all;
+    for (int i = 0; i < (maxn < 1 ? 1 : maxn > 600 ? 600 : maxn); ++i) {
+        if (!SafePropValid(acc)) break;
+        char nm[160], val[1200];
+        SafePropName(acc, nm, sizeof nm);
+        if (!SafePropValue(acc, val, sizeof val)) std::strcpy(val, "<Fehler>");
+        if (!all.empty()) all += ";";
+        all += PropClean(std::string(nm) + "=" + val, 420);
+        if (!SafePropInc(acc)) break;
+    }
+    SafePropEnd(acc);
+    return SStr(all);
+}
 bool EntIsBuilding(const Entity& e) { return std::strcmp(EntCategory(e).c_str(), "Building") == 0; }
 // Im Systemsektor liegen auch Welt-Objekte (z. B. G3_World_Border_001): deshalb zusaetzlich NPC-Pflicht.
 bool IsDynamicSpawn(const Entity& e) {
@@ -1109,6 +1636,20 @@ bool SafeTemplateNames(void* admin, const void* part, int maxn, std::string* out
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
+// Anzahl der Vorlagen, deren Name mit part beginnt (billig, ohne die Namen zu lesen); -1 ohne Spiel
+int SafeCountTemplates(void* admin, const void* part) {
+    __try {
+        return g_i.countPart(admin, part, 2);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+int CountTemplateNames(const SStr& part) {
+    if (!ResolveInv() || !g_i.countPart || !g_i.byPart) return -1;
+    if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
+        SStr mod("eCSceneAdmin");
+        g_e.sceneAdmin = SafeSceneAdmin(&mod);
+    }
+    return g_e.sceneAdmin ? SafeCountTemplates(g_e.sceneAdmin, &part) : -1;
+}
 SStr FindTemplateNames(const SStr& part, int maxn) {
     std::string r;
     if (ResolveInv() && g_i.countPart && g_i.byPart) {
@@ -1116,7 +1657,7 @@ SStr FindTemplateNames(const SStr& part, int maxn) {
             SStr mod("eCSceneAdmin");
             g_e.sceneAdmin = SafeSceneAdmin(&mod);
         }
-        if (g_e.sceneAdmin) SafeTemplateNames(g_e.sceneAdmin, &part, maxn < 1 ? 1 : maxn > 200 ? 200 : maxn, &r);
+        if (g_e.sceneAdmin) SafeTemplateNames(g_e.sceneAdmin, &part, maxn < 1 ? 1 : maxn > 20000 ? 20000 : maxn, &r);
     }
     return SStr(r);
 }
@@ -1124,6 +1665,28 @@ int EntRemoveItems(Entity& e, const SStr& name, int count) {   // Rueckgabe: Zah
     void* inv = InventoryOf(e);
     int r = 0;
     return inv && count > 0 && SafeRemoveItems(inv, &name, count, &r) ? r : -1;
+}
+
+// Entfernt alle Stapel mit diesem Namen samt dem Stapel selbst (gCInventory_PS::DeleteStack). RemoveItems verringert nur die Menge; bei dauerhaften Items
+// (Permanent, z. B. Lern-Items von Talenten) bleibt dann ein leerer Stapel stehen. Rueckgabe: Zahl entfernter Stapel, -1 bei Fehler
+typedef bool(__thiscall* InvDeleteStackFn)(void*, int);
+bool SafeDeleteStacks(void* inv, const void* name, int* removed) {
+    static InvDeleteStackFn del = reinterpret_cast<InvDeleteStackFn>(GetProcAddress(g_e.game, "?DeleteStack@gCInventory_PS@@QAE_NH@Z"));
+    if (!del) return false;
+    __try {
+        for (int guard = 0; guard < 64; ++guard) {
+            const int idx = g_i.find(inv, name, 0, 0, -1);
+            if (idx < 0) break;
+            if (!del(inv, idx)) break;
+            ++*removed;
+        }
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+int EntDeleteItemStack(Entity& e, const SStr& name) {
+    void* inv = InventoryOf(e);
+    int r = 0;
+    return inv && SafeDeleteStacks(inv, &name, &r) ? r : -1;
 }
 
 void* WorldClock() {
@@ -1262,6 +1825,13 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterObjectMethod("Entity", "int AddItems(const bCString &in, int)", asFUNCTION(EntAddItems), asCALL_CDECL_OBJFIRST));
     OG3_REG(
         e->RegisterObjectMethod("Entity", "int RemoveItems(const bCString &in, int)", asFUNCTION(EntRemoveItems), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool LearnSkill(const bCString &in)", asFUNCTION(EntLearnSkill), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool ActivateSkill(const bCString &in)", asFUNCTION(EntActivateSkill), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool DeactivateSkill(const bCString &in)", asFUNCTION(EntDeactivateSkill), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool HasLearnedSkill(const bCString &in) const", asFUNCTION(EntHasLearnedSkill), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool IsSkillActive(const bCString &in) const", asFUNCTION(EntIsSkillActive), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "int GetSkillActivationCount(const bCString &in) const", asFUNCTION(EntSkillActivationCount), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "int DeleteItemStack(const bCString &in)", asFUNCTION(EntDeleteItemStack), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterGlobalFunction("int CloneTemplate(const bCString &in base, const bCString &in newName)", asFUNCTION(CloneTemplate),
                                       asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("Entity SpawnNPC(const bCString &in templateName, const bCVector &in position)", asFUNCTION(SpawnNPC),
@@ -1277,6 +1847,44 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("bool DestroyNPC(const Entity &in)", asFUNCTION(DestroyNPC), asCALL_CDECL));
     OG3_REG(e->RegisterObjectMethod("Entity", "bCString GetCategory() const", asFUNCTION(EntCategory), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetCurrentAttacker() const", asFUNCTION(EntCurrentAttacker), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "uint GetStatusEffects() const", asFUNCTION(EntStatusMask), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool HasStatusEffect(int) const", asFUNCTION(EntHasStatus), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetStatusEffect(int, bool)", asFUNCTION(EntSetStatus), asCALL_CDECL_OBJFIRST));
+    {
+        static const int kSE[] = {1, 2, 4, 8, 16, 64, 128, 256, 512};
+        static const char* kSEN[] = {"STATUS_BURNING", "STATUS_FROZEN",  "STATUS_POISONED",     "STATUS_DISEASED",     "STATUS_TRANSFORMED",
+                                     "STATUS_IN_FOG",  "STATUS_GHOST",   "STATUS_IN_MAGIC_BARRIER", "STATUS_SOULTRAVEL"};
+        for (int i = 0; i < 9; ++i) {
+            char d[64];
+            std::snprintf(d, sizeof d, "const int %s", kSEN[i]);
+            OG3_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kSE[i])));
+        }
+    }
+    OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetSlotItem(int) const", asFUNCTION(EntSlotItem), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "uint GetSlotQuality(int) const", asFUNCTION(EntSlotQuality), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetSlotQuality(int, uint)", asFUNCTION(EntSetSlotQuality), asCALL_CDECL_OBJFIRST));
+    {
+        static const int kQ[] = {2, 4, 8, 16, 32, 64, 128, 256, 512};
+        static const char* kQN[] = {"QUALITY_DISEASED", "QUALITY_POISONED", "QUALITY_BURNING", "QUALITY_FROZEN", "QUALITY_SHARP",
+                                    "QUALITY_BLESSED",  "QUALITY_FORGED",   "QUALITY_WORN",    "QUALITY_LIFESTEAL"};
+        for (int i = 0; i < 9; ++i) {
+            char d[64];
+            std::snprintf(d, sizeof d, "const int %s", kQN[i]);
+            OG3_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kQ[i])));
+        }
+        static const int kSlots[] = {1, 2, 5, 6, 7, 14};
+        static const char* kSN[] = {"SLOT_RIGHT_HAND", "SLOT_LEFT_HAND", "SLOT_BACK_LEFT", "SLOT_BACK_RIGHT", "SLOT_BOW", "SLOT_AMMO"};
+        for (int i = 0; i < 6; ++i) {
+            char d[64];
+            std::snprintf(d, sizeof d, "const int %s", kSN[i]);
+            OG3_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kSlots[i])));
+        }
+    }
+    OG3_REG(e->RegisterGlobalFunction("bCString GetProperty(const Entity &in, const bCString &in set, const bCString &in prop)", asFUNCTION(GetPropertyText), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool SetProperty(const Entity &in, const bCString &in set, const bCString &in prop, const bCString &in value)", asFUNCTION(SetPropertyText), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool SetTemplateRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const bCString &in target)", asFUNCTION(SetTemplateRefScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("Entity GetTemplateEntity(const bCString &in name)", asFUNCTION(GetTemplateEntityScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bCString ListProperties(const Entity &in, const bCString &in set, int max = 200)", asFUNCTION(ListPropertyTexts), asCALL_CDECL));
     OG3_REG(e->RegisterObjectMethod("Entity", "bool IsBuilding() const", asFUNCTION(EntIsBuilding), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterGlobalFunction("bool IsNPC(const Entity &in)", asFUNCTION(IsNPCScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool IsDynamicSpawn(const Entity &in)", asFUNCTION(IsDynamicSpawn), asCALL_CDECL));
@@ -1287,6 +1895,7 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
         e->RegisterObjectMethod("Entity", "bool SetRotation(const bCQuaternion &in)", asFUNCTION(EntSetRotation), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "bool LookAt(const Entity &in, float yawOffsetDegrees = 0)", asFUNCTION(EntLookAt),
                                     asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterGlobalFunction("int CountTemplateNames(const bCString &in prefix)", asFUNCTION(CountTemplateNames), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bCString FindTemplateNames(const bCString &in part, int max = 20)", asFUNCTION(FindTemplateNames),
                                       asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool SetGameEvent(const bCString &in)", asFUNCTION(SetGameEvent), asCALL_CDECL));

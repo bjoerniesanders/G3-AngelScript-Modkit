@@ -4,7 +4,7 @@ Mit dem **OG3-Patch** schreibst du Mods für Gothic 3 in einer Skriptsprache, oh
 Die Skripte sind **AngelScript** (C++-ähnliche Syntax, `int`, `float`, `bCString`, Klassen, Arrays). Der Patch lädt sie beim Spielstart, führt sie
 bei Spielereignissen aus und lädt sie im laufenden Spiel neu, sobald du die Datei speicherst.
 
-Aktuelle Skript-Schnittstelle: **Version 26** (`GetApiVersion()`).
+Aktuelle Skript-Schnittstelle: **Version 28** (`GetApiVersion()`).
 
 ## Inhalt
 
@@ -21,6 +21,7 @@ Aktuelle Skript-Schnittstelle: **Version 26** (`GetApiVersion()`).
 | [Dialoge](dialogs.md) | Gespräche (Infos) lesen und eigene anlegen, Befehle, Questlog-Verbindung |
 | [Speichern und Laden](saving.md) | Lade-Ereignisse, Schalter im Spielstand, Wiederherstellung |
 | [Beispiele](examples.md) | Fertige Mods zum Lernen und Kopieren |
+| [Referenz](reference.md) | Geprüfte Werte, Namen und Konstanten: Schadensarten, Statuseffekte, Qualitäten, Slots, KI-Modi, Attribute, Namen aus dem Spiel |
 | [Grenzen und Stand](limitations.md) | Was funktioniert, was ungetestet ist, was noch fehlt |
 
 ## Schnellstart

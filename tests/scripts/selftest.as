@@ -80,6 +80,16 @@ void TestMatrix4() {
     Entity z;
     check(near(z.GetWorldMatrix().GetElement(0, 0), 1), "Entity ohne Spiel: Einheitsmatrix");
     check(!IsNPC(z) && !IsDynamicSpawn(z) && z.GetCategory() == "" && !z.IsBuilding(), "ohne Spiel kein NPC/keine Kategorie");
+    check(STATUS_POISONED == 4 && STATUS_DISEASED == 8 && STATUS_BURNING == 1, "Konstanten der Statuseffekte");
+    check(!z.GetSlotItem(SLOT_RIGHT_HAND).IsValid(), "Slot-Item ungueltiger Entity: ungueltig");
+    check(GetProperty(z, "Item", "GoldValue") == "" && ListProperties(z, "Item") == "", "Eigenschaften ohne Spiel: leer");
+    check(!GetTemplateEntity("Perk_OrcSlayer").IsValid() && !SetProperty(z, "Item", "GoldValue", "1"), "Vorlage/Schreiben ohne Spiel: ungueltig/false");
+    check(!z.LearnSkill("Perk_1H_1") && !z.ActivateSkill("Perk_1H_1") && !z.DeactivateSkill("Perk_1H_1") && !z.HasLearnedSkill("Perk_1H_1") && !z.IsSkillActive("Perk_1H_1") && z.GetSkillActivationCount("Perk_1H_1") == -1, "Talente ohne Spiel: false/-1");
+    check(z.DeleteItemStack("It_Perk_1H_1") == -1, "DeleteItemStack ohne Spiel: -1");
+    check(CountTemplateNames("It_") <= 0, "Vorlagen zaehlen ohne Spiel: -1");
+    check(QUALITY_LIFESTEAL == 512 && QUALITY_SHARP == 32 && QUALITY_BLESSED == 64 && SLOT_RIGHT_HAND == 1 && SLOT_BACK_RIGHT == 6, "Konstanten der Qualitaet und Slots");
+    check(z.GetSlotQuality(SLOT_RIGHT_HAND) == 0 && !z.SetSlotQuality(SLOT_RIGHT_HAND, QUALITY_LIFESTEAL), "Qualitaet ungueltiger Entity: 0/false");
+    check(z.GetStatusEffects() == 0 && !z.HasStatusEffect(STATUS_DISEASED) && !z.SetStatusEffect(STATUS_DISEASED, true), "Statuseffekte ungueltiger Entity: 0/false");
     check(z.GetTemplateName() == "" && !z.GetParent().IsValid() && z.GetBoundsMax().GetMagnitude() < 0.001f, "ohne Spiel keine Vorlage/Huelle/Eltern");
     check(!PickCenter().IsValid() && !HasPickPoint() && GetPickPoint().GetMagnitude() < 0.001f, "ohne Spiel kein Bildschirm-Picking");
     check(!GetFocusedEntity().IsValid(), "ohne Spiel kein Fokus-Entity");

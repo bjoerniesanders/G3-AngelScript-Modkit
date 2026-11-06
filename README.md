@@ -1,4 +1,4 @@
-﻿# OG3-Patch
+# OG3-Patch
 
 AngelScript-Modding fuer das **Original-Gothic-3**: `og3_patch.dll` wird von einer schlanken Ersatz-`dbghelp.dll` (dem Loader, `src/loader`) geladen, startet
 AngelScript 2.38 und bindet Spielereignisse, Quests, Inventar, Dialoge und Datei-Patches an Mod-Skripte.
@@ -10,7 +10,7 @@ AngelScript 2.38 und bindet Spielereignisse, Quests, Inventar, Dialoge und Datei
 | `tests/` | `test_runner.cpp` (og3_patch_test), `scripts/selftest.as`, `mods/` (Ordner-Test) |
 | `examples/` | Beispiel-Mods (`mods/`) und Mini-Mod (`scripts/main.as`) |
 | `docs/` | `og3_patch.md` (Stand/Technik), `modkit/` (Modder-Doku) |
-| `tools/` | `install_loader.ps1` (Ein-/Ausbau mit dem Loader), `install_patch.ps1` (nur mit dem Proxy des Hauptrepos), `graphify_modding_sync.ps1` |
+| `tools/` | `g3pak_read.py` (Archive lesen, auch komprimierte Eintraege), `reference_from_log.py` (Referenz aus dem Dump), `install_loader.ps1` (Ein-/Ausbau mit dem Loader), `install_patch.ps1` (nur mit dem Proxy des Hauptrepos), `graphify_modding_sync.ps1` |
 | (beim Bauen geladen) | AngelScript (zlib) und MinHook: `OG3P_ANGELSCRIPT_DIR` / `OG3P_MINHOOK_DIR` oder automatischer Download |
 
 ## Bauen (32 Bit)
@@ -31,7 +31,7 @@ des Spiels funktionieren weiter), stellt den Loader als `dbghelp.dll` hin und ko
 `<Spiel>\og3_backup\loader_<Zeit>\`. Protokolle: `og3_loader.log` (Loader, Absturzkandidaten) und `og3_patch.log` (Patch). Einstellungen in `og3_patch.ini`
 (`[patch] enable/script/hotreload/mods`, `[loader] crashlog`); fehlt sie, liest der Loader die `og3_hooks.ini` des Hauptrepos.
 
-`tools/install_patch.ps1` ist der ältere Weg mit dem Proxy aus dem Hauptrepo `OpenGothic3` (`build32\hook\dbghelp.dll`, enthaelt zusaetzlich die Nachbau-Hooks).
+`tools/install_patch.ps1` ist der �ltere Weg mit dem Proxy aus dem Hauptrepo `OpenGothic3` (`build32\hook\dbghelp.dll`, enthaelt zusaetzlich die Nachbau-Hooks).
 Beides gleichzeitig geht nicht, beide ersetzen dieselbe `dbghelp.dll`.
 
 ## Abhaengigkeiten zum Hauptrepo
