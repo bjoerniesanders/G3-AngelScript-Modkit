@@ -188,6 +188,25 @@ bool NpcAttackers(void* ent, void** last, void** cur) {
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
+// Item in einem Ausruestungs-Slot des Entity: gCInventory_PS (eEPropertySetType_Inventory = 31)::GetStackFromSlot(gESlot).
+// gESlot: 1 RightHand, 2 LeftHand, 3 EquipLeftHand, 7 Bow, 14 Ammo.
+typedef void*(__thiscall* FnStackFromSlot)(const void*, int);
+FnStackFromSlot g_stackFromSlot = nullptr;
+void* SlotItem(void* ent, int slot) {
+    if (!ent || !g_getPS || !g_stackFromSlot || !ReadableMem(ent, 8)) return nullptr;
+    __try {
+        void* ps = g_getPS(ent, 31);
+        return ps ? g_stackFromSlot(ps, slot) : nullptr;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+// Waffe, die der Angreifer fuehrt: rechte Hand (Nahkampf; bei Tieren das Item "Fist"), sonst linke Hand (Bogen). Gemessen 2026-11-06: gezogene Waffe liegt in
+// der rechten Hand, der gezogene Bogen in der linken, der weggesteckte im Slot Bogen (7).
+void* HeldWeapon(void* owner) {
+    if (!owner) return nullptr;
+    void* w = SlotItem(owner, 1);
+    return w ? w : SlotItem(owner, 2);
+}
+
 // Wahrer Verursacher eines Treffers (API 25, Parameter "owner"): ist der Verursacher (Waffe/Geschoss/Zauber) selbst ein NPC, dieser; sonst der aktuelle Gegner
 // des Opfers (gCNPC_PS::CurrentAttackerEntity, im Spieltest 2026-11-06 bei Held und NPCs der zuschlagende Gegner). Kann leer sein; im Gruppenkampf ist der
 // Fallback nur eine Naeherung (es ist der Gegner, den das Opfer gerade im Visier hat, nicht zwingend der Schlaeger).
@@ -262,6 +281,70 @@ void __fastcall HSetHP(void* self, void*, const long* v) {
     g_inDamage = false;
 }
 
+// Tierbisse und anderer Spielskript-Schaden am Helden: Script_Game.dll senkt das Attribut "HP" ueber gCPlayerMemory_PS::SetBaseValue(tag, Wert), ohne
+// gCEntity::OnDamage (gemessen mit dem Haltepunkt 2026-11-06: Wolfsbisse 21 Punkte je Biss). Der Hook meldet das Absinken VOR dem Schreiben an dieselbe Kette
+// Override_Damage/OnDamage wie die Treffer; eine geaenderte Menge wird direkt geschrieben, ohne Super() entfaellt der Verlust. Typ ist hier unbekannt (0).
+// Kommt fuer denselben Treffer spaeter noch gCEntity::OnDamage (HeroHit), wird der nicht zum zweiten Mal gemeldet (g_baseHitAmount/-Tick).
+typedef bool(__thiscall* FnPMSetBase)(void*, const void*, int);
+typedef int(__thiscall* FnPMGetBase)(const void*, const void*);
+FnPMSetBase o_pmSetBase = nullptr;
+FnPMGetBase g_pmGetBase = nullptr;
+volatile LONG g_baseHitAmount = -1;
+volatile DWORD g_baseHitTick = 0;
+bool SafeIsHpTag(const void* tag) {
+    __try {
+        const char* t = tag ? g_sb.strGetText(tag) : nullptr;
+        return t && std::strcmp(t, "HP") == 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool SafePMBase(const void* ps, const void* tag, int* out) {
+    __try {
+        *out = g_pmGetBase(ps, tag);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+// Umgebungsschaden (Sturz u. a.) statt Kampftreffer: Die Skript-Schadensroutine (Script_Game.dll) wird bei Kampftreffern (Biss, Schlag, Zauber) direkt von der
+// Engine (Game.dll) aufgerufen, bei Sturz aber von einer anderen Skriptroutine derselben DLL (gemessen 2026-11-06: Rueckkehradressen Script_Game.dll+0x35BF2 < Game.dll
+// bei Kampf, Script_Game.dll+0x35BF2 < Script_Game.dll+0xADF8F < Game.dll beim Sturz). Erkannt wird das strukturell: auf das erste Script_Game-Bild des Aufrufstapels
+// folgt ein weiteres Script_Game-Bild. Dann gibt es keinen Angreifer: owner und inflictor bleiben leer (sonst stuende dort der letzte Gegner).
+bool IsScriptNested() {
+    static HMODULE sg = nullptr;
+    if (!sg) sg = GetModuleHandleA("Script_Game.dll");
+    if (!sg) return false;
+    const char* b = reinterpret_cast<const char*>(sg);
+    const DWORD size = reinterpret_cast<const IMAGE_NT_HEADERS*>(b + reinterpret_cast<const IMAGE_DOS_HEADER*>(b)->e_lfanew)->OptionalHeader.SizeOfImage;
+    void* fr[10];
+    const USHORT n = CaptureStackBackTrace(1, 10, fr, nullptr);
+    for (USHORT i = 0; i < n; ++i) {
+        const char* a = static_cast<const char*>(fr[i]);
+        if (a >= b && a < b + size) return i + 1 < n && static_cast<const char*>(fr[i + 1]) >= b && static_cast<const char*>(fr[i + 1]) < b + size;
+    }
+    return false;
+}
+bool __fastcall HPMSetBase(void* self, void*, const void* tag, int v) {
+    int alt = 0;
+    if (g_inDamage || !g_pmGetBase || !g_psEntity || !SafeIsHpTag(tag) || !SafePMBase(self, tag, &alt) || v >= alt || alt <= 0) return o_pmSetBase(self, tag, v);
+    void* hero = SafeCall0(g_psEntity, self);
+    if (!hero || !IsPlayerEntity(hero)) return o_pmSetBase(self, tag, v);
+    const int amount = alt - v;
+    void* owner = IsScriptNested() ? nullptr : DamageOwner(hero, nullptr);
+    bool res = true, called = false;
+    g_inDamage = true;
+    DamageDispatch(
+        hero, HeldWeapon(owner), owner, amount, 0,
+        [&](int m) {
+            int neu = m == amount ? v : alt - m;
+            if (neu < 0) neu = 0;
+            res = o_pmSetBase(self, tag, neu);
+            return true;
+        },
+        &called);
+    g_inDamage = false;
+    g_baseHitAmount = amount;
+    g_baseHitTick = GetTickCount();
+    return res;
+}
+
 // Treffer auf den Helden: sein gCDamageReceiver_PS steht immer auf 1, die Lebenspunkte liegen im Attribut "HP" und sind beim Aufruf von gCEntity::OnDamage
 // (this = a = b = Held, Menge, Typ) schon abgezogen (gemessen). Der Hook meldet den Treffer an dieselbe Kette Override_Damage wie bei NPCs; eine geaenderte Menge
 // wirkt nachtraeglich: die Differenz wird dem Attribut zurueckgegeben bzw. zusaetzlich abgezogen. Ohne Super() entfaellt der Treffer (volle Rueckgabe).
@@ -270,11 +353,16 @@ typedef void(__thiscall* FnOnDmg)(void*, void*, void*, int, int, void*);
 FnOnDmg o_gOnDmg = nullptr;
 void HeroHit(void* hero, int amount, int type) {
     if (g_inDamage || amount <= 0) return;
+    if (amount == g_baseHitAmount && GetTickCount() - g_baseHitTick < 150) {   // derselbe Treffer wurde schon ueber SetBaseValue gemeldet
+        g_baseHitAmount = -1;
+        return;
+    }
     int neu = amount;
     bool called = false;
     g_inDamage = true;
+    void* owner = DamageOwner(hero, nullptr);
     DamageDispatch(
-        hero, nullptr, DamageOwner(hero, nullptr), amount, type,
+        hero, HeldWeapon(owner), owner, amount, type,
         [&](int m) {
             neu = m;
             return true;
@@ -471,9 +559,12 @@ int InstallGameHooks(ScriptHost& host) {
         g_getPS = reinterpret_cast<FnGetPS>(GetProcAddress(eng, "?GetPropertySet@eCEntity@@UAEPAVeCEntityPropertySet@@W4eEPropertySetType@@@Z"));
         g_lastAtk = reinterpret_cast<FnGetRef>(GetProcAddress(game, "?GetLastAttackerEntity@gCNPC_PS@@QBEABVeCEntityProxy@@XZ"));
         g_curAtk = reinterpret_cast<FnGetRef>(GetProcAddress(game, "?GetCurrentAttackerEntity@gCNPC_PS@@QBEABVeCEntityProxy@@XZ"));
+        g_pmGetBase = reinterpret_cast<FnPMGetBase>(GetProcAddress(game, "?GetBaseValue@gCPlayerMemory_PS@@QBEHABVbCString@@@Z"));
+        g_stackFromSlot = reinterpret_cast<FnStackFromSlot>(GetProcAddress(game, "?GetStackFromSlot@gCInventory_PS@@QBEPAVeCEntity@@W4gESlot@@@Z"));
     }
     n += Hook(game, "?SetHitPoints@gCDamageReceiver_PS@@QAEXABJ@Z", reinterpret_cast<void*>(&HSetHP), reinterpret_cast<void**>(&o_setHP),
               host);
+    Hook(game, "?SetBaseValue@gCPlayerMemory_PS@@QAE_NABVbCString@@H@Z", reinterpret_cast<void*>(&HPMSetBase), reinterpret_cast<void**>(&o_pmSetBase), host);
     Hook(game, "?OnDamage@gCEntity@@UAEXPAVeCEntity@@0HHAAVeCContactIterator@@@Z", reinterpret_cast<void*>(&HGOnDmg),
          reinterpret_cast<void**>(&o_gOnDmg), host);
     char b[96];
@@ -482,6 +573,11 @@ int InstallGameHooks(ScriptHost& host) {
     InstallInfoHook(host);
     InstallSaveHooks(game, host);
     return n;
+}
+
+void* CurrentAttackerOf(void* ent) {
+    void *l, *c;
+    return NpcAttackers(ent, &l, &c) ? c : nullptr;
 }
 
 }   // namespace og3p

@@ -996,6 +996,7 @@ SStr EntCategory(const Entity& e) {
     if (n.find("world_border") != std::string::npos) return SStr("Border");
     return SStr("Other");
 }
+Entity EntCurrentAttacker(const Entity& e) { return {EntIsValid(e) ? CurrentAttackerOf(e.p) : nullptr}; }
 bool EntIsBuilding(const Entity& e) { return std::strcmp(EntCategory(e).c_str(), "Building") == 0; }
 // Im Systemsektor liegen auch Welt-Objekte (z. B. G3_World_Border_001): deshalb zusaetzlich NPC-Pflicht.
 bool IsDynamicSpawn(const Entity& e) {
@@ -1275,6 +1276,7 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("bCVector GetPickPosition()", asFUNCTION(GetPickPosition), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool DestroyNPC(const Entity &in)", asFUNCTION(DestroyNPC), asCALL_CDECL));
     OG3_REG(e->RegisterObjectMethod("Entity", "bCString GetCategory() const", asFUNCTION(EntCategory), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetCurrentAttacker() const", asFUNCTION(EntCurrentAttacker), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "bool IsBuilding() const", asFUNCTION(EntIsBuilding), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterGlobalFunction("bool IsNPC(const Entity &in)", asFUNCTION(IsNPCScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool IsDynamicSpawn(const Entity &in)", asFUNCTION(IsDynamicSpawn), asCALL_CDECL));

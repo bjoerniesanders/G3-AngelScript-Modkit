@@ -37,9 +37,9 @@ bool Override_ReceiveItem(Entity giver, Entity receiver, const bCString &in name
     return ok;
 }
 
-// Schaden: Override_Damage(Opfer, Waffe/Geschoss, Verursacher, Menge, Typ) (ab API 25) greift in jeden Treffer ein. Bei NPCs kommt er vor dem Abziehen der Lebenspunkte (SetHitPoints),
-// beim Helden danach: die Lebenspunkte (Attribut HP) sind dann schon abgezogen, eine geaenderte Menge wird nachtraeglich ausgeglichen. SetOverrideArg(3, ..) aendert
-// die Menge; ohne Super() entfaellt der Treffer. owner = wahrer Verursacher (NPC), inflictor = Waffe/Geschoss, beim Helden leer.
+// Schaden: Override_Damage(Opfer, Waffe/Geschoss, Verursacher, Menge, Typ) (ab API 25) greift in jeden Treffer ein. Er kommt immer vor dem Abziehen der Lebenspunkte (NPCs: SetHitPoints,
+// Held: SetBaseValue auf das Attribut HP). SetOverrideArg(3, ..) aendert die Menge; ohne Super() entfaellt der Treffer. owner = Verursacher (NPC, im Gruppenkampf eine
+// Naeherung), inflictor = Waffe/Geschoss (beim Helden die Waffe des Angreifers, bei Tieren "Fist"). Bei Tod ist die Menge nur der Rest der Lebenspunkte.
 // HELD_SCHADEN_HALB halbiert den Schaden, den der Held erleidet. Zum Abschalten auf false setzen.
 const bool HELD_SCHADEN_HALB = true;
 int schadenLog = 0;
@@ -77,7 +77,7 @@ void OnFrame(float dt) {
             hero.AddAttribute("HP", zurueck);
             hp = hero.GetAttribute("HP");
         }
-        print("HP-Verlust ohne Treffer-Meldung: " + letzteHP + " -> " + (hp - zurueck) + " (" + verlust + "), Fall- oder Umgebungsschaden, zurueckgegeben " + zurueck + ", jetzt " + hp);
+        print("HP-Verlust ohne Treffer-Meldung: " + letzteHP + " -> " + (hp - zurueck) + " (" + verlust + "), Gegner: '" + hero.GetCurrentAttacker().GetName() + "', zurueckgegeben " + zurueck + ", jetzt " + hp);
     }
     letzteHP = hp;
 }

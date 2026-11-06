@@ -1,6 +1,6 @@
 # Grenzen und Stand
 
-Stand: 2026-11-02, Skript-Schnittstelle Version 25.
+Stand: 2026-11-02, Skript-Schnittstelle Version 26.
 
 ## Im Spiel geprüft
 
