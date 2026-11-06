@@ -6,3 +6,4 @@ graphify-modding/
 __pycache__/
 *.pyc
 thirdparty/
+dist/

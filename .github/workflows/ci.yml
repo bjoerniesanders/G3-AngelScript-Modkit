@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # AngelScript and MinHook are not in the repository (thirdparty/ is ignored); CMake downloads them (AngelScript with checksum).
+      - name: Configure (Win32)
+        run: cmake -S . -B build -A Win32
+
+      - name: Build
+        run: cmake --build build --config Release --parallel --target og3_patch og3_loader og3_packmod og3_patch_test og3_loader_test
+
+      - name: Check build output
+        shell: pwsh
+        run: |
+          foreach ($f in 'build/patch/og3_patch.dll', 'build/loader/dbghelp.dll', 'build/patch/og3_packmod.exe', 'build/patch/og3_patch_test.exe', 'build/patch/og3_loader_test.exe') {
+            if (-not (Test-Path $f)) { throw "$f is missing" }
+            "{0,-32} {1,9} bytes" -f $f, (Get-Item $f).Length
+          }
+
+      - name: FPU fix active (no fninit)
+        shell: pwsh
+        run: ./tools/check_no_fninit.ps1 -Dll build/patch/og3_patch.dll
+
+      - name: PackMod numbering
+        run: python -I tests/packmod_generations.py build/patch/og3_packmod.exe
+
+      - name: Build a sample release package
+        shell: pwsh
+        run: ./tools/package_release.ps1 -BuildDir build -Version ci-${{ github.run_number }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: og3-patch-ci-${{ github.run_number }}
+          path: dist/*.zip
+          retention-days: 7

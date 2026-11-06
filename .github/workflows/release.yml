@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (Win32)
+        run: cmake -S . -B build -A Win32
+
+      - name: Build
+        run: cmake --build build --config Release --parallel --target og3_patch og3_loader og3_packmod og3_patch_test og3_loader_test
+
+      - name: FPU fix active (no fninit)
+        shell: pwsh
+        run: ./tools/check_no_fninit.ps1 -Dll build/patch/og3_patch.dll
+
+      - name: PackMod numbering
+        run: python -I tests/packmod_generations.py build/patch/og3_packmod.exe
+
+      - name: Determine version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}' } else { 'manual-${{ github.run_number }}' }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Build release package
+        shell: pwsh
+        run: ./tools/package_release.ps1 -BuildDir build -Version ${{ steps.ver.outputs.version }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: og3-patch-${{ steps.ver.outputs.version }}
+          path: dist/*.zip
+
+      - name: Create GitHub release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create '${{ github.ref_name }}' (Get-ChildItem dist/*.zip).FullName --title 'OG3-Patch ${{ github.ref_name }}' --generate-notes

@@ -23,6 +23,17 @@ Ausgabe: `build32/patch/` (og3_patch.dll, Tests, og3_packmod) und `build32/loade
     og3_patch_test.exe <SharedBase.dll> tests\mods
     powershell -NoProfile -File tests\run_loader_test.ps1 -SharedBase <SharedBase.dll> -DbghelpOrig <dbghelp_orig.dll>   (Loader in einem Wegwerf-Ordner)
 
+## CI und Release (GitHub Actions)
+- `.github/workflows/ci.yml` (jeder Push auf `main`, Pull-Requests, von Hand): baut 32 Bit mit MSVC, prueft, dass `og3_patch.dll` kein `fninit` enthaelt
+  (`tools/check_no_fninit.ps1`, Schutz fuer den FPU-Fix), fuehrt `tests/packmod_generations.py` aus und packt probeweise ein Zip (Artefakt, 7 Tage).
+- `.github/workflows/release.yml`: beim Push eines Tags `v*` dasselbe plus GitHub-Release mit dem Zip:
+      git tag v0.30.0
+      git push origin v0.30.0
+- Paket lokal: `powershell -NoProfile -File tools\package_release.ps1 -BuildDir build32 -Version v0.30.0` (Ergebnis in `dist\`). Inhalt: Loader, `og3_patch.dll`,
+  `og3_packmod.exe`, `tools\install_loader.ps1`, Beispiel-Mods (standardmaessig aus), Doku, `INSTALL.txt`; keine Spieldateien.
+- Nicht in der CI: Selbsttest, Mod-Tests, Kompilierpruefung der Beispiele, Loader-Test und PackMod-Rundlauf. Sie brauchen die `SharedBase.dll` bzw. Archive des
+  Spiels, die nicht ins Repo gehoeren, und laufen lokal (Abschnitt Test).
+
 ## Einbau (Loader, eigenstaendig)
     powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner> [-BuildDir build32]
     powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner> -Uninstall
@@ -31,7 +42,7 @@ des Spiels funktionieren weiter), stellt den Loader als `dbghelp.dll` hin und ko
 `<Spiel>\og3_backup\loader_<Zeit>\`. Protokolle: `og3_loader.log` (Loader, Absturzkandidaten) und `og3_patch.log` (Patch). Einstellungen in `og3_patch.ini`
 (`[patch] enable/script/hotreload/mods`, `[loader] crashlog`); fehlt sie, liest der Loader die `og3_hooks.ini` des Hauptrepos.
 
-`tools/install_patch.ps1` ist der ältere Weg mit dem Proxy aus dem Hauptrepo `OpenGothic3` (`build32\hook\dbghelp.dll`, enthaelt zusaetzlich die Nachbau-Hooks).
+`tools/install_patch.ps1` ist der aeltere Weg mit dem Proxy aus dem Hauptrepo `OpenGothic3` (`build32\hook\dbghelp.dll`, enthaelt zusaetzlich die Nachbau-Hooks).
 Beides gleichzeitig geht nicht, beide ersetzen dieselbe `dbghelp.dll`.
 
 ## Abhaengigkeiten zum Hauptrepo
@@ -39,3 +50,12 @@ Keine. Zur Laufzeit braucht der Patch die `SharedBase.dll` des Spiels (Original;
 
 ## Lizenz
 MIT, siehe `LICENSE`. AngelScript (zlib-Lizenz) und MinHook (BSD-2-Clause) werden beim Bauen geladen und liegen nicht im Repo. Das Projekt enthaelt keine Spieldaten.
+
+## Danksagung
+
+An die Autoren des Gothic-3-SDK (gothic3sdk), dessen Header die Klassen, Signaturen und Eigenschaften der Engine erschlossen haben, an das Team des
+Community Patch, an die Macher des Gothic 3 Mod Starters, deren Arbeit das Format der Mod-Archive offengelegt hat, und an die Gothic-Community.
+Das Modkit nutzt AngelScript (Andreas Joensson, AngelCode, zlib-Lizenz) und MinHook (Tsuda Kageyu, BSD-2-Lizenz). Vorbild fuer den Aufbau war das Modkit
+des Gothic-1-Remakes.
+
+Gothic 3 ist eine Marke der jeweiligen Rechteinhaber. OG3-Patch ist ein inoffizielles Fan-Projekt und enthaelt keine Dateien des Spiels.
