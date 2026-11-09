@@ -123,6 +123,26 @@ Zeigt `OnDamage` mit `owner` und `inflictor`, Qualität pro Slot lesen und setze
 
 `beliars_klaue` löst bei einem **starken** Treffer mit dem Orkschlächter (mindestens `MIN_TREFFER` = 55 Schaden) gegen einen **Gegner** (Haltung `AttitudeToPlayer2` feindlich oder Raubtier, bei Tieren auch verärgert) mit `CHANCE_PROZENT` = 30 % Chance einen Blitz aus: `Smn_Lightning` am Opfer erzeugen, den Helden mit `SetEntityRef(..., "gCInteraction_PS", "Owner", hero)` als Besitzer eintragen (nur dann läuft der Schaden durch die echte Kette: Quelle `Smn_Lightning`, Besitzer Held, Art 6) und den Blitz mit `StartEffect("eff_magic_summonlightning_target_01", opfer)` sichtbar machen. Gemessen: Der Blitz macht 17 bis über 500 Schaden (das Skript `ZS_Lightning` rechnet selbst) und kann Umstehende treffen. Zwischen zwei Blitzen liegen mindestens 4 Sekunden.
 
+## 9. Spielskripte nach Namen (`script_probe`, Messmod)
+
+Ab Version 32. Beim ersten Weltstart prüft die Mod mit `ScriptExists`/`GetScriptDll`, welche bekannten Skriptnamen es gibt. Sie meldet einige Skripte
+(`AssessHit`, `MagicTeleport`, `IsDeadlyDamage`, ...) mit `WatchScript` an, reicht sie in `Override_Script` unverändert durch und schreibt die ersten
+Aufrufe je Name mit Self, Other, Zahl und Ergebnis ins Protokoll (`OnScript`). Strg + Ziffernblock + ruft lesende Skripte (`IsHumanoid`,
+`GetStaminaPoints`, `GetAttitude`, ...) per `CallScript` für den Helden und das anvisierte Entity auf. Standardmäßig aus (`+script_probe`).
+Mit `scriptlog=1` in `og3_patch.ini` schreibt der Patch zusätzlich alle 60 s die häufigsten Skriptnamen und den Zeitaufwand seiner Hooks.
+
+## 10. Begleiter teleportieren mit (`teleport_party`)
+
+Ab Version 33. Fängt das Spielskript `MagicTeleport` ab (`WatchScript`/`Override_Script`) und holt nach dem Teleport des Helden seine Begleiter, Beschwörungen
+und Sklaven mit `TeleportTo` zu ihm; wartende Begleiter bleiben (`WARTENDE_MIT`). Nach 1,5 s holt die Mod alle nach, die noch weiter als 15 m weg sind.
+Strg + Ziffernblock , schreibt die Gruppe ins Protokoll. Standardmäßig aus (`+teleport_party`).
+
+## 11. Zeitrate und Spieluhr (`time_probe`, Messmod)
+
+Ab Version 36. Umschalt + Ziffernblock + / - verdoppelt bzw. halbiert die Zeitrate (`SetTimeScale`), Umschalt + Ziffernblock \* schaltet die Spieluhr
+auf das Zehnfache (`SetClockFactor`) und zurück. Weil der Uhrfaktor im Spielstand steht, stellt die Mod ihn in `OnBeforeSave` zurück und setzt ihn in
+`OnAfterSave` wieder. Die Werte stehen oben links (`OnDraw`). Standardmäßig aus (`+time_probe`).
+
 ## Tastenbelegung der Beispiel-Mods
 
 Die Mods werden einzeln zum Testen zugeschaltet; einige teilen sich Tasten (`spawn_demo` mit `lifesteal_demo` bei `*` und mit `reference_dump` bei `/`), dann nicht beide gleichzeitig zuschalten. **Nicht benutzt werden Tasten, die das Spiel selbst belegt:** Numblock 7, 8, 9 (Debug-Zähler), F1 bis F4, F6 bis F9 (Zeitlupe, Spieler zurücksetzen, Schnellladen) und F12,
@@ -139,6 +159,10 @@ dazu Strg+Numblock 1-6. Frei sind außerdem Pos1, Bild hoch/runter, Einfg, Entf 
 | `reference_dump` | Ziffernblock / (Referenz-Dump ins Protokoll) |
 | `lifesteal_demo` | Ziffernblock \* (Lebensraub an der geführten Waffe umschalten) |
 | `blitz_test` | Strg + Ziffernblock - (Blitz auf den anvisierten NPC, Messmod) |
+| `teleport_party` | Strg + Ziffernblock , (Gruppe des Helden ins Protokoll) |
+| `time_probe` | Umschalt + Ziffernblock + / - (Zeitrate), Umschalt + Ziffernblock \* (Spieluhr x10), Messmod |
+| `event_probe` | Strg + Ziffernblock \* (Konsole öffnen), Umschalt + Ziffernblock / (Ware des anvisierten Händlers neu erzeugen), Messmod |
+| `script_probe` | Strg + Ziffernblock + (lesende Spielskripte per `CallScript` aufrufen, Messmod) |
 | `examples/scripts/main.as` | F10, F11 |
 | `index.md` Schnellstart | Rollen-Taste |
 

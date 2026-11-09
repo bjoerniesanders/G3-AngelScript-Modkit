@@ -60,7 +60,7 @@ set_target_properties(og3_angelscript PROPERTIES MSVC_RUNTIME_LIBRARY MultiThrea
 enable_language(C)
 file(GLOB OG3P_MINHOOK_SRCS ${OG3P_MINHOOK_DIR}/src/*.c ${OG3P_MINHOOK_DIR}/src/hde/*.c)
 set(OG3P_SRCS src/patch_main.cpp src/script_host.cpp src/sb_api.cpp src/engine_bindings.cpp src/game_hooks.cpp
-              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/pack_mod.cpp)
+              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp)
 list(TRANSFORM OG3P_SRCS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
 add_library(og3_patch SHARED ${OG3P_SRCS} ${OG3P_MINHOOK_SRCS})
 target_include_directories(og3_patch PRIVATE src ${OG3P_MINHOOK_DIR}/include)

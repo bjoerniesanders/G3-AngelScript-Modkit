@@ -857,6 +857,9 @@ int InstallGameHooks(ScriptHost& host) {
     InstallQualityTooltip(game, host);
     InstallInfoHook(host);
     InstallSaveHooks(game, host);
+    InstallScriptCallHooks(host);
+    InstallDrawHooks(host);
+    InstallMoreEventHooks(host);
     return n;
 }
 

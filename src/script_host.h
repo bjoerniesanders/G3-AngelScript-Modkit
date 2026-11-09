@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#define OG3_SCRIPT_API_VERSION 31
+#define OG3_SCRIPT_API_VERSION 37
 
 class asIScriptEngine;
 class asIScriptContext;
@@ -155,6 +155,22 @@ bool AdjustHeroHitPoints(const void* ent, int delta);
 
 // Spielereignisse (game_hooks.cpp): Hooks auf Game.dll einhaengen; Rueckgabe = Zahl aktiver Hooks
 int InstallGameHooks(ScriptHost& host);
+// Spielskripte nach Namen (script_calls.cpp): Hooks auf gCScriptAdmin::RunScript/RunScriptFromScript, Bindings CallScript/WatchScript/...
+int InstallScriptCallHooks(ScriptHost& host);   // nach InstallGameHooks (Game.dll geladen, MinHook bereit)
+void SetScriptCallOptions(bool stats);   // ini [patch] scriptlog
+void ScriptCallsFrame();                 // einmal je Bild im Spiel-Thread
+void ScriptCallsReport();
+// Zeichen-API (draw_api.cpp): Hook auf GFC CFFGFCWnd::OnPaint -> Ereignis OnDraw(); DrawFrameTick einmal je Spielbild
+int InstallDrawHooks(ScriptHost& host);
+void DrawFrameTick();
+// Laeuft der Aufrufer im Spiel-Thread (dem Thread von OnFrame)? false, solange noch kein Bild lief (script_calls.cpp)
+bool OnGameThread();
+// Ereignisse 7.3 (more_events.cpp): Konsole, Quest-Status
+int InstallMoreEventHooks(ScriptHost& host);
+void MoreEventsFrame();   // einmal je Bild (Spiel-Takt): OnTouch-Handler, Verwandlungs-Hooks, Messung
+// Script.dll-Entity-Objekt (0xA8 Byte, gemessen) per Konstruktor der Script.dll bauen; Puffer mit kScriptEntityBytes, Ausrichtung 8
+constexpr unsigned kScriptEntityBytes = 0x100;
+bool MakeScriptEntity(void* buf, void* ent);                // Messung jetzt schreiben (beim Entladen einer Welt)
 
 // Spielfenster (groesstes sichtbares Hauptfenster des Prozesses), nullptr falls noch keins
 HWND__* GameWindow();

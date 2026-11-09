@@ -13,7 +13,7 @@ array<Entity> erzeugt;
 void OnWorldDeactivate() { erzeugt.resize(0); }   // Entities nicht ueber Weltwechsel aufbewahren
 
 void OnKey(int vk, bool down) {
-    if (vk == 0x6D && IsKeyDown(0x11)) return;   // Strg + Ziffernblock - gehoert der Mod blitz_test
+    if (IsKeyDown(0x11) || IsKeyDown(0x10)) return;   // mit Strg oder Umschalt gehoeren die Ziffernblock-Tasten anderen Mods (blitz_test, script_probe, event_probe, time_probe, ...)
     if (!down) return;
     if (vk == 0x6B) {
         bCString namen = FindTemplateNames(SUCHE, 30);

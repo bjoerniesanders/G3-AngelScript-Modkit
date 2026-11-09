@@ -20,6 +20,9 @@
 namespace og3p {
 bool RegisterQuestBindings(asIScriptEngine* e);    // quest_bindings.cpp
 bool RegisterDialogBindings(asIScriptEngine* e);   // dialog_bindings.cpp
+bool RegisterScriptCallBindings(asIScriptEngine* e);   // script_calls.cpp
+bool RegisterDrawBindings(asIScriptEngine* e);         // draw_api.cpp
+bool RegisterMoreEventBindings(asIScriptEngine* e);    // more_events.cpp
 namespace {
 
 struct Entity {
@@ -1506,6 +1509,112 @@ bool SetEntityRefScript(const Entity& e, const SStr& set, const SStr& prop, cons
     void* ps = PropSetFor(e, set);
     return ps && SafeSetRef(ps, access, setEntity, target.p);
 }
+// Gruppe/Begleiter (API 33): gCParty_PS (Game.dll). Die Mitglieder stehen beim ANFUEHRER (GetMembers: bTObjArray<eCEntityProxy>, Feld 0 Zeiger,
+// Feld 1 Anzahl; eCEntityProxy 0x1C Byte, SDK), jedes Mitglied verweist mit PartyLeaderEntity auf ihn. Teleport ueber Script.dll Entity::Teleport(Entity const &)
+// mit echten Script.dll-Entities (MakeScriptEntity).
+typedef const void*(__thiscall* PartyMembersFn)(const void*);
+typedef const void*(__thiscall* PartyLeaderFn)(const void*);
+typedef void(__thiscall* PartySetWaitFn)(void*, const bool*);
+typedef const bool*(__thiscall* PartyGetWaitFn)(const void*);
+typedef void*(__thiscall* ProxyEntFn)(const void*);
+typedef bool(__thiscall* TeleportFn)(void*, const void*);
+struct PartyApi {
+    bool tried = false;
+    PartyMembersFn members = nullptr;
+    PartyLeaderFn leader = nullptr;
+    PartySetWaitFn setWait = nullptr;
+    PartyGetWaitFn getWait = nullptr;
+    ProxyEntFn proxyEnt = nullptr;
+    TeleportFn teleport = nullptr;
+};
+PartyApi& Party() {
+    static PartyApi a;
+    if (!a.tried && Resolve()) {
+        a.tried = true;
+        a.members = reinterpret_cast<PartyMembersFn>(GetProcAddress(g_e.game, "?GetMembers@gCParty_PS@@QBEABV?$bTObjArray@VeCEntityProxy@@@@XZ"));
+        a.leader = reinterpret_cast<PartyLeaderFn>(GetProcAddress(g_e.game, "?GetPartyLeaderEntity@gCParty_PS@@QBEABVeCEntityProxy@@XZ"));
+        a.setWait = reinterpret_cast<PartySetWaitFn>(GetProcAddress(g_e.game, "?SetWaiting@gCParty_PS@@QAEXAB_N@Z"));
+        a.getWait = reinterpret_cast<PartyGetWaitFn>(GetProcAddress(g_e.game, "?GetWaiting@gCParty_PS@@QBEAB_NXZ"));
+        a.proxyEnt = reinterpret_cast<ProxyEntFn>(GetProcAddress(g_e.engine, "?GetEntity@eCEntityProxy@@QAEPAVeCEntity@@XZ"));
+        if (HMODULE script = GetModuleHandleA("Script.dll"))
+            a.teleport = reinterpret_cast<TeleportFn>(GetProcAddress(script, "?Teleport@Entity@@QAE_NABV1@@Z"));
+    }
+    return a;
+}
+void* PartyPS(const Entity& e) {
+    if (!EntIsValid(e) || !ResolveProps()) return nullptr;
+    SStr set("Party");
+    return PropSetFor(e, set);
+}
+// Mitglied i (i < 0: nur zaehlen); Rueckgabe Anzahl oder -1
+int SafePartyMember(void* ps, int i, void** out) {
+    PartyApi& a = Party();
+    if (!a.members || !a.proxyEnt) return -1;
+    __try {
+        const void* arr = a.members(ps);
+        if (!arr) return -1;
+        const unsigned char* data = *static_cast<const unsigned char* const*>(arr);
+        const int n = int(static_cast<const unsigned*>(arr)[1]);
+        if (n < 0 || n > 1000) return -1;
+        if (i >= 0 && i < n && data) *out = a.proxyEnt(data + 0x1C * i);
+        return n;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+void* SafePartyLeader(void* ps) {
+    PartyApi& a = Party();
+    if (!a.leader || !a.proxyEnt) return nullptr;
+    __try {
+        const void* px = a.leader(ps);
+        return px ? a.proxyEnt(px) : nullptr;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+int EntPartyCount(const Entity& e) {
+    void* ps = PartyPS(e);
+    void* dummy = nullptr;
+    return ps ? SafePartyMember(ps, -1, &dummy) : -1;
+}
+Entity EntPartyMember(const Entity& e, int i) {
+    void* ps = PartyPS(e);
+    void* m = nullptr;
+    if (ps && i >= 0) SafePartyMember(ps, i, &m);
+    return {m && Valid(m) ? m : nullptr};
+}
+Entity EntPartyLeader(const Entity& e) {
+    void* ps = PartyPS(e);
+    void* l = ps ? SafePartyLeader(ps) : nullptr;
+    return {l && Valid(l) ? l : nullptr};
+}
+bool SafeSetWait(void* ps, bool w) {
+    __try {
+        Party().setWait(ps, &w);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool SafeGetWait(void* ps) {
+    __try {
+        const bool* b = Party().getWait(ps);
+        return b && *b;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool EntSetPartyWaiting(const Entity& e, bool w) {
+    void* ps = PartyPS(e);
+    return ps && Party().setWait && SafeSetWait(ps, w);
+}
+bool EntIsPartyWaiting(const Entity& e) {
+    void* ps = PartyPS(e);
+    return ps && Party().getWait && SafeGetWait(ps);
+}
+bool SafeTeleport(void* self, const void* target) {
+    __try {
+        return Party().teleport(self, target);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool EntTeleportTo(const Entity& e, const Entity& target) {
+    if (!EntIsValid(e) || !EntIsValid(target) || !Party().teleport) return false;
+    alignas(8) unsigned char a[kScriptEntityBytes], b[kScriptEntityBytes];
+    if (!MakeScriptEntity(a, e.p) || !MakeScriptEntity(b, target.p)) return false;
+    return SafeTeleport(a, b);
+}
 // Effekte (API 30): Script.dll EffectSystem::ExistsEffect(Name) und StartEffect(Name, Entity) starten einen benannten Effekt (z. B. "eff_magic_summonlightning_target_01", der Blitz
 // des Zaubers "Blitz beschwoeren") am Entity. Der Effekt-Handle (Effect, 4 Byte, Rueckgabe per Zeiger) wird nicht aufbewahrt; die Effektverwaltung beendet ihn selbst.
 typedef bool(__stdcall* EffectExistsFn)(const void*);
@@ -1544,7 +1653,10 @@ bool EffectExistsScript(const SStr& name) {
 }
 bool StartEffectScript(const SStr& name, const Entity& at) {
     EffectApi& a = Effects();
-    return a.start && a.exists && EntIsValid(at) && SafeEffectExists(a.exists, &name) && SafeEffectStart(a.start, &name, &at);
+    if (!a.start || !a.exists || !EntIsValid(at) || !SafeEffectExists(a.exists, &name)) return false;
+    alignas(8) unsigned char se[kScriptEntityBytes];   // echtes Script.dll-Entity (0xA8 Byte) statt nur des Zeigers
+    if (!MakeScriptEntity(se, at.p)) return false;
+    return SafeEffectStart(a.start, &name, se);
 }
 // Vorlage (Template-Entity) nach genauem Namen; ungueltig, wenn es sie nicht gibt. Ihre Eigenschaftssets lassen sich wie bei einem Entity lesen (und fuer eigene Vorlagen schreiben)
 Entity GetTemplateEntityScript(const SStr& name) {
@@ -1815,6 +1927,106 @@ bool SetGameTime(int day, int hour, int minute) {
     return (day < 0 || SafeClockSet(g_s.setDay, c, day)) && SafeClockSet(g_s.setHour, c, hour) && SafeClockSet(g_s.setMinute, c, minute);
 }
 
+// ---- Zeitrate (API 36): eCApplication::Get/SetTimeScaling (Engine; Ablauf der ganzen Simulation wie die Zeitlupe des Spiels, nicht im Spielstand) und
+// gCClock_PS::Get/SetFactor (Game; Geschwindigkeit der Spieluhr, Eigenschaft der Weltuhr und damit IM Spielstand). Die Huelle aus WorldClock() ist das
+// PSClock-Objekt der Script.dll, ihr erstes Feld der gCClock_PS-Zeiger (wie bei PSPlayerMemory).
+typedef float(__thiscall* AppScaleGetFn)(const void*);
+typedef void(__thiscall* AppScaleSetFn)(void*, float);
+typedef const float*(__thiscall* FactorGetFn)(const void*);
+typedef void(__thiscall* FactorSetFn)(void*, const float*);
+struct TimeApi {
+    bool tried = false;
+    InstFn app = nullptr;
+    AppScaleGetFn getScale = nullptr;
+    AppScaleSetFn setScale = nullptr;
+    FactorGetFn getFactor = nullptr;
+    FactorSetFn setFactor = nullptr;
+};
+TimeApi& Time() {
+    static TimeApi a;
+    if (!a.tried && Resolve()) {
+        a.tried = true;
+        a.app = reinterpret_cast<InstFn>(GetProcAddress(g_e.engine, "?GetInstance@eCApplication@@SGAAV1@XZ"));
+        a.getScale = reinterpret_cast<AppScaleGetFn>(GetProcAddress(g_e.engine, "?GetTimeScaling@eCApplication@@QBEMXZ"));
+        a.setScale = reinterpret_cast<AppScaleSetFn>(GetProcAddress(g_e.engine, "?SetTimeScaling@eCApplication@@QAEXM@Z"));
+        a.getFactor = reinterpret_cast<FactorGetFn>(GetProcAddress(g_e.game, "?GetFactor@gCClock_PS@@QBEABMXZ"));
+        a.setFactor = reinterpret_cast<FactorSetFn>(GetProcAddress(g_e.game, "?SetFactor@gCClock_PS@@QAEXABM@Z"));
+    }
+    return a;
+}
+bool SafeAppScale(bool set, float* v) {
+    TimeApi& a = Time();
+    __try {
+        void* app = a.app ? a.app() : nullptr;
+        if (!app) return false;
+        if (set)
+            a.setScale(app, *v);
+        else
+            *v = a.getScale(app);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+float GetTimeScaleScript() {
+    float v = -1;
+    return Time().getScale && SafeAppScale(false, &v) ? v : -1.0f;
+}
+bool SetTimeScaleScript(float v) {
+    if (!Time().setScale || !(v >= 0.05f && v <= 10.0f)) return false;
+    return SafeAppScale(true, &v);
+}
+bool SafeFactor(void* holder, bool set, float* v) {
+    TimeApi& a = Time();
+    __try {
+        void* ps = *static_cast<void**>(holder);
+        if (!ps) return false;
+        if (set)
+            a.setFactor(ps, v);
+        else {
+            const float* f = a.getFactor(ps);
+            if (!f) return false;
+            *v = *f;
+        }
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+float GetClockFactorScript() {
+    void* c = WorldClock();
+    float v = -1;
+    return c && Time().getFactor && SafeFactor(&c, false, &v) ? v : -1.0f;
+}
+bool SetClockFactorScript(float v) {
+    void* c = WorldClock();
+    if (!c || !Time().setFactor || !(v >= 0.0f && v <= 10000.0f)) return false;
+    return SafeFactor(&c, true, &v);
+}
+
+// ---- Haendlerware (API 37): gCInventory_PS::GenerateTradeInvFromTreasureSets laeuft ueber den Hook in more_events.cpp (Override_TradeGenerate)
+typedef bool(__thiscall* GenTradeFn)(void*);
+bool SafeGenTrade(GenTradeFn f, void* inv, bool* ok) {
+    __try {
+        *ok = f(inv);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool SafeStackCount(void* inv, int* n) {
+    __try {
+        *n = g_i.stackCount(inv);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+int EntStackCount(const Entity& e) {
+    void* inv = InventoryOf(e);
+    int n = -1;
+    return inv && g_i.stackCount && SafeStackCount(inv, &n) ? n : -1;
+}
+bool EntGenerateTradeGoods(const Entity& e) {
+    void* inv = InventoryOf(e);   // loest auch g_e.game auf
+    static GenTradeFn f = nullptr;
+    if (!f && g_e.game) f = reinterpret_cast<GenTradeFn>(GetProcAddress(g_e.game, "?GenerateTradeInvFromTreasureSets@gCInventory_PS@@QAE_NXZ"));
+    bool ok = false;
+    return inv && f && SafeGenTrade(f, inv, &ok) && ok;
+}
+
 // ---- Bildschirmtext + Menueseite (API 3): gCSession::GetScreenOutputCtrl()->PrintScreen(bCUnicodeString, bCByteAlphaColor, Sekunden)
 // wie Script.dll GUI::PrintScreen_Debug, aber ohne "Debug: "-Praefix und mit eigener Farbe; gCGUIManager::PrintGameMessage/GetActivePage
 // wie GUI2. Unicode-String und Farbe ueber SharedBase-Exporte in rohen Puffern (Farbe 12 Byte: vtable, r, g, b, a).
@@ -1993,6 +2205,14 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("bool SetProperty(const Entity &in, const bCString &in set, const bCString &in prop, const bCString &in value)", asFUNCTION(SetPropertyText), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool SetTemplateRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const bCString &in target)", asFUNCTION(SetTemplateRefScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool SetEntityRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const Entity &in target)", asFUNCTION(SetEntityRefScript), asCALL_CDECL));
+    OG3_REG(e->RegisterObjectMethod("Entity", "int GetPartyMemberCount() const", asFUNCTION(EntPartyCount), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetPartyMember(int index) const", asFUNCTION(EntPartyMember), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetPartyLeader() const", asFUNCTION(EntPartyLeader), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool IsPartyWaiting() const", asFUNCTION(EntIsPartyWaiting), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetPartyWaiting(bool)", asFUNCTION(EntSetPartyWaiting), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool TeleportTo(const Entity &in target)", asFUNCTION(EntTeleportTo), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "int GetInventoryStackCount() const", asFUNCTION(EntStackCount), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool GenerateTradeGoods()", asFUNCTION(EntGenerateTradeGoods), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterGlobalFunction("bool EffectExists(const bCString &in name)", asFUNCTION(EffectExistsScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool StartEffect(const bCString &in name, const Entity &in at)", asFUNCTION(StartEffectScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("Entity GetTemplateEntity(const bCString &in name)", asFUNCTION(GetTemplateEntityScript), asCALL_CDECL));
@@ -2017,6 +2237,10 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("int GetGameHour()", asFUNCTION(GameHour), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("int GetGameMinute()", asFUNCTION(GameMinute), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool SetGameTime(int day, int hour, int minute)", asFUNCTION(SetGameTime), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("float GetTimeScale()", asFUNCTION(GetTimeScaleScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool SetTimeScale(float scale)", asFUNCTION(SetTimeScaleScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("float GetClockFactor()", asFUNCTION(GetClockFactorScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool SetClockFactor(float factor)", asFUNCTION(SetClockFactorScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool PrintScreen(const bCString &in, float seconds = 3, int r = 255, int g = 255, int b = 255)",
                                       asFUNCTION(PrintScreenText), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool PrintGameMessage(const bCString &in, int type = 0)", asFUNCTION(PrintGameMessageText),
@@ -2027,6 +2251,9 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("Entity FindEntity(const bCString &in)", asFUNCTION(FindEntity), asCALL_CDECL));
     if (!RegisterQuestBindings(e)) ok = false;
     if (!RegisterDialogBindings(e)) ok = false;
+    if (!RegisterScriptCallBindings(e)) ok = false;
+    if (!RegisterDrawBindings(e)) ok = false;
+    if (!RegisterMoreEventBindings(e)) ok = false;
     return ok;
 }
 

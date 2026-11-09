@@ -88,7 +88,7 @@ void OnFrame(float dt) {
 }
 
 void OnKey(int vk, bool down) {
-    if (vk == TASTE_DUMP && IsKeyDown(0x11)) return;   // Strg + / gehoert der Mod property_inspect
+    if (vk == TASTE_DUMP && (IsKeyDown(0x11) || IsKeyDown(0x10))) return;   // Strg + / gehoert property_inspect, Umschalt + / event_probe
     if (down && vk == TASTE_DUMP && vollAktiv) {   // laeuft der vollstaendige Dump, bricht die Taste ihn ab
         vollAktiv = false;
         warteschlange = "";

@@ -319,6 +319,9 @@ void __fastcall HProcess(void* self, void*) {
         firstFrame = false;
         FpuState("erstes Bild");
     }
+    ScriptCallsFrame();
+    DrawFrameTick();
+    MoreEventsFrame();
     if (InLoadPause()) return;
     g_host.CallFrame(FrameTime());
 }
@@ -333,6 +336,7 @@ void __fastcall HWorldActivate(void* self, void*) {
 }
 void __fastcall HWorldDeactivate(void* self, void*) {
     g_inWorldLoad = true;
+    ScriptCallsReport();
     g_host.CallSimple("void OnWorldDeactivate()");
     g_orig[kWorldDeactivate](self);
 }
@@ -518,6 +522,7 @@ extern "C" __declspec(dllexport) int og3_patch_start(HMODULE sharedBase, const c
         g_logWrite = GetPrivateProfileIntA("patch", "logwrite", 1, ini) != 0;
         g_loadPauseMs = unsigned(GetPrivateProfileIntA("patch", "loadpause", 0, ini)) * 1000u;
         g_memLog = GetPrivateProfileIntA("patch", "memlog", 0, ini) != 0;
+        SetScriptCallOptions(GetPrivateProfileIntA("patch", "scriptlog", 0, ini) != 0);
         GetPrivateProfileStringA("patch", "mods", modsRel, modsRel, MAX_PATH, ini);
     }
     g_modsDir = (modsRel[1] == ':' || modsRel[0] == '\\') ? std::string(modsRel) : g_gameDir + modsRel;

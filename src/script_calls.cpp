@@ -1,0 +1,469 @@
+// Spielskripte nach Namen (Skript-Schnittstelle ab Version 32, Roadmap 7.1).
+// Die Spielskripte der Script_*.dll (z. B. "AssessHit", "MagicTeleport", "SetHitPoints") stehen in der Tabelle gCScriptAdmin::m_Scripts (Name -> Funktion
+// int __stdcall(gCScriptProcessingUnit*, Entity* self, Entity* other, int arg)). Jeder Aufruf nach Namen laeuft ueber einen von zwei Exporten der Game.dll
+// (gemessen am Assembler der Game.dll 2026-11-09):
+//   RunScriptFromScript(Name, SPU, self, other, arg) - Self/Other als Script.dll-Entity-Objekte; CallScriptFromScript (exportiert) endet hier,
+//   RunScript(Name, SPU)                             - Self/Other/Zahl stehen in der Processing Unit; gCScriptAdmin::CallScript (virtuell) endet hier.
+// Beide schlagen den Namen in m_Scripts nach und rufen die Funktion; einen anderen Weg in die Tabelle gibt es in der Game.dll nicht. Wer die Funktion in der
+// Tabelle ersetzt (so machen es Script-Plugins wie TeleportPartyMembers), liegt also HINTER unseren Hooks: unser Override_Script sieht auch deren Skripte.
+//
+// Fuer Mods:
+//   int CallScript(name, self, other, arg)  - Skript aufrufen (ueber CallScriptFromScript, wie ein Spielskript es tut)
+//   bool ScriptExists(name), bCString GetScriptDll(name)
+//   WatchScript(name)                        - nur fuer beobachtete Namen ruft der Patch Override_Script/OnScript (sonst kostet jeder Skriptaufruf Zeit)
+//   bool Override_Script(const bCString &in name, Entity self, Entity other, int arg)   - Super() = Original; SetOverrideArg(3, x) aendert arg
+//   void OnScript(const bCString &in name, Entity self, Entity other, int arg, int result)  - danach, nur wenn das Original lief
+//   SetScriptResult(int)                     - Ergebnis fuers Spiel, wenn Override_Script das Original NICHT aufruft (sonst 1 bei true, 0 bei false)
+// Messung (ini [patch] scriptlog=1): alle 60 s die haeufigsten Skriptnamen je Weg, Aufrufe aus anderen Threads und die Zeit in unseren Hooks.
+#include <windows.h>
+
+#include <angelscript.h>
+
+#include <algorithm>
+#include <cstdio>
+#include <cstring>
+#include <string>
+#include <vector>
+
+#include <MinHook.h>
+
+#include "sb_api.h"
+#include "script_host.h"
+
+namespace og3p {
+namespace {
+
+struct Entity {
+    void* p;
+};
+
+typedef void*(__stdcall* InstFn)();
+typedef void*(__thiscall* FindModuleFn)(const void*, const void*);
+typedef int(__thiscall* CallFromScriptFn)(void*, const void*, void*, void*, int);
+typedef bool(__thiscall* ScriptDllFn)(const void*, const void*, void*);
+typedef int(__thiscall* RunScriptFn)(void*, const void*, void*);
+typedef int(__thiscall* RunFromScriptFn)(void*, const void*, void*, void*, void*, int);
+typedef void*(__thiscall* SpuEntFn)(void*);
+typedef int(__thiscall* SpuIntFn)(void*);
+typedef void(__thiscall* SpuSetIntFn)(void*, int);
+
+struct Api {
+    bool tried = false;
+    HMODULE game = nullptr, engine = nullptr;
+    InstFn moduleAdmin = nullptr;
+    FindModuleFn findModule = nullptr;
+    CallFromScriptFn callFromScript = nullptr;
+    ScriptDllFn scriptDll = nullptr;
+    SpuEntFn spuSelf = nullptr, spuOther = nullptr;
+    SpuIntFn spuInt = nullptr;
+    SpuSetIntFn spuSetInt = nullptr;
+    void* admin = nullptr;
+} g_a;
+
+bool ResolveApi() {
+    if (g_a.tried) return g_a.game != nullptr;
+    g_a.game = GetModuleHandleA("Game.dll");
+    g_a.engine = GetModuleHandleA("Engine.dll");
+    if (!g_a.game || !g_a.engine) {
+        g_a.game = nullptr;
+        return false;   // spaeter erneut (Testprogramm: nie vorhanden)
+    }
+    g_a.tried = true;
+    auto G = [](const char* n) { return reinterpret_cast<void*>(GetProcAddress(g_a.game, n)); };
+    g_a.moduleAdmin = reinterpret_cast<InstFn>(GetProcAddress(g_a.engine, "?GetInstance@eCModuleAdmin@@SGAAV1@XZ"));
+    g_a.findModule = reinterpret_cast<FindModuleFn>(GetProcAddress(g_a.engine, "?FindModule@eCModuleAdmin@@QBEPAVeCEngineComponentBase@@ABVbCString@@@Z"));
+    g_a.callFromScript = reinterpret_cast<CallFromScriptFn>(G("?CallScriptFromScript@gCScriptAdmin@@QAEHABVbCString@@PAX1H@Z"));
+    g_a.scriptDll = reinterpret_cast<ScriptDllFn>(G("?GetScriptDLLWithScript@gCScriptAdmin@@UBE_NABVbCString@@AAV2@@Z"));
+    g_a.spuSelf = reinterpret_cast<SpuEntFn>(G("?GetSelfEntity@gCScriptProcessingUnit@@QAEPAVeCEntity@@XZ"));
+    g_a.spuOther = reinterpret_cast<SpuEntFn>(G("?GetOtherEntity@gCScriptProcessingUnit@@QAEPAVeCEntity@@XZ"));
+    g_a.spuInt = reinterpret_cast<SpuIntFn>(G("?GetIntParameter@gCScriptProcessingUnit@@QAEHXZ"));
+    g_a.spuSetInt = reinterpret_cast<SpuSetIntFn>(G("?SetIntParameter@gCScriptProcessingUnit@@QAEXH@Z"));
+    return true;
+}
+
+bool InModule(HMODULE m, const void* p) {
+    if (!m) return false;
+    auto* b = reinterpret_cast<const unsigned char*>(m);
+    auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(b + reinterpret_cast<const IMAGE_DOS_HEADER*>(b)->e_lfanew);
+    return p >= b && p < b + nt->OptionalHeader.SizeOfImage;
+}
+
+void* SafeFindAdmin(const void* nameStr) {
+    __try {
+        void* ma = g_a.moduleAdmin ? g_a.moduleAdmin() : nullptr;
+        return ma && g_a.findModule ? g_a.findModule(ma, nameStr) : nullptr;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+// gCScriptAdmin lebt die ganze Sitzung (Engine-Modul); einmal suchen
+void* ScriptAdmin() {
+    if (!ResolveApi()) return nullptr;
+    if (!g_a.admin) {
+        SStr n("gCScriptAdmin");
+        g_a.admin = SafeFindAdmin(&n);
+    }
+    return g_a.admin;
+}
+
+// eCEntity* aus einem Skript-Argument: normal ein Script.dll-Entity-Objekt (erstes Feld eCEntity*, keine vtable); falls ein Aufrufer direkt ein eCEntity*
+// uebergibt (erstes Feld = vtable in der Engine.dll), dieses selbst
+void* EntityOfArg(void* arg) {
+    if (!arg || !ReadableMem(arg, sizeof(void*))) return nullptr;
+    void* first = *static_cast<void**>(arg);
+    if (InModule(g_a.engine, first) || InModule(g_a.game, first)) return arg;
+    if (!first || !ReadableMem(first, sizeof(void*))) return nullptr;
+    void* vt = *static_cast<void**>(first);
+    return InModule(g_a.engine, vt) || InModule(g_a.game, vt) ? first : nullptr;
+}
+
+const char* TextOf(const void* s) {
+    if (!s || !ReadableMem(s, sizeof(void*))) return nullptr;
+    __try {
+        return g_sb.strGetText(s);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+
+void* SafeSpuEnt(SpuEntFn fn, void* spu) {
+    if (!fn || !spu) return nullptr;
+    __try {
+        return fn(spu);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+int SafeSpuInt(void* spu) {
+    if (!g_a.spuInt || !spu) return 0;
+    __try {
+        return g_a.spuInt(spu);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return 0; }
+}
+
+// ---- Bindings
+
+bool g_callFailLogged = false;
+int SafeCallFromScript(void* admin, const void* name, void* self, void* other, int arg, bool* ok) {
+    __try {
+        *ok = true;
+        return g_a.callFromScript(admin, name, self, other, arg);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        *ok = false;
+        return 0;
+    }
+}
+bool SafeScriptDll(void* admin, const void* name, void* out) {
+    __try {
+        return g_a.scriptDll(admin, name, out);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+SStr GetScriptDllScript(const SStr& name) {
+    void* admin = ScriptAdmin();
+    SStr dll;
+    if (admin && g_a.scriptDll && !SafeScriptDll(admin, &name, &dll)) return SStr();
+    return dll;
+}
+bool ScriptExistsScript(const SStr& name) {
+    void* admin = ScriptAdmin();
+    SStr dll;
+    return admin && g_a.scriptDll && SafeScriptDll(admin, &name, &dll);
+}
+
+// Script.dll-Entity-Objekt fuer den Aufruf: 0xA8 Byte (gemessen am Konstruktor in Script.dll 2026-11-09: erstes Feld eCEntity*, danach 41 zwischengespeicherte
+// Property-Set-Zeiger, die Entity(eCEntity const*) fuellt). Ohne sie lesen Skripte wie GetStaminaPoints 0. Destruktor ist leer (nur ret).
+typedef void*(__thiscall* EntityCtorFn)(void*, const void*);
+typedef void*(__thiscall* EntityDefCtorFn)(void*);
+struct ScriptEntityBuf {
+    alignas(8) unsigned char raw[0x100];
+};
+bool SafeMakeEntity(ScriptEntityBuf* b, void* ent) {
+    static bool tried = false;
+    static EntityCtorFn ctor = nullptr;
+    static EntityDefCtorFn defCtor = nullptr;
+    if (!tried) {
+        tried = true;
+        if (HMODULE script = GetModuleHandleA("Script.dll")) {
+            ctor = reinterpret_cast<EntityCtorFn>(GetProcAddress(script, "??0Entity@@QAE@PBVeCEntity@@@Z"));
+            defCtor = reinterpret_cast<EntityDefCtorFn>(GetProcAddress(script, "??0Entity@@QAE@XZ"));
+        }
+    }
+    std::memset(b->raw, 0, sizeof b->raw);
+    if (!ctor || !defCtor) return false;
+    __try {
+        if (ent)
+            ctor(b->raw, ent);
+        else
+            defCtor(b->raw);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+int CallScriptScript(const SStr& name, const Entity& self, const Entity& other, int arg) {
+    void* admin = ScriptAdmin();
+    if (!admin || !g_a.callFromScript) return 0;
+    if (!ScriptExistsScript(name)) {
+        if (ScriptHost::s_current) ScriptHost::s_current->Log(std::string("CallScript: Skript '") + name.c_str() + "' gibt es nicht");
+        return 0;
+    }
+    ScriptEntityBuf s, o;
+    if (!SafeMakeEntity(&s, self.p) || !SafeMakeEntity(&o, other.p)) {
+        if (ScriptHost::s_current) ScriptHost::s_current->Log("CallScript: Entity-Konstruktor der Script.dll fehlt oder schlug fehl");
+        return 0;
+    }
+    bool ok = false;
+    const int r = SafeCallFromScript(admin, &name, &s, &o, arg, &ok);
+    if (!ok && !g_callFailLogged && ScriptHost::s_current) {
+        g_callFailLogged = true;
+        ScriptHost::s_current->Log(std::string("CallScript('") + name.c_str() + "'): Ausnahme im Spielskript abgefangen (weitere werden nicht gemeldet)");
+    }
+    return r;
+}
+
+std::vector<std::string> g_watch;   // beobachtete Skriptnamen (Gross-/Kleinschreibung egal)
+volatile long g_watchCount = 0;
+void WatchScriptScript(const SStr& name) {
+    const std::string n = name.c_str();
+    if (n.empty()) return;
+    for (const std::string& w : g_watch)
+        if (_stricmp(w.c_str(), n.c_str()) == 0) return;
+    g_watch.push_back(n);
+    InterlockedExchange(&g_watchCount, long(g_watch.size()));
+    if (ScriptHost::s_current) ScriptHost::s_current->Log("WatchScript: '" + n + "' wird beobachtet (Override_Script/OnScript)");
+}
+bool IsWatched(const char* n) {
+    if (!g_watchCount || !n) return false;
+    for (const std::string& w : g_watch)
+        if (_stricmp(w.c_str(), n) == 0) return true;
+    return false;
+}
+
+// Ergebnis fuer das Spiel, wenn ein Override_Script das Original nicht aufruft (je verschachteltem Aufruf eins)
+struct ResultFrame {
+    bool set = false;
+    int value = 0;
+};
+std::vector<ResultFrame> g_results;
+void SetScriptResultScript(int v) {
+    if (g_results.empty()) {
+        if (ScriptHost::s_current) ScriptHost::s_current->Log("SetScriptResult: nur innerhalb von Override_Script");
+        return;
+    }
+    g_results.back().set = true;
+    g_results.back().value = v;
+}
+
+// ---- Hooks
+
+ScriptHost* g_host = nullptr;
+RunScriptFn o_run = nullptr;
+RunFromScriptFn o_runFrom = nullptr;
+DWORD g_gameThread = 0;
+long g_depth = 0;
+const char* kOverride = "bool Override_Script(const bCString &in, Entity, Entity, int)";
+const char* kEvent = "void OnScript(const bCString &in, Entity, Entity, int, int)";
+
+// ---- Messung
+bool g_stats = false;
+struct Stat {
+    char name[64];
+    unsigned hash;
+    unsigned run, fromScript, foreign;
+};
+const int kStatSlots = 2048;
+Stat* g_stat = nullptr;   // offene Adressierung; erst mit scriptlog=1 angelegt
+int g_statUsed = 0;
+unsigned long long g_hookTicks = 0, g_hookCalls = 0;
+DWORD g_statStart = 0;
+
+void Count(const char* n, bool fromScript, bool foreign) {
+    if (!g_stat || !n) return;
+    unsigned h = 2166136261u;
+    for (const char* c = n; *c; ++c) h = (h ^ static_cast<unsigned char>(*c)) * 16777619u;
+    for (int i = 0; i < kStatSlots; ++i) {
+        Stat& s = g_stat[(h + unsigned(i)) % kStatSlots];
+        if (s.name[0] == 0) {
+            if (g_statUsed >= kStatSlots - 1) return;
+            ++g_statUsed;
+            s.hash = h;
+            strncpy_s(s.name, n, _TRUNCATE);
+        } else if (s.hash != h || std::strncmp(s.name, n, sizeof s.name - 1) != 0)
+            continue;
+        if (fromScript)
+            ++s.fromScript;
+        else
+            ++s.run;
+        if (foreign) ++s.foreign;
+        return;
+    }
+}
+
+void LogStats() {
+    if (!g_stat || !g_host) return;
+    std::vector<const Stat*> v;
+    unsigned long long total = 0, foreign = 0;
+    for (int i = 0; i < kStatSlots; ++i)
+        if (g_stat[i].name[0]) {
+            v.push_back(&g_stat[i]);
+            total += g_stat[i].run + g_stat[i].fromScript;
+            foreign += g_stat[i].foreign;
+        }
+    std::sort(v.begin(), v.end(), [](const Stat* a, const Stat* b) { return a->run + a->fromScript > b->run + b->fromScript; });
+    LARGE_INTEGER f;
+    QueryPerformanceFrequency(&f);
+    const double us = g_hookCalls ? double(g_hookTicks) * 1e6 / double(f.QuadPart) / double(g_hookCalls) : 0.0;
+    char b[256];
+    std::snprintf(b, sizeof b, "Skriptaufrufe seit %lu s: %llu Aufrufe, %d Namen, %llu aus fremden Threads, eigener Aufwand je Aufruf %.2f us",
+                  (GetTickCount() - g_statStart) / 1000u, total, int(v.size()), foreign, us);
+    g_host->Log(b);
+    const size_t n = v.size() < 40 ? v.size() : 40;
+    for (size_t i = 0; i < n; ++i) {
+        std::snprintf(b, sizeof b, "  %-40s RunScript %u, RunScriptFromScript %u%s", v[i]->name, v[i]->run, v[i]->fromScript,
+                      v[i]->foreign ? " (auch fremder Thread)" : "");
+        g_host->Log(b);
+    }
+}
+
+struct HookTimer {
+    LARGE_INTEGER t0;
+    HookTimer() {
+        if (g_stats) QueryPerformanceCounter(&t0);
+    }
+    void Stop() {
+        if (!g_stats) return;
+        LARGE_INTEGER t1;
+        QueryPerformanceCounter(&t1);
+        g_hookTicks += static_cast<unsigned long long>(t1.QuadPart - t0.QuadPart);
+        ++g_hookCalls;
+    }
+};
+
+// Gemeinsamer Ablauf beider Hooks fuer beobachtete Namen: Override-Kette, dann OnScript
+template <class Orig>
+int Dispatch(const void* name, void* self, void* other, int arg, Orig original) {
+    EvArg a[] = {EvArg::Str(name), EvArg::Ent(self), EvArg::Ent(other), EvArg::U(static_cast<unsigned>(arg))};
+    int result = 0;
+    bool origRan = false;
+    g_results.emplace_back();
+    bool res = false, called = false;
+    const bool taken = g_host->CallOverride(
+        kOverride, a, 4,
+        [&](const EvArg* ar) {
+            result = original(static_cast<int>(ar[3].value));
+            origRan = true;
+            return result != 0;
+        },
+        &res, &called);
+    const ResultFrame rf = g_results.back();
+    g_results.pop_back();
+    if (!taken) {
+        result = original(arg);
+        origRan = true;
+    } else if (!origRan)
+        result = rf.set ? rf.value : (res ? 1 : 0);
+    if (origRan) {
+        EvArg e[] = {EvArg::Str(name), EvArg::Ent(self), EvArg::Ent(other), EvArg::U(static_cast<unsigned>(arg)), EvArg::U(static_cast<unsigned>(result))};
+        g_host->CallEvent(kEvent, e, 5);
+    }
+    return result;
+}
+
+int __fastcall HRun(void* admin, void*, const void* name, void* spu) {
+    HookTimer t;
+    const bool foreign = g_gameThread && GetCurrentThreadId() != g_gameThread;
+    const char* n = (g_stats || g_watchCount) ? TextOf(name) : nullptr;
+    if (g_stats) Count(n, false, foreign);
+    const bool watch = !foreign && g_gameThread && g_depth < 8 && IsWatched(n);
+    t.Stop();
+    if (!watch) return o_run(admin, name, spu);
+    ++g_depth;
+    void* self = SafeSpuEnt(g_a.spuSelf, spu);
+    void* other = SafeSpuEnt(g_a.spuOther, spu);
+    const int arg = SafeSpuInt(spu);
+    const int r = Dispatch(name, self, other, arg, [&](int x) {
+        if (x != arg && g_a.spuSetInt) g_a.spuSetInt(spu, x);
+        return o_run(admin, name, spu);
+    });
+    --g_depth;
+    return r;
+}
+
+int __fastcall HRunFrom(void* admin, void*, const void* name, void* spu, void* self, void* other, int arg) {
+    HookTimer t;
+    const bool foreign = g_gameThread && GetCurrentThreadId() != g_gameThread;
+    const char* n = (g_stats || g_watchCount) ? TextOf(name) : nullptr;
+    if (g_stats) Count(n, true, foreign);
+    const bool watch = !foreign && g_gameThread && g_depth < 8 && IsWatched(n);
+    t.Stop();
+    if (!watch) return o_runFrom(admin, name, spu, self, other, arg);
+    ++g_depth;
+    const int r = Dispatch(name, EntityOfArg(self), EntityOfArg(other), arg,
+                           [&](int x) { return o_runFrom(admin, name, spu, self, other, x); });
+    --g_depth;
+    return r;
+}
+
+bool HookExport(HMODULE m, const char* sym, void* detour, void** orig, ScriptHost& host) {
+    void* target = reinterpret_cast<void*>(GetProcAddress(m, sym));
+    if (!target) {
+        host.Log(std::string("Skriptaufrufe: Export fehlt: ") + sym);
+        return false;
+    }
+    return MH_CreateHook(target, detour, orig) == MH_OK && MH_EnableHook(target) == MH_OK;
+}
+
+}   // namespace
+
+// Script.dll-Entity fuer andere Bindings (z. B. StartEffect): buf muss mindestens kScriptEntityBytes gross sein
+bool MakeScriptEntity(void* buf, void* ent) {
+    static_assert(sizeof(ScriptEntityBuf) >= kScriptEntityBytes, "Puffergroesse");
+    return SafeMakeEntity(static_cast<ScriptEntityBuf*>(buf), ent);
+}
+
+bool RegisterScriptCallBindings(asIScriptEngine* e) {
+    bool ok = true;
+    OG3_REG(e->RegisterGlobalFunction("int CallScript(const bCString &in name, const Entity &in self, const Entity &in other, int arg = 0)",
+                                      asFUNCTION(CallScriptScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool ScriptExists(const bCString &in name)", asFUNCTION(ScriptExistsScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bCString GetScriptDll(const bCString &in name)", asFUNCTION(GetScriptDllScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("void WatchScript(const bCString &in name)", asFUNCTION(WatchScriptScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("void SetScriptResult(int value)", asFUNCTION(SetScriptResultScript), asCALL_CDECL));
+    return ok;
+}
+
+void SetScriptCallOptions(bool stats) { g_stats = stats; }
+
+bool OnGameThread() { return g_gameThread != 0 && GetCurrentThreadId() == g_gameThread; }
+
+void ScriptCallsReport() {
+    if (g_stats && g_stat && g_hookCalls) LogStats();
+}
+
+// Einmal je Bild aus dem Spiel-Takt: merkt den Thread der Skripte; mit scriptlog=1 alle 60 s die Messung
+void ScriptCallsFrame() {
+    if (!g_gameThread) g_gameThread = GetCurrentThreadId();
+    if (!g_stats || !g_stat) return;
+    static DWORD last = GetTickCount();
+    if (GetTickCount() - last >= 60000u) {
+        last = GetTickCount();
+        LogStats();
+    }
+}
+
+int InstallScriptCallHooks(ScriptHost& host) {
+    HMODULE game = GetModuleHandleA("Game.dll");
+    if (!game) return 0;
+    g_host = &host;
+    ResolveApi();
+    if (g_stats) {
+        g_stat = static_cast<Stat*>(VirtualAlloc(nullptr, sizeof(Stat) * kStatSlots, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+        g_statStart = GetTickCount();
+    }
+    int n = 0;
+    n += HookExport(game, "?RunScript@gCScriptAdmin@@QAEHABVbCString@@PAVgCScriptProcessingUnit@@@Z", reinterpret_cast<void*>(&HRun),
+                    reinterpret_cast<void**>(&o_run), host);
+    n += HookExport(game, "?RunScriptFromScript@gCScriptAdmin@@QAEHABVbCString@@PAVgCScriptProcessingUnit@@PAX2H@Z",
+                    reinterpret_cast<void*>(&HRunFrom), reinterpret_cast<void**>(&o_runFrom), host);
+    char b[160];
+    std::snprintf(b, sizeof b, "Skriptaufrufe: %d von 2 Hooks aktiv (RunScript, RunScriptFromScript)%s; CallScript %s", n,
+                  g_stats ? ", Messung an (scriptlog=1)" : "", g_a.callFromScript ? "bereit" : "NICHT verfuegbar");
+    host.Log(b);
+    return n;
+}
+
+}   // namespace og3p

@@ -56,7 +56,7 @@ bool Umschalten(Entity hero, int slot, const bCString &in name) {
 }
 
 void OnKey(int vk, bool down) {
-    if (!down || vk != TASTE_LEBENSRAUB) return;
+    if (!down || vk != TASTE_LEBENSRAUB || IsKeyDown(0x11)) return;   // Strg + Ziffernblock * gehoert event_probe
     Entity hero = GetHero();
     if (!hero.IsValid()) return;
     if (Umschalten(hero, SLOT_RIGHT_HAND, "rechte Hand")) return;
