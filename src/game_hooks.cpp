@@ -626,12 +626,19 @@ void InstallQualityTooltip(HMODULE game, ScriptHost& host) {
         return;
     }
     char* target = reinterpret_cast<char*>(game) + kTipFuncRva;
+    char* line = reinterpret_cast<char*>(game) + kTipLineRva;
     static const unsigned char kSig[] = {0x83, 0xEC, 0x10, 0x8B, 0x40, 0x18, 0x53, 0x56, 0x33, 0xDB, 0x85, 0xC9};   // sub esp,10h / mov eax,[eax+18h] / push ebx / push esi / xor ebx,ebx / test ecx,ecx
+    // Zeilen-Helfer: sub esp,2Ch / push ebx / mov ebx,ecx / push esi / lea ecx,[esp+18h] / mov esi,eax. Der folgende call [Import] bleibt draussen (absolute Adresse).
+    static const unsigned char kLineSig[] = {0x83, 0xEC, 0x2C, 0x53, 0x8B, 0xD9, 0x56, 0x8D, 0x4C, 0x24, 0x18, 0x8B, 0xF0};
     if (!ReadableMem(target, sizeof kSig) || std::memcmp(target, kSig, sizeof kSig) != 0) {
         host.Log("Qualitaets-Tooltip: Funktion bei Game.dll+0xA3DF0 hat nicht die erwarteten Bytes (andere Spielversion?) - nicht eingehaengt");
         return;
     }
-    g_tipLine = reinterpret_cast<char*>(game) + kTipLineRva;
+    if (!ReadableMem(line, sizeof kLineSig) || std::memcmp(line, kLineSig, sizeof kLineSig) != 0) {
+        host.Log("Qualitaets-Tooltip: Zeilen-Helfer bei Game.dll+0xA48B0 hat nicht die erwarteten Bytes (andere Spielversion?) - nicht eingehaengt");
+        return;
+    }
+    g_tipLine = line;
     const bool ok = MH_CreateHook(target, reinterpret_cast<void*>(&TipStub), &o_tipFunc) == MH_OK && MH_EnableHook(target) == MH_OK;
     host.Log(std::string("Qualitaets-Tooltip (Lebensraub): ") + (ok ? "eingehaengt" : "FEHLER beim Einhaengen"));
 }
@@ -662,7 +669,11 @@ const char* QuestNameOf(const void* q) {
 }
 bool __fastcall HLoadQuests(void* self, void*) {
     const bool r = o_loadQuests(self);
-    LogLine("Laden: LoadQuestsFromInis fertig -> OnQuestsLoaded");
+    {
+        char tb[96];
+        std::snprintf(tb, sizeof tb, "Laden: LoadQuestsFromInis fertig -> OnQuestsLoaded (Thread %lu)", static_cast<unsigned long>(GetCurrentThreadId()));
+        LogLine(tb);
+    }
     SetQuestManagerOverride(self);   // Bindings arbeiten jetzt auf dem Manager, der gerade aufgebaut wurde
     g_host->CallEvent("void OnQuestsLoaded()", nullptr, 0);
     SetQuestManagerOverride(nullptr);
@@ -717,6 +728,44 @@ int __fastcall HReadInfoSave(void* self, void*, void* stream) {
     return o_readInfoSave(self, stream);
 }
 
+// ---- Speichern: gCWorld::SaveGameWorld(Name, Bild, Zeiger, DWORD) laeuft genau einmal je Speichern (Menue und Schnellspeichern), im selben Thread wie das Laden
+// (gemessen 2026-11-08). Davor OnBeforeSave(Name), danach OnAfterSave(Name, ok): Mods koennen dauerhafte Zustaende vor dem Schreiben entfernen und danach wiederherstellen.
+// (gCWorld::CreateSaveGame gehoert nicht zum Speichern: es kam beim Speichern nie vor.)
+typedef bool(__thiscall* SaveWorldFn)(void*, const void*, void*, void*, DWORD);
+SaveWorldFn o_saveWorld = nullptr;
+long g_saveDepth = 0;
+
+// Name des Spielstands als Text; Zeiger gilt nur, solange der bCString lebt (sofort kopieren)
+const char* SaveNameOf(const void* name) {
+    if (!name || !ReadableMem(name, sizeof(void*))) return "?";
+    __try {
+        const char* t = g_sb.strGetText(name);
+        return t ? t : "?";
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return "?"; }
+}
+void LogSave(const char* phase, const void* name, long depth, int result) {
+    char b[256];
+    std::snprintf(b, sizeof b, "Speichern: SaveGameWorld('%.80s') %s, Thread %lu, Tiefe %ld, Ergebnis %d", SaveNameOf(name), phase,
+                  static_cast<unsigned long>(GetCurrentThreadId()), depth, result);
+    LogLine(b);
+}
+bool __fastcall HSaveWorld(void* self, void*, const void* name, void* img, void* p, DWORD k) {
+    const long d = InterlockedIncrement(&g_saveDepth);
+    const bool outer = d == 1;   // verschachtelte Aufrufe (nie gemessen) melden keine Ereignisse
+    LogSave("Beginn", name, d, 0);
+    if (outer) {
+        EvArg a[] = {EvArg::Str(name)};
+        g_host->CallEvent("void OnBeforeSave(const bCString &in)", a, 1);
+    }
+    const bool r = o_saveWorld(self, name, img, p, k);
+    LogSave("Ende", name, d, r ? 1 : 0);
+    if (outer) {
+        EvArg a[] = {EvArg::Str(name), EvArg::U(r ? 1u : 0u)};
+        g_host->CallEvent("void OnAfterSave(const bCString &in, int)", a, 2);
+    }
+    InterlockedDecrement(&g_saveDepth);
+    return r;
+}
 void InstallSaveHooks(HMODULE game, ScriptHost& host) {
     g_questName = reinterpret_cast<GetNameFn>(GetProcAddress(game, "?GetName@gCQuest_PS@@QBEABVbCString@@XZ"));
     int n = 0;
@@ -734,9 +783,12 @@ void InstallSaveHooks(HMODULE game, ScriptHost& host) {
               reinterpret_cast<void**>(&o_writeRuntime), host);
     n += Hook(game, "?ReadSaveGame@gCInfoManager_PS@@UAE?AW4bEResult@@AAVbCIStream@@@Z", reinterpret_cast<void*>(&HReadInfoSave),
               reinterpret_cast<void**>(&o_readInfoSave), host);
+    n += Hook(game, "?SaveGameWorld@gCWorld@@QAE_NABVbCString@@PAVeCGfxImageData@@PAXK@Z", reinterpret_cast<void*>(&HSaveWorld),
+              reinterpret_cast<void**>(&o_saveWorld), host);
     char b[96];
-    std::snprintf(b, sizeof b, "Lade-/Speicher-Hooks: %d von 7 aktiv", n);
+    std::snprintf(b, sizeof b, "Lade-/Speicher-Hooks: %d von 8 aktiv", n);
     host.Log(b);
+
 }
 
 }   // namespace

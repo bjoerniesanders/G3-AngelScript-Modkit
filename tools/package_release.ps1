@@ -20,6 +20,8 @@ foreach ($f in "og3_patch.dll", "og3_patch.map", "og3_packmod.exe") {
 Copy-Item (Join-Path $root "tools\install_loader.ps1"), (Join-Path $root "tools\g3pak_read.py") (Join-Path $stage "tools\")
 Copy-Item (Join-Path $root "examples") $stage -Recurse
 Copy-Item (Join-Path $root "docs\modkit") (Join-Path $stage "docs") -Recurse
+# Private planning files live next to the public docs on the maintainer's machine only (git-excluded); never ship them in a package.
+foreach ($p in "roadmap.md", "plugin-analyse.md") { Remove-Item (Join-Path $stage "docs\modkit\$p") -Force -ErrorAction SilentlyContinue }
 foreach ($f in "README.md", "LICENSE") { if (Test-Path (Join-Path $root $f)) { Copy-Item (Join-Path $root $f) $stage } }
 
 $install = @"

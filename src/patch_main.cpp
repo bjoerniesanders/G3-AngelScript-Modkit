@@ -15,6 +15,7 @@
 
 #include <atomic>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -163,9 +164,70 @@ void RunMainOnce() {
     g_host.CallMain();
     FpuState("nach main");
 }
+// Versionszeilen (Roadmap 2.2): Dateigroesse und PE-Zeitstempel der wichtigen Module, damit Fehlerberichte von anderen Installationen vergleichbar sind.
+// "Spielordner ja/nein" zeigt z. B. ein DXVK-d3d9.dll (liegt im Spielordner) gegenueber dem System-d3d9.dll. Der Pfad selbst wird nicht ausgegeben.
+// CRC32 (zlib-Polynom, wie 7-Zip/Python zlib.crc32) ueber den Dateiinhalt. Noetig, weil binaer gepatchte DLLs (Community-/PU-Patch-Varianten) dieselbe Groesse und
+// denselben PE-Zeitstempel haben koennen (gemessen 2026-11-07: Game.dll Steam-Installation vs. Entwicklerinstallation, 15701 Bytes anders). 0 bei Lesefehler.
+unsigned FileCrc32(const char* path, bool* ok) {
+    static unsigned table[256];
+    static bool init = false;
+    if (!init) {
+        for (unsigned i = 0; i < 256; ++i) {
+            unsigned c = i;
+            for (int k = 0; k < 8; ++k) c = (c & 1) ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+            table[i] = c;
+        }
+        init = true;
+    }
+    *ok = false;
+    FILE* f = std::fopen(path, "rb");
+    if (!f) return 0;
+    std::vector<unsigned char> buf(1 << 16);
+    unsigned crc = 0xFFFFFFFFu;
+    size_t n;
+    while ((n = std::fread(buf.data(), 1, buf.size(), f)) > 0)
+        for (size_t i = 0; i < n; ++i) crc = table[(crc ^ buf[i]) & 0xFF] ^ (crc >> 8);
+    *ok = !std::ferror(f);
+    std::fclose(f);
+    return crc ^ 0xFFFFFFFFu;
+}
+void LogModuleVersion(const char* name) {
+    HMODULE m = GetModuleHandleA(name);
+    if (!m) {
+        Log(std::string("Modul ") + name + ": nicht geladen");
+        return;
+    }
+    char path[MAX_PATH] = {};
+    GetModuleFileNameA(m, path, MAX_PATH);
+    bool crcOk = false;
+    const unsigned crc = FileCrc32(path, &crcOk);
+    WIN32_FILE_ATTRIBUTE_DATA fa = {};
+    const bool haveSize = GetFileAttributesExA(path, GetFileExInfoStandard, &fa) != 0;
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(m);
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(reinterpret_cast<const char*>(m) + dos->e_lfanew);
+    const bool inGameDir = !g_gameDir.empty() && _strnicmp(path, g_gameDir.c_str(), g_gameDir.size()) == 0;
+    char b[240], crcText[16] = "-";
+    if (crcOk) std::snprintf(crcText, sizeof crcText, "%08X", crc);
+    std::snprintf(b, sizeof b, "Modul %s: %lu Bytes, PE-Zeitstempel %08lX, CRC32 %s, Spielordner %s", name, haveSize ? fa.nFileSizeLow : 0ul,
+                  static_cast<unsigned long>(nt->FileHeader.TimeDateStamp), crcText, inGameDir ? "ja" : "nein");
+    Log(b);
+}
+void LogModuleVersions() {
+    // Script.dll und Script_Game.dll laden erst nach OnPostInitializeModules (gemessen 2026-11-07); sie werden bei der ersten Weltaktivierung nachgetragen.
+    static const char* kMods[] = {"Gothic3.exe", "Game.dll", "Engine.dll", "SharedBase.dll", "d3d9.dll"};
+    for (const char* n : kMods) LogModuleVersion(n);
+}
+void LogScriptModuleVersions() {
+    static bool done = false;
+    if (done) return;
+    done = true;
+    LogModuleVersion("Script.dll");
+    LogModuleVersion("Script_Game.dll");
+}
 void __fastcall HPostInit(void* self, void*) {
     g_orig[kPostInit](self);
     Log("Engine initialisiert (OnPostInitializeModules)");
+    LogModuleVersions();
     RunMainOnce();
 }
 // ---------------------------------------------------------------- Windows-Menuetaste ohne Piepton
@@ -263,6 +325,7 @@ void __fastcall HProcess(void* self, void*) {
 void __fastcall HWorldActivate(void* self, void*) {
     g_orig[kWorldActivate](self);
     FpuState("Welt aktiviert");
+    LogScriptModuleVersions();
     g_inWorldLoad = false;
     g_lastActivate = GetTickCount();
     if (!g_lastActivate) g_lastActivate = 1;

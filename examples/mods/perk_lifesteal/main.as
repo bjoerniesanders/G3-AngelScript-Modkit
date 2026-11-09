@@ -67,7 +67,9 @@ bCString Zustand(Entity hero, const bCString &in talent) {
 }
 
 void OnQuestsLoaded() { Versuch(); }
-void OnWorldActivate() { Versuch(); }
+int ladeZaehler = 0;
+int gemessen = 0;
+void OnWorldActivate() { Versuch(); ladeZaehler++; }
 
 // Die frueheren Qualitaetszeile "(20 %) Lebensraub" (Bit QUALITY_LIFESTEAL aus lifesteal_demo) steckt im Spielstand an der Waffe: hier einmal pro Sekunde entfernen,
 // damit nur noch das Bonustalent an der Waffe steht.
@@ -109,6 +111,8 @@ void OnDamage(Entity victim, Entity inflictor, Entity owner, int amount, int typ
 void StapelPruefen(Entity hero) {
     if (stapelGeprueft || !fertig) return;
     stapelGeprueft = true;
+    { Entity vt = GetTemplateEntity(NEU); Entity vl = GetTemplateEntity(LERNITEM);
+      print("Vorlagen nach Laden: " + NEU + " gueltig=" + vt.IsValid() + ", " + LERNITEM + " gueltig=" + vl.IsValid() + ", Skill=" + (vl.IsValid() ? GetProperty(vl, "Item", "Skill") : bCString("-"))); }
     print("Stapel: It_Perk_1H_1=" + hero.GetItemCount("It_Perk_1H_1") + " It_Perk_Orcslayer=" + hero.GetItemCount("It_Perk_Orcslayer") + " It_Perk_Axe_1=" + hero.GetItemCount("It_Perk_Axe_1")
           + " It_Perk_Bow_1=" + hero.GetItemCount("It_Perk_Bow_1") + " " + LERNITEM + "=" + hero.GetItemCount(LERNITEM));
     if (hero.GetItemCount(LERNITEM) <= 0) {
@@ -137,6 +141,31 @@ void Entfernen(Entity hero) {
     PrintScreen("Lebensraub entfernt: jetzt speichern, dann die Mod abschalten", 8.0f, 255, 220, 80);
 }
 
+// Speichern (ab API 31): Der Lern-Item-Stapel steht sonst im Spielstand und kann dort mit fremden Mods oder ohne diese Mod den Charakterbogen zum Absturz bringen.
+// Darum vor dem Schreiben Talent deaktivieren und Stapel loeschen, danach (auch bei Fehlschlag) wieder anlegen und, wenn die Waffe ausgeruestet ist, neu aktivieren.
+bool stapelEntnommen = false;
+void OnBeforeSave(const bCString &in name) {
+    if (ENTFERNEN || !fertig) return;
+    Entity hero = GetHero();
+    if (!hero.IsValid()) return;
+    Entity w = GetTemplateEntity(WAFFE);
+    print("Speichern '" + name + "': ActivateSkill2 der Waffe = " + (w.IsValid() ? GetProperty(w, "Item", "ActivateSkill2") : bCString("-")) + " | " + Zustand(hero, NEU));
+    if (hero.IsSkillActive(NEU)) hero.DeactivateSkill(NEU);
+    manuell = false;
+    int n = hero.GetItemCount(LERNITEM);
+    int r = n > 0 ? hero.DeleteItemStack(LERNITEM) : 0;
+    stapelEntnommen = true;
+    print("Speichern: Stapel " + LERNITEM + " entnommen: vorher " + n + ", geloescht=" + r + ", jetzt " + hero.GetItemCount(LERNITEM) + " | " + Zustand(hero, NEU));
+}
+void OnAfterSave(const bCString &in name, int ok) {
+    if (!stapelEntnommen) return;
+    stapelEntnommen = false;
+    Entity hero = GetHero();
+    if (!hero.IsValid()) return;
+    stapelGeprueft = false;   // StapelPruefen legt den Stapel wieder an und holt die Aktivierung nach
+    StapelPruefen(hero);
+    print("Gespeichert '" + name + "' (ok=" + ok + "): Stapel wiederhergestellt: " + hero.GetItemCount(LERNITEM) + " | " + Zustand(hero, NEU));
+}
 void OnFrame(float dt) {
     zeit += dt;
     if (zeit < 0.5f) return;
@@ -147,6 +176,11 @@ void OnFrame(float dt) {
     if (ENTFERNEN) {
         if (fertig) Entfernen(hero);
         return;
+    }
+    if (gemessen != ladeZaehler) {
+        gemessen = ladeZaehler;
+        Entity vt = GetTemplateEntity(NEU); Entity vl = GetTemplateEntity(LERNITEM);
+        print("Ladevorgang #" + gemessen + ": Vorlage " + NEU + " gueltig=" + vt.IsValid() + ", " + LERNITEM + " gueltig=" + vl.IsValid() + ", Skill=" + (vl.IsValid() ? GetProperty(vl, "Item", "Skill") : bCString("-")) + " | Stapel=" + hero.GetItemCount(LERNITEM) + " | " + Zustand(hero, NEU));
     }
     StapelPruefen(hero);
     if (manuell && !WaffeAusgeruestet(hero)) {
