@@ -173,11 +173,9 @@ struct ScriptEntityBuf {
     alignas(8) unsigned char raw[0x100];
 };
 bool SafeMakeEntity(ScriptEntityBuf* b, void* ent) {
-    static bool tried = false;
     static EntityCtorFn ctor = nullptr;
     static EntityDefCtorFn defCtor = nullptr;
-    if (!tried) {
-        tried = true;
+    if (!ctor || !defCtor) {   // Script.dll laedt erst nach main(): bis dahin bei jedem Aufruf erneut suchen
         if (HMODULE script = GetModuleHandleA("Script.dll")) {
             ctor = reinterpret_cast<EntityCtorFn>(GetProcAddress(script, "??0Entity@@QAE@PBVeCEntity@@@Z"));
             defCtor = reinterpret_cast<EntityDefCtorFn>(GetProcAddress(script, "??0Entity@@QAE@XZ"));
@@ -337,14 +335,15 @@ struct HookTimer {
 template <class Orig>
 int Dispatch(const void* name, void* self, void* other, int arg, Orig original) {
     EvArg a[] = {EvArg::Str(name), EvArg::Ent(self), EvArg::Ent(other), EvArg::U(static_cast<unsigned>(arg))};
-    int result = 0;
+    int result = 0, used = arg;   // used: Zahl, mit der das Original wirklich lief (SetOverrideArg)
     bool origRan = false;
     g_results.emplace_back();
     bool res = false, called = false;
     const bool taken = g_host->CallOverride(
         kOverride, a, 4,
         [&](const EvArg* ar) {
-            result = original(static_cast<int>(ar[3].value));
+            used = static_cast<int>(ar[3].value);
+            result = original(used);
             origRan = true;
             return result != 0;
         },
@@ -357,7 +356,7 @@ int Dispatch(const void* name, void* self, void* other, int arg, Orig original) 
     } else if (!origRan)
         result = rf.set ? rf.value : (res ? 1 : 0);
     if (origRan) {
-        EvArg e[] = {EvArg::Str(name), EvArg::Ent(self), EvArg::Ent(other), EvArg::U(static_cast<unsigned>(arg)), EvArg::U(static_cast<unsigned>(result))};
+        EvArg e[] = {EvArg::Str(name), EvArg::Ent(self), EvArg::Ent(other), EvArg::U(static_cast<unsigned>(used)), EvArg::U(static_cast<unsigned>(result))};
         g_host->CallEvent(kEvent, e, 5);
     }
     return result;
@@ -376,8 +375,11 @@ int __fastcall HRun(void* admin, void*, const void* name, void* spu) {
     void* other = SafeSpuEnt(g_a.spuOther, spu);
     const int arg = SafeSpuInt(spu);
     const int r = Dispatch(name, self, other, arg, [&](int x) {
-        if (x != arg && g_a.spuSetInt) g_a.spuSetInt(spu, x);
-        return o_run(admin, name, spu);
+        if (x == arg || !g_a.spuSetInt) return o_run(admin, name, spu);
+        g_a.spuSetInt(spu, x);
+        const int rr = o_run(admin, name, spu);
+        g_a.spuSetInt(spu, arg);   // geaenderte Zahl nicht in der Verarbeitungseinheit stehen lassen
+        return rr;
     });
     --g_depth;
     return r;

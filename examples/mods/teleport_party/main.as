@@ -1,15 +1,20 @@
 // Begleiter teleportieren mit (ab API 33): Teleportiert sich der Held per Rune oder Zauber, kommen seine Begleiter mit.
-// Ablauf: Das Spielskript "MagicTeleport" (Script_Game.dll) wird per WatchScript/Override_Script abgefangen; nach dem Original (Super) holt die Mod jedes
-// Gruppenmitglied des Helden mit Entity.TeleportTo zu ihm. Weil der Held erst nach dem Ueberblenden am Ziel stehen kann, prueft die Mod NACHHOLEN
-// Sekunden spaeter noch einmal und holt alle nach, die weiter als WEIT entfernt sind.
+// Ablauf: Das Spielskript "MagicTeleport" (Script_Game.dll) wird per WatchScript/Override_Script abgefangen. VOR dem Original merkt sich die Mod, wer
+// mitkommt; nach dem Original (Super) holt sie diese Mitglieder mit Entity.TeleportTo zum Helden. Weil der Held erst nach dem Ueberblenden am Ziel stehen
+// kann, prueft die Mod NACHHOLEN Sekunden spaeter noch einmal und holt alle nach, die weiter als WEIT entfernt sind.
 // Mitglieder: gCParty_PS.PartyMemberType 1 Party (Begleiter), 3 Slave, 5 Summoned (Beschwoerung) kommen mit; 4 Controlled (Verwandlung/Kontrolle) und 2 Mob nicht.
 // Wartende Begleiter (der Held hat "Warte hier" gesagt) bleiben, wenn WARTENDE_MIT = false.
+// Gemessen 2026-11-09: MagicTeleport selbst schaltet alle Begleiter auf Warten (im normalen Spiel bleiben sie so am alten Ort stehen). Darum zaehlt der
+// Wartestatus von VOR dem Teleport, und die Mod hebt das Warten der Mitgenommenen danach wieder auf (sofort und nach NACHHOLEN Sekunden).
+// Nach TeleportTo setzt die Mod jeden Begleiter NEBEN cm neben den Helden, mehrere im Kreis verteilt (genau auf dem Helden spricht er ihn sofort an).
 // Protokoll: og3_patch.log (Positionen vor/nach, je Mitglied Typ, Abstand, Ergebnis).
 const bool WARTENDE_MIT = false;
 const float NACHHOLEN = 1.5f;   // Sekunden
 const float WEIT = 1500.0f;     // Abstand in Spieleinheiten (cm)
+const float NEBEN = 150.0f;     // Abstand neben dem Helden
 
 float nachholen = -1;
+array<Entity> mitnehmen;   // vor dem Teleport bestimmt
 
 void main() {
     WatchScript("MagicTeleport");
@@ -34,23 +39,38 @@ bool KommtMit(Entity m) {
     return true;
 }
 
-// alle mitkommenden Mitglieder holen; nurWeit: nur die, die weiter als WEIT weg sind. Rueckgabe: Zahl geholter
-int Holen(bool nurWeit, const bCString &in anlass) {
+// Mitglieder bestimmen, die mitkommen (vor dem Teleport, solange der Wartestatus noch der des Spielers ist)
+void Bestimmen() {
+    mitnehmen.resize(0);
     Entity held = GetHero();
     int n = held.GetPartyMemberCount();
-    int geholt = 0;
     for (int i = 0; i < n; ++i) {
         Entity m = held.GetPartyMember(i);
         if (!m.IsValid() || m == held) continue;
+        if (KommtMit(m))
+            mitnehmen.insertLast(m);
+        else
+            print("Vorher: " + m.GetName() + " (Typ " + Typ(m) + ", wartet " + m.IsPartyWaiting() + ") bleibt");
+    }
+}
+
+// die bestimmten Mitglieder holen; nurWeit: nur die, die weiter als WEIT weg sind. Rueckgabe: Zahl geholter
+int Holen(bool nurWeit, const bCString &in anlass) {
+    Entity held = GetHero();
+    int geholt = 0;
+    for (uint i = 0; i < mitnehmen.length(); ++i) {
+        Entity m = mitnehmen[i];
+        if (!m.IsValid()) continue;
+        if (m.IsPartyWaiting()) print(anlass + ": " + m.GetName() + " wurde vom Spiel auf Warten gesetzt, aufgehoben: " + m.SetPartyWaiting(false));
         float d = held.GetDistanceTo(m);
-        bool mit = KommtMit(m);
-        if (mit && (!nurWeit || d > WEIT)) {
-            bool ok = m.TeleportTo(held);
-            if (ok) geholt++;
-            print(anlass + ": " + m.GetName() + " (Typ " + Typ(m) + ", Abstand " + int(d) + ") -> " + (ok ? "geholt, jetzt " + int(held.GetDistanceTo(m)) : bCString("Teleport fehlgeschlagen")));
-        } else if (!nurWeit) {
-            print(anlass + ": " + m.GetName() + " (Typ " + Typ(m) + ", wartet " + m.IsPartyWaiting() + ", Abstand " + int(d) + ") bleibt");
+        if (nurWeit && d <= WEIT) continue;
+        bool ok = m.TeleportTo(held);
+        if (ok) {
+            float w = 2.4f * float(i) + 1.0f;   // je Begleiter ein anderer Platz im Kreis
+            m.SetPosition(held.GetPosition() + bCVector(NEBEN * cos(w), 0, NEBEN * sin(w)));
+            geholt++;
         }
+        print(anlass + ": " + m.GetName() + " (Typ " + Typ(m) + ", Abstand " + int(d) + ") -> " + (ok ? "geholt, jetzt " + int(held.GetDistanceTo(m)) : bCString("Teleport fehlgeschlagen")));
     }
     return geholt;
 }
@@ -59,11 +79,12 @@ bool Override_Script(const bCString &in name, Entity self, Entity other, int arg
     if (name != "MagicTeleport") return Super();
     Entity held = GetHero();
     if (!(self == held)) return Super();
+    Bestimmen();
     bCVector vorher = held.GetPosition();
     bool r = Super();
     bCVector nachher = held.GetPosition();
-    print("MagicTeleport des Helden: Ergebnis " + r + ", Position vorher " + vorher.ToString() + ", nachher " + nachher.ToString() + ", Mitglieder " + held.GetPartyMemberCount());
-    if (held.GetPartyMemberCount() > 0) {
+    print("MagicTeleport des Helden: Ergebnis " + r + ", Position vorher " + vorher.ToString() + ", nachher " + nachher.ToString() + ", Mitglieder " + held.GetPartyMemberCount() + ", mit " + mitnehmen.length());
+    if (r && mitnehmen.length() > 0) {
         Holen(false, "Sofort");
         nachholen = NACHHOLEN;
     }
@@ -76,6 +97,7 @@ void OnFrame(float dt) {
     if (nachholen >= 0) return;
     int g = Holen(true, "Nachholen");
     if (g > 0) PrintScreen(g + " Begleiter nachgeholt", 3, 180, 255, 180);
+    mitnehmen.resize(0);
 }
 
 // Strg + Ziffernblock , (Komma/Entf-Taste des Ziffernblocks) zeigt die Gruppe des Helden im Protokoll

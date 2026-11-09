@@ -132,8 +132,10 @@ bool __fastcall HSetStatus(void* q, void*, const int* status) {
         res = o_setStatus(q, status);
         called = true;
     }
-    if (called && applied != old) {
-        EvArg e[] = {EvArg::Str(&sn), EvArg::U(static_cast<unsigned>(old)), EvArg::U(static_cast<unsigned>(applied))};
+    // gemeldet wird der Status, der danach wirklich gilt (lehnt das Spiel ab, bleibt er gleich und es gibt kein Ereignis)
+    const int now = called && g_getStatus ? SafeOldStatus(q) : (called ? applied : old);
+    if (called && now >= 0 && now != old) {
+        EvArg e[] = {EvArg::Str(&sn), EvArg::U(static_cast<unsigned>(old)), EvArg::U(static_cast<unsigned>(now))};
         g_host->CallEvent("void OnQuestStatus(const bCString &in, int, int)", e, 3);
     }
     return res;
@@ -192,7 +194,7 @@ void __fastcall HTouch(void* self, void*, void* other, void* contacts) {
 // ---- Haendlerware: Game gCInventory_PS::GenerateTradeInvFromTreasureSets() -> Override_TradeGenerate(Haendler), danach OnTradeGenerated(Haendler, ok)
 typedef bool(__thiscall* GenTradeFn)(void*);
 GenTradeFn o_genTrade = nullptr;
-int g_tradeLogged = 0;
+int g_tradeLogged = 0, g_tradeDepth = 0;   // Tiefe: GenerateTradeGoods() aus Override_TradeGenerate/OnTradeGenerated laeuft ohne Ereignis
 
 bool __fastcall HGenTrade(void* inv) {
     void* trader = SafePsEntity(inv);
@@ -200,7 +202,8 @@ bool __fastcall HGenTrade(void* inv) {
         ++g_tradeLogged;
         g_host->Log("Haendlerware: erzeugen fuer '" + EntName(trader) + "' (Thread " + (OnGameThread() ? "Spiel" : "anderer") + ")");
     }
-    if (!g_host || !trader || !OnGameThread()) return o_genTrade(inv);
+    if (!g_host || !trader || !OnGameThread() || g_tradeDepth > 0) return o_genTrade(inv);
+    ++g_tradeDepth;
     EvArg a[] = {EvArg::Ent(trader)};
     bool res = false, called = false;
     if (!g_host->CallOverride("bool Override_TradeGenerate(Entity)", a, 1, [&](const EvArg*) { return o_genTrade(inv); }, &res, &called)) {
@@ -211,6 +214,7 @@ bool __fastcall HGenTrade(void* inv) {
         EvArg e[] = {EvArg::Ent(trader), EvArg::U(res ? 1u : 0u)};
         g_host->CallEvent("void OnTradeGenerated(Entity, int)", e, 2);
     }
+    --g_tradeDepth;
     return res;
 }
 

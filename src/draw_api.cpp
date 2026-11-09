@@ -358,8 +358,11 @@ void __fastcall HPaint(void* wnd, void*) {
 // Bildende des Haupt-Renderers: OnDraw ueber allen Fenstern
 bool __fastcall HEndFrame(void* r, void*, bool flag) {
     if (g_host && !g_inDraw && g_desk && RendererReady() && (!g_gameThread || GetCurrentThreadId() == g_gameThread)) {
-        if (!g_mainRend) g_mainRend = SafeMainRenderer();
+        g_mainRend = SafeMainRenderer();   // jedes Mal: das Spiel kann den Renderer neu anlegen (Geraet zurueckgesetzt, Aufloesung)
         if (r == g_mainRend && g_rendTick != g_tick) {
+            g_rendTick = g_tick;   // Renderer-Weg verfuegbar (auch wenn dieses Bild schon ueber den Rueckfall gezeichnet wurde)
+        }
+        if (r == g_mainRend && g_drawnTick != g_tick) {
             if (!g_measured && g_measureStart) ++g_endFrames;
             Vec3 sc{0, 0, 0};
             if (SafeRPrepare(r, &sc)) {
@@ -376,7 +379,6 @@ bool __fastcall HEndFrame(void* r, void*, bool flag) {
                 }
                 const Mat4 id0 = Identity();   // der Renderer rechnet seinen Zeichen-Massstab selbst ein (gemessen: sonst doppelt)
                 SafeRXform(r, &id0);
-                g_rendTick = g_tick;
                 g_drawnTick = g_tick;
                 g_rend = r;
                 g_inDraw = true;
@@ -411,11 +413,14 @@ struct Image {
     // SFFGUIBitmap aus eCGUIAdmin::LoadBitmapA (gemessen am Assembler 2026-11-09): +0 Textur-Nummer, +4 bCRect Ausschnitt, +0x18..+0x24 vier Floats,
     // +0x28 bCString Name
     alignas(8) unsigned char info[0x60] = {};
-    bool infoOk = false;
+    bool infoOk = false, strReady = false, gfcOnlyLogged = false;
+    std::string name;
+    DWORD nextTry = 0;   // naechster Versuch fuer LoadBitmapA (nur GFC geladen)
     unsigned tex() const { return *reinterpret_cast<const unsigned*>(info); }
     const Rect* src() const { return reinterpret_cast<const Rect*>(info + 4); }
 };
-std::map<std::string, int> g_imageIds;
+std::map<std::string, int> g_imageIds;      // nur erfolgreich geladene Bilder
+std::map<std::string, DWORD> g_imageRetry;  // fehlgeschlagene Namen: naechster Versuch (GUI-Daten koennen anfangs noch fehlen)
 std::vector<Image*> g_images;   // Index = Bild-Nummer - 1
 bool SafeBmpCreate(Bitmap* b, const SStr& name) {
     __try {
@@ -423,11 +428,26 @@ bool SafeBmpCreate(Bitmap* b, const SStr& name) {
         return g_a.bmpCreate(b, &name) && b->handle;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
+bool SafeStrCtor(void* p) {
+    __try {
+        g_sb.strCtor(p);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
 bool SafeLoadInfo(void* admin, const SStr& name, unsigned char* info) {
     __try {
-        g_sb.strCtor(info + 0x28);
         return g_a.loadBmp(admin, &name, info);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+// Textur und Ausschnitt fuer den Renderer-Weg holen (eCGUIAdmin::LoadBitmapA); der bCString im SFFGUIBitmap wird nur einmal angelegt
+void TryInfo(Image* img, const SStr& name) {
+    if (img->infoOk || !g_a.loadBmp) return;
+    void* admin = SafeAdmin();
+    if (!admin) return;
+    if (!img->strReady) img->strReady = SafeStrCtor(img->info + 0x28);
+    if (!img->strReady) return;
+    const Rect* s = img->src();
+    img->infoOk = SafeLoadInfo(admin, name, img->info) && s->right > s->left && s->bottom > s->top;
 }
 bool SafeDcBitmap(void* dc, Bitmap* b, const Rect* r, float angle) {
     __try {
@@ -474,44 +494,46 @@ int TextWidthScript(int font, const SStr& text) {
         SafeDcCalc(g_dc, unsigned(font), text.c_str(), &r, kNoClip);
     return r.right - r.left;
 }
-// Bild laden (gecacht je Name): Nummer > 0, 0 = nicht ladbar. Nur im Spiel-Thread.
+// Bild laden (gecacht je Name): Nummer > 0, 0 = (noch) nicht ladbar. Nur im Spiel-Thread; ein fehlgeschlagener Name wird hoechstens alle 2 s erneut
+// versucht (in main() fehlen die GUI-Daten oft noch), im Protokoll steht nur der erste Fehlschlag.
 int LoadImageScript(const SStr& name) {
     auto it = g_imageIds.find(name.c_str());
     if (it != g_imageIds.end()) return it->second;
-    int id = 0;
-    bool viaRenderer = false;
-    if (!g_gameThread || GetCurrentThreadId() == g_gameThread) {
-        Image* img = new Image;
-        if (g_a.loadBmp)
-            if (void* admin = SafeAdmin()) {
-                const Rect* s = img->src();
-                img->infoOk = SafeLoadInfo(admin, name, img->info) && s->right > s->left && s->bottom > s->top;
-            }
-        if (g_a.bmpCtor && g_a.bmpCreate) {
-            img->gfc = new Bitmap{nullptr, nullptr};
-            if (!SafeBmpCreate(img->gfc, name)) {
-                delete img->gfc;
-                img->gfc = nullptr;
-            }
-        }
-        if (img->infoOk || img->gfc) {
-            g_images.push_back(img);
-            id = int(g_images.size());
-            viaRenderer = img->infoOk;
-        } else {
-            delete img;
+    if (g_gameThread && GetCurrentThreadId() != g_gameThread) return 0;
+    const DWORD now = GetTickCount();
+    auto rt = g_imageRetry.find(name.c_str());
+    const bool firstTry = rt == g_imageRetry.end();
+    if (!firstTry && int(now - rt->second) < 0) return 0;
+    Image* img = new Image;
+    img->name = name.c_str();
+    TryInfo(img, name);
+    if (g_a.bmpCtor && g_a.bmpCreate) {
+        img->gfc = new Bitmap{nullptr, nullptr};
+        if (!SafeBmpCreate(img->gfc, name)) {
+            delete img->gfc;
+            img->gfc = nullptr;
         }
     }
-    g_imageIds[name.c_str()] = id;
-    if (ScriptHost::s_current) {
+    int id = 0;
+    if (img->infoOk || img->gfc) {
+        g_images.push_back(img);
+        id = int(g_images.size());
+        g_imageIds[img->name] = id;
+        g_imageRetry.erase(img->name);
+    } else {
+        g_imageRetry[img->name] = now + 2000u;
+        delete img;   // bCString im Puffer bleibt angelegt (wenige Byte je Fehlschlag)
+        img = nullptr;
+    }
+    if (ScriptHost::s_current && (id || firstTry)) {
         char b[360];
-        if (id && viaRenderer) {
-            const Image* img = g_images[id - 1];
+        if (img && img->infoOk) {
             const Rect* s = img->src();
             std::snprintf(b, sizeof b, "Zeichnen: Bild '%.200s' -> %d (Textur %u, Ausschnitt %d,%d-%d,%d%s)", name.c_str(), id, img->tex(), s->left, s->top,
                           s->right, s->bottom, img->gfc ? ", auch GFC" : "");
         } else {
-            std::snprintf(b, sizeof b, "Zeichnen: Bild '%.200s' -> %d%s", name.c_str(), id, id ? " (nur GFC)" : " (nicht geladen)");
+            std::snprintf(b, sizeof b, "Zeichnen: Bild '%.200s' -> %d%s", name.c_str(), id,
+                          id ? " (nur GFC: ueber dem HUD erst, wenn LoadBitmapA es findet)" : " (nicht geladen, neuer Versuch spaeter)");
         }
         ScriptHost::s_current->Log(b);
     }
@@ -521,6 +543,15 @@ bool DrawImageScript(int image, int x, int y, int w, int h, float angle) {
     if (!CanDraw("DrawImage") || image <= 0 || image > int(g_images.size()) || w <= 0 || h <= 0) return false;
     Image* img = g_images[image - 1];
     if (g_rend) {
+        if (!img->infoOk && int(GetTickCount() - img->nextTry) >= 0) {   // nur ueber GFC geladen: Renderer-Daten hoechstens alle 2 s erneut holen
+            img->nextTry = GetTickCount() + 2000u;
+            SStr n(img->name.c_str());
+            TryInfo(img, n);
+            if (!img->infoOk && !img->gfcOnlyLogged && ScriptHost::s_current) {
+                img->gfcOnlyLogged = true;
+                ScriptHost::s_current->Log("Zeichnen: Bild '" + img->name + "' hat keine Renderer-Daten (LoadBitmapA) und wird ueber dem HUD nicht gezeichnet");
+            }
+        }
         if (!img->infoOk || !g_a.rSprite) return false;
         const Rect* s = img->src();
         // Ausschnitt auf w x h bringen, um die Mitte drehen, an (x, y) setzen, dann GUI-Flaeche -> Fenster

@@ -140,7 +140,7 @@ Mit `scriptlog=1` in `og3_patch.ini` schreibt der Patch zusätzlich alle 60 s di
 ## 10. Begleiter teleportieren mit (`teleport_party`)
 
 Ab Version 33. Fängt das Spielskript `MagicTeleport` ab (`WatchScript`/`Override_Script`) und holt nach dem Teleport des Helden seine Begleiter, Beschwörungen
-und Sklaven mit `TeleportTo` zu ihm; wartende Begleiter bleiben (`WARTENDE_MIT`). Nach 1,5 s holt die Mod alle nach, die noch weiter als 15 m weg sind.
+und Sklaven mit `TeleportTo` zu ihm und stellt sie 1,5 m neben ihn, mehrere im Kreis (genau auf dem Helden würden sie ihn sofort ansprechen); wartende Begleiter bleiben (`WARTENDE_MIT`). Weil `MagicTeleport` selbst alle Begleiter auf Warten schaltet, gilt der Wartestatus von vor dem Teleport; die Mod hebt das Warten der Mitgenommenen danach wieder auf. Nach 1,5 s holt die Mod alle nach, die noch weiter als 15 m weg sind.
 Strg + Ziffernblock , schreibt die Gruppe ins Protokoll. Standardmäßig aus (`+teleport_party`).
 
 ## 11. Zeitrate und Spieluhr (`time_probe`, Messmod)

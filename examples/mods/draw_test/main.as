@@ -10,6 +10,13 @@ bool gemeldet = false;
 int bildPfad = -1, bildKurz = -1, bildGross = -1;
 float winkel = 0;
 
+// Laden vor der ersten Welt: liefert oft 0 (GUI-Daten fehlen noch); dieselbe Nummer muss spaeter in OnDraw trotzdem kommen
+int bildFrueh = -1;
+void main() {
+    bildFrueh = LoadImage("g3_hud_icon_location_silden.tga");
+    print("LoadImage in main(): " + bildFrueh);
+}
+
 void OnFrame(float dt) {
     winkel += dt * 6.2832 / 4;
     if (winkel > 6.2832) winkel -= 6.2832;
@@ -22,6 +29,11 @@ void OnDraw() {
         bildKurz = LoadImage("g3_hud_icon_misc_compass.tga");
         bildGross = LoadImage("\\data\\gui\\icons\\hud\\v3\\icons\\locations\\g3_hud_icon_location_silden.tga");
     }
+    if (bildFrueh <= 0) {
+        bildFrueh = LoadImage("g3_hud_icon_location_silden.tga");
+        if (bildFrueh > 0) print("LoadImage nach main(): " + bildFrueh);
+    }
+    DrawImage(bildFrueh, 410, 60, 64, 64);
     bilder++;
     int w = GetScreenWidth(), h = GetScreenHeight();
     DrawText(schrift, 30, 26, "OG3 OnDraw " + w + "x" + h + "  Bild " + bilder, 0xFFFFFF80);

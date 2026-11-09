@@ -1536,9 +1536,10 @@ PartyApi& Party() {
         a.setWait = reinterpret_cast<PartySetWaitFn>(GetProcAddress(g_e.game, "?SetWaiting@gCParty_PS@@QAEXAB_N@Z"));
         a.getWait = reinterpret_cast<PartyGetWaitFn>(GetProcAddress(g_e.game, "?GetWaiting@gCParty_PS@@QBEAB_NXZ"));
         a.proxyEnt = reinterpret_cast<ProxyEntFn>(GetProcAddress(g_e.engine, "?GetEntity@eCEntityProxy@@QAEPAVeCEntity@@XZ"));
+    }
+    if (!a.teleport)   // Script.dll laedt erst nach main(): bis dahin erneut suchen
         if (HMODULE script = GetModuleHandleA("Script.dll"))
             a.teleport = reinterpret_cast<TeleportFn>(GetProcAddress(script, "?Teleport@Entity@@QAE_NABV1@@Z"));
-    }
     return a;
 }
 void* PartyPS(const Entity& e) {
