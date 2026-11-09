@@ -123,6 +123,12 @@ Zeigt `OnDamage` mit `owner` und `inflictor`, Qualität pro Slot lesen und setze
 
 `beliars_klaue` löst bei einem **starken** Treffer mit dem Orkschlächter (mindestens `MIN_TREFFER` = 55 Schaden) gegen einen **Gegner** (Haltung `AttitudeToPlayer2` feindlich oder Raubtier, bei Tieren auch verärgert) mit `CHANCE_PROZENT` = 30 % Chance einen Blitz aus: `Smn_Lightning` am Opfer erzeugen, den Helden mit `SetEntityRef(..., "gCInteraction_PS", "Owner", hero)` als Besitzer eintragen (nur dann läuft der Schaden durch die echte Kette: Quelle `Smn_Lightning`, Besitzer Held, Art 6) und den Blitz mit `StartEffect("eff_magic_summonlightning_target_01", opfer)` sichtbar machen. Gemessen: Der Blitz macht 17 bis über 500 Schaden (das Skript `ZS_Lightning` rechnet selbst) und kann Umstehende treffen. Zwischen zwei Blitzen liegen mindestens 4 Sekunden.
 
+## Zeichnen prüfen (`draw_test`, Messmod)
+
+Ab Version 34, 38 und 39. Zeigt oben links Bildgröße und Bildzähler, darunter Kompass (Pfad und Dateiname), einen sich drehenden Kompass (`OnFrame` dreht
+ihn über die Zeit) und ein Orts-Symbol (`LoadImage`/`DrawImage`), Marken in den vier Ecken, einen Text in der Bildmitte und roten Text über der
+Statusleiste (alles über HUD und Inventar), dazu „Held“ und „Mitte“ an der Position des Helden (`WorldToScreen`). Standardmäßig aus (`+draw_test`).
+
 ## 9. Spielskripte nach Namen (`script_probe`, Messmod)
 
 Ab Version 32. Beim ersten Weltstart prüft die Mod mit `ScriptExists`/`GetScriptDll`, welche bekannten Skriptnamen es gibt. Sie meldet einige Skripte

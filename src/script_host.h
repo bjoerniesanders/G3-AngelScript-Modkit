@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#define OG3_SCRIPT_API_VERSION 37
+#define OG3_SCRIPT_API_VERSION 39
 
 class asIScriptEngine;
 class asIScriptContext;
