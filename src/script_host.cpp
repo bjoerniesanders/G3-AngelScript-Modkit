@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 #include "script_host.h"
 
 #include <angelscript.h>
@@ -598,6 +600,27 @@ void SetPrintToGameLog(bool on) { g_printToGameLog = on; }
 
 HWND GameWindow() { return FindGameWindow(); }
 
+void NoteNull(const char* where) {
+    static std::mutex mu;
+    static const char* seen[64] = {};
+    static int count = 0;
+    {
+        std::lock_guard<std::mutex> lock(mu);
+        for (int i = 0; i < count; ++i)
+            if (seen[i] == where) return;
+        if (count < 64) seen[count++] = where;
+    }
+    if (ScriptHost::s_current) ScriptHost::s_current->Log(std::string("Hook: unerwarteter Nullzeiger (nur einmal gemeldet): ") + where);
+}
+
+const char* SafeStrText(const void* s, const char* fallback) {
+    if (!s || !ReadableMem(s, sizeof(void*))) return fallback;
+    __try {
+        const char* t = g_sb.strGetText(s);
+        return t ? t : fallback;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return fallback; }
+}
+
 bool ReadableMem(const void* p, size_t n) {
     const uintptr_t start = reinterpret_cast<uintptr_t>(p);
     if (start < 0x10000 || n == 0) return false;   // Nullzeiger-Bereich: Zahlen, Flags, Zaehler - keine Zeiger
@@ -789,9 +812,17 @@ bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const boo
                 void* p;
             } e{const_cast<void*>(ev[i].ptr)};
             ctx_->SetArgObject(i, &e);
-        } else if (ev[i].kind == EvArg::Text)
-            ctx_->SetArgObject(i, const_cast<void*>(ev[i].ptr));
-        else
+        } else if (ev[i].kind == EvArg::Text) {
+            // const bCString &in darf nie null sein (das Skript stuerzte beim ersten Zugriff ab): dann ein leerer Text
+            static SStr* empty = nullptr;
+            const void* s = ev[i].ptr;
+            if (!s) {
+                if (!empty) empty = new SStr("");
+                s = empty;
+                NoteNull("Text-Parameter eines Ereignisses (leer weitergegeben)");
+            }
+            ctx_->SetArgObject(i, const_cast<void*>(s));
+        } else
             ctx_->SetArgDWord(i, ev[i].value);
     }
     Timeout t{GetTickCount()};

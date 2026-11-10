@@ -8,7 +8,7 @@ auf einer anderen Installation ausprobiert, kann das Ergebnis gern melden (Proto
 | Installation | Community Patch | PU-Patch | DXVK | Ergebnis | Stand |
 |---|---|---|---|---|---|
 | Entwicklerinstallation (Kopie, Windows 11) | 1.75 | ja | ja | alle Prüfungen bestanden | API 30, 2026-11 |
-| Steam (stark gemoddet, Kopie) | Steam-Fassung mit eigenem Patchstand | ja | ja (anderer DXVK-Stand) | Start, Spielstand laden, Weltwechsel, Beenden ohne Fehler (nur Mini-Mod); alle 8 Spiel-Hooks und 2 Statuseffekt-Hooks aktiv, x87-Steuerwort durchgehend 007F; Tooltip-Hook ausgelassen, weil `Game.dll+0xA48B0` dort abweicht (erwartet). Offen: Beispiel-Mods, Speichern/Laden, Ausbau | 2026-11 |
+| Steam (stark gemoddet, Kopie) | Steam-Fassung mit eigenem Patchstand | ja | ja (anderer DXVK-Stand) | Start, Spielstand laden, Weltwechsel, Beenden ohne Fehler (nur Mini-Mod); alle 8 Spiel-Hooks und 2 Statuseffekt-Hooks aktiv, x87-Steuerwort durchgehend 007F; Tooltip-Hook ausgelassen, weil `Game.dll+0xA48B0` dort abweicht (erwartet). 2026-11-08: Blackscreen im Intro durch gemeinsamen `Shader.Cache` (getrennt: behoben); ein Spielstand mit `perk_lifesteal` stürzte nach Neustart und Laden beim Öffnen des Charakterbogens ab, auch ohne Mods (Ursache offen) | 2026-11 |
 | GOG | offen | offen | offen | nicht getestet | |
 | CD/DVD-Version | offen | offen | offen | nicht getestet | |
 

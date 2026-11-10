@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // PackMod: Ordner -> Gothic-3-Archiv (G3V0). Das Ergebnis entspricht dem, was G3PakDir (Union Starter) schreibt, und wird von der Engine wie ein .pak geladen.
 // Mod-Archive tragen die Endungen .mod (.m00, .m01, ...) bzw. .nod (.n00, ...): sie setzen die Reihe der .pak-Dateien fort, werden immer geladen und ueberschreiben
 // alles Normale; ohne Luecke in der Nummerierung (die Engine hoert an der ersten Luecke auf). .nod gilt nur bei aktivem "Alternativen Balancing".

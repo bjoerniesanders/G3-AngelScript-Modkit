@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Weitere Ereignisse aus exportierten Funktionen (Skript-Schnittstelle ab Version 35, Roadmap 7.3; Beruehrung, Haendlerware, Verwandlung ab 37).
 //   Konsole:      Engine.dll eCConsole::OnExecute(const bCString &eingabe, bCString &ausgabe) -> bool
 //                 Override_ConsoleCommand(zeile): true ohne Super() = Befehl gehoert dem Mod; Antwort mit SetConsoleReply(text)
@@ -27,22 +29,16 @@ ExecFn o_exec = nullptr;
 void* g_reply = nullptr;   // Ausgabe-bCString des laufenden Befehls (nur waehrend Override_ConsoleCommand)
 int g_execLogged = 0;
 
-const char* Text(const void* s) {
-    if (!s || !ReadableMem(s, sizeof(void*))) return "";
-    __try {
-        const char* t = g_sb.strGetText(s);
-        return t ? t : "";
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return ""; }
-}
 
 bool __fastcall HExec(void* console, void*, const void* in, void* out) {
     char b[300];
     if (g_execLogged < 50) {
         ++g_execLogged;
-        std::snprintf(b, sizeof b, "Konsole: Befehl '%.200s'", Text(in));
+        std::snprintf(b, sizeof b, "Konsole: Befehl '%.200s'", SafeStrText(in, ""));
         if (g_host) g_host->Log(b);
     }
-    if (!g_host || !OnGameThread()) return o_exec(console, in, out);
+    if (!in || !out) NoteNull("Override_ConsoleCommand: Ein-/Ausgabetext");
+    if (!g_host || !in || !out || !OnGameThread()) return o_exec(console, in, out);
     EvArg a[] = {EvArg::Str(in)};
     bool res = false, called = false;
     void* prev = g_reply;
@@ -52,7 +48,7 @@ bool __fastcall HExec(void* console, void*, const void* in, void* out) {
     g_reply = prev;
     if (!taken) return o_exec(console, in, out);
     if (!called && g_execLogged < 50) {
-        std::snprintf(b, sizeof b, "Konsole: Befehl von einer Mod uebernommen (Ergebnis %d, Antwort '%.150s')", res ? 1 : 0, Text(out));
+        std::snprintf(b, sizeof b, "Konsole: Befehl von einer Mod uebernommen (Ergebnis %d, Antwort '%.150s')", res ? 1 : 0, SafeStrText(out, ""));
         g_host->Log(b);
     }
     return res;
@@ -258,14 +254,6 @@ void __fastcall HEndTr(void* self) {
     g_host->CallEvent("void OnTransformEnd(Entity)", a, 1);
 }
 
-bool HookSym(HMODULE m, const char* sym, void* detour, void** orig, ScriptHost& host) {
-    void* t = m ? reinterpret_cast<void*>(GetProcAddress(m, sym)) : nullptr;
-    if (!t) {
-        host.Log(std::string("Ereignisse 7.3: Export fehlt: ") + sym);
-        return false;
-    }
-    return MH_CreateHook(t, detour, orig) == MH_OK && MH_EnableHook(t) == MH_OK;
-}
 
 }   // namespace
 
@@ -292,12 +280,12 @@ int InstallMoreEventHooks(ScriptHost& host) {
         g_psEntity = reinterpret_cast<PsEntityFn>(GetProcAddress(eng, "?GetEntity@eCEntityPropertySet@@UAEPAVeCEntity@@XZ"));
     }
     int n = 0;
-    n += HookSym(eng, "?OnExecute@eCConsole@@MAE_NABVbCString@@AAV2@@Z", reinterpret_cast<void*>(&HExec), reinterpret_cast<void**>(&o_exec), host);
-    n += HookSym(game, "?SetStatus@gCQuest_PS@@QAE_NABW4gEQuestStatus@@@Z", reinterpret_cast<void*>(&HSetStatus),
+    n += HookExport(eng, "?OnExecute@eCConsole@@MAE_NABVbCString@@AAV2@@Z", reinterpret_cast<void*>(&HExec), reinterpret_cast<void**>(&o_exec), host);
+    n += HookExport(game, "?SetStatus@gCQuest_PS@@QAE_NABW4gEQuestStatus@@@Z", reinterpret_cast<void*>(&HSetStatus),
                  reinterpret_cast<void**>(&o_setStatus), host);
-    n += HookSym(eng, "?OnTouch@eCDynamicEntity@@UAEXPAVeCEntity@@AAVeCContactIterator@@@Z", reinterpret_cast<void*>(&HTouch),
+    n += HookExport(eng, "?OnTouch@eCDynamicEntity@@UAEXPAVeCEntity@@AAVeCContactIterator@@@Z", reinterpret_cast<void*>(&HTouch),
                  reinterpret_cast<void**>(&o_touch), host);
-    n += HookSym(game, "?GenerateTradeInvFromTreasureSets@gCInventory_PS@@QAE_NXZ", reinterpret_cast<void*>(&HGenTrade),
+    n += HookExport(game, "?GenerateTradeInvFromTreasureSets@gCInventory_PS@@QAE_NXZ", reinterpret_cast<void*>(&HGenTrade),
                  reinterpret_cast<void**>(&o_genTrade), host);
     host.Log("Ereignisse 7.3: " + std::to_string(n) + " von 4 Hooks aktiv (Konsole, Quest-Status, Beruehrung, Haendlerware)");
     return n;
@@ -313,9 +301,9 @@ void MoreEventsFrame() {
             lastTry = GetTickCount();
             if (HMODULE script = GetModuleHandleA("Script.dll")) {
                 g_trHooked = true;
-                int n = HookSym(script, "?StartTransform@Entity@@QAEXAAV1@M_N@Z", reinterpret_cast<void*>(&HStartTr),
+                int n = HookExport(script, "?StartTransform@Entity@@QAEXAAV1@M_N@Z", reinterpret_cast<void*>(&HStartTr),
                                 reinterpret_cast<void**>(&o_startTr), *g_host);
-                n += HookSym(script, "?EndTransform@Entity@@QAEXXZ", reinterpret_cast<void*>(&HEndTr), reinterpret_cast<void**>(&o_endTr), *g_host);
+                n += HookExport(script, "?EndTransform@Entity@@QAEXXZ", reinterpret_cast<void*>(&HEndTr), reinterpret_cast<void**>(&o_endTr), *g_host);
                 g_host->Log("Ereignisse 7.3: " + std::to_string(n) + " von 2 Verwandlungs-Hooks aktiv");
             }
         }

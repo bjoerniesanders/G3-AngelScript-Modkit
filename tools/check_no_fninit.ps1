@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 param([Parameter(Mandatory)][string]$Dll)
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path $Dll)) { throw "$Dll is missing" }

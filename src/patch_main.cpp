@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // og3_patch.dll - offener Patch fuer Gothic 3 mit AngelScript-Modding (Meilenstein 1).
 // Wird vom dbghelp-Proxy geladen (og3_hooks.ini [patch] enable=1) und arbeitet mit der geladenen SharedBase.dll (Original oder Nachbau).
 //
@@ -451,6 +453,8 @@ extern "C" __declspec(dllexport) int og3_patch_run_file(const char* path) {
         EvArg a[] = {EvArg::Ent(nullptr), EvArg::Ent(nullptr), EvArg::Str(&nm), EvArg::Str(&id), EvArg::U(7)};
         g_host.CallEvent("void OnReceiveItem(Entity, Entity, const bCString &in, const bCString &in, uint)", a, 5);
         g_host.CallEvent("void OnNPCKilled(Entity)", a, 1);
+        EvArg n[] = {EvArg::Ent(nullptr), EvArg::Str(nullptr)};   // Nullzeiger aus der Engine: das Skript bekommt einen leeren Text
+        g_host.CallEvent("void OnEnter(Entity, const bCString &in)", n, 2);
     }
     {   // Override-Kette: Super() ruft das "Original", Rueckgabe wird vom Skript veraendert; ohne Super() wird das Original uebersprungen
         EvArg a[] = {EvArg::U(5)};

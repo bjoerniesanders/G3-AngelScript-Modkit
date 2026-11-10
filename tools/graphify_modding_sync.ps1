@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 # Aktualisiert die Kopie in graphify-modding aus den Quellen (AngelScript-Teil) und baut den Graphen inkrementell neu:
 #   powershell -NoProfile -File og3-patch\tools\graphify_modding_sync.ps1   (danach im Ordner graphify-modding: /graphify . --update)
 $src = Split-Path -Parent $PSScriptRoot; $dst = Join-Path $src 'graphify-modding'

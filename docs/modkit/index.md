@@ -13,7 +13,8 @@ Aktuelle Skript-Schnittstelle: **Version 39** (`GetApiVersion()`).
 | [Mod-Ordner und Installation](mod-package.md) | Wo ein Mod liegt, Ladereihenfolge, ini-Einstellungen, Protokoll, Hot-Reload |
 | [Scripting-Guide](scripting-guide.md) | Die Sprache, Eigenheiten, Fallstricke, Fehlersuche |
 | [Ereignisse](events.md) | Alle Funktionen, die ein Mod definieren kann (Engine- und Spielereignisse) |
-| [API-Referenz](api-reference.md) | Alle Typen und Funktionen, die ein Skript aufrufen kann |
+| [API-Referenz](api-reference.md) | Alle Typen und Funktionen, die ein Skript aufrufen kann, mit Vermerken (experimentell, veraltet, ...) |
+| [Versionsregeln](api-policy.md) | Was sich zwischen zwei Versionen der Skript-Schnittstelle ändern darf |
 | [Quests](quests.md) | Quests anlegen, steuern, mit Texten und Belohnung versehen |
 | [Hooks](hooks.md) | Spielfunktionen mit Override und Super() ändern oder abbrechen |
 | [Datei-Patches](patches.md) | Unified-Diff-Patches auf Quest- und Info-Dateien des Spiels |
@@ -47,3 +48,9 @@ Aktuelle Skript-Schnittstelle: **Version 39** (`GetApiVersion()`).
   (kein Code-Eingriff, verträglich mit dem Parallel-Universe-Patch).
 - Für Spielereignisse (Kills, Items, Zauber, ...) werden einzelne Funktionen der `Game.dll` im Speicher abgefangen (MinHook). Auf der Platte bleibt alles unverändert.
 - Skripte rufen dieselben Engine-Funktionen auf wie das Spiel selbst, zum Beispiel für Attribute, Inventar und Quests. Das Verhalten ist deshalb das Originalverhalten.
+
+## Lizenz deiner Mod
+
+Der Patch steht unter GPL-3.0-or-later. Eine Zusatzerlaubnis (`LICENSE-EXCEPTIONS.md` im Hauptordner) stellt klar: Mods, die den Patch nur über die
+Skript-Schnittstelle nutzen (Skripte, `mod.ini`, Stringtabellen, Datei-Patches, Archive), darfst du unter jeder Lizenz veröffentlichen. Die Beispiel-Mods
+sind gemeinfrei (CC0), du kannst sie ohne Bedingungen in eigene Mods übernehmen.

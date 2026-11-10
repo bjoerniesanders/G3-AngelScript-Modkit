@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Dialog-Bindings (Skript-Schnittstelle ab Version 10), Teil 1: die Infos des Spiels LESEN.
 // Dialoge in Gothic 3 sind "Infos" (gCInfo_PS) im gCInfoManager_PS: jede Info hat Besitzer (NPC), Eltern-Info, Quest, Bedingungsart,
 // Typ und ein Info-Skript aus Zeilen (gCInfoScriptLine_PS: Befehl, Entity1/2, ID1/2, Text als Text-ID). Bevor eigene Dialoge angelegt werden,
@@ -518,7 +520,7 @@ bool RegisterDialogBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("bCString GetInfoName(int)", asFUNCTION(GetInfoName), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bCString GetInfoOwner(int)", asFUNCTION(GetInfoOwner), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bCString DescribeInfo(const bCString &in)", asFUNCTION(DescribeInfo), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool ExecuteInfo(const bCString &in)", asFUNCTION(ExecuteInfo), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool ExecuteInfo(const bCString &in)", asFUNCTION(ExecuteInfo), asCALL_CDECL));   // funktioniert nicht (kein OnInfoFinished)
     OG3_REG(e->RegisterGlobalFunction("bool SetInfoGiven(const bCString &in, bool)", asFUNCTION(SetInfoGiven), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool IsInfoGiven(const bCString &in)", asFUNCTION(IsInfoGiven), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool InfoExists(const bCString &in)", asFUNCTION(InfoExists), asCALL_CDECL));

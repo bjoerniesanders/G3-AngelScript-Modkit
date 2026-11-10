@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 """Erzeugt Abschnitt 8 von docs/modkit/reference.md aus dem Protokoll der Mod reference_dump.
 
 Aufruf:  python -I tools/reference_from_log.py [Protokoll] [reference.md]

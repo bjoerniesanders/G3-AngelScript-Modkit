@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Zeichen-API (Skript-Schnittstelle ab Version 34, Bilder ab 38, Zeichnen ueber dem HUD ab 39, Roadmap 7.2).
 // Gemessen 2026-11-09:
 //  - eCGUIAdmin::EndFrame (Export) laeuft im Spiel praktisch nie; eCGUIAdmin::CreateTexture(Farbe) und eCGUIRenderer::DrawRect sind leere Rumpfe
@@ -105,7 +107,7 @@ EndFrameFn o_endFrame = nullptr;
 // Waehrend OnDraw: genau einer der beiden Wege ist gesetzt
 void* g_dc = nullptr;     // Rueckfall: Geraetekontext des Desktops
 void* g_rend = nullptr;   // Haupt-Renderer am Bildende
-float g_scaleX = 1.0f, g_scaleY = 1.0f;   // GUI-Flaeche -> Fensterpixel (nur Renderer-Weg)
+float g_rendScale = 0.0f;   // Zeichen-Massstab des Renderers (nur fuers Protokoll; er skaliert selbst)
 bool g_inDraw = false;
 DWORD g_gameThread = 0;
 int g_screenW = 0, g_screenH = 0;   // Zeichenflaeche (Client-Rechteck des Desktops)
@@ -306,8 +308,8 @@ void LogMeasure() {
     char b[360];
     std::snprintf(b, sizeof b,
                   "Zeichnen: in 20 s %u OnPaint-Aufrufe, %u Bildenden des Haupt-Renderers, %u-mal OnDraw (%.1f je s, davon %u ueber dem HUD); "
-                  "Zeichenflaeche %dx%d, Spielfenster %dx%d, Massstab %.3f x %.3f",
-                  g_paints, g_endFrames, g_draws, g_draws / 20.0, g_rendDraws, g_screenW, g_screenH, g_clientW, g_clientH, g_scaleX, g_scaleY);
+                  "Zeichenflaeche %dx%d, Spielfenster %dx%d, Massstab des Renderers %.3f",
+                  g_paints, g_endFrames, g_draws, g_draws / 20.0, g_rendDraws, g_screenW, g_screenH, g_clientW, g_clientH, g_rendScale);
     if (g_host) g_host->Log(b);
 }
 
@@ -367,14 +369,11 @@ bool __fastcall HEndFrame(void* r, void*, bool flag) {
             Vec3 sc{0, 0, 0};
             if (SafeRPrepare(r, &sc)) {
                 SizesOncePerSecond();
-                // Massstab GUI-Flaeche -> Fenster: aus dem Renderer, sonst aus den Groessen
-                g_scaleX = sc.x > 0.01f ? sc.x : (g_screenW > 0 && g_clientW > 0 ? float(g_clientW) / float(g_screenW) : 1.0f);
-                g_scaleY = sc.y > 0.01f ? sc.y : (g_screenH > 0 && g_clientH > 0 ? float(g_clientH) / float(g_screenH) : 1.0f);
+                g_rendScale = sc.x;
                 if (!g_scaleLogged) {
                     g_scaleLogged = true;
-                    char b[200];
-                    std::snprintf(b, sizeof b, "Zeichnen: Haupt-Renderer %p, Zeichen-Massstab des Renderers %.3f x %.3f, benutzt %.3f x %.3f", r, sc.x, sc.y,
-                                  g_scaleX, g_scaleY);
+                    char b[160];
+                    std::snprintf(b, sizeof b, "Zeichnen: Haupt-Renderer %p, Zeichen-Massstab des Renderers %.3f x %.3f", r, sc.x, sc.y);
                     g_host->Log(b);
                 }
                 const Mat4 id0 = Identity();   // der Renderer rechnet seinen Zeichen-Massstab selbst ein (gemessen: sonst doppelt)
@@ -584,10 +583,6 @@ bool WorldToScreenScript(const SVec3& p, float& sx, float& sy) {
     return true;
 }
 
-bool Hook(HMODULE m, const char* sym, void* detour, void** orig) {
-    void* t = m ? reinterpret_cast<void*>(GetProcAddress(m, sym)) : nullptr;
-    return t && MH_CreateHook(t, detour, orig) == MH_OK && MH_EnableHook(t) == MH_OK;
-}
 
 }   // namespace
 
@@ -618,9 +613,10 @@ void DrawFrameTick() {
 int InstallDrawHooks(ScriptHost& host) {
     g_host = &host;
     Resolve();
-    const bool ok = Hook(GetModuleHandleA("GFC.dll"), "?OnPaint@CFFGFCWnd@@UAEXXZ", reinterpret_cast<void*>(&HPaint), reinterpret_cast<void**>(&o_paint));
-    const bool okEnd = RendererReady() && Hook(GetModuleHandleA("Engine.dll"), "?EndFrame@eCGUIRenderer@@UAE_N_N@Z", reinterpret_cast<void*>(&HEndFrame),
-                                               reinterpret_cast<void**>(&o_endFrame));
+    const bool ok = HookExport(GetModuleHandleA("GFC.dll"), "?OnPaint@CFFGFCWnd@@UAEXXZ", reinterpret_cast<void*>(&HPaint),
+                               reinterpret_cast<void**>(&o_paint), host);
+    const bool okEnd = RendererReady() && HookExport(GetModuleHandleA("Engine.dll"), "?EndFrame@eCGUIRenderer@@UAE_N_N@Z", reinterpret_cast<void*>(&HEndFrame),
+                                                     reinterpret_cast<void**>(&o_endFrame), host);
     char b[320];
     std::snprintf(b, sizeof b,
                   "Zeichnen: OnPaint-Hook (GFC.dll) %s, Bildende des Renderers %s; Text ja/%s, Schrift %s, Farbe %s, Kamera %s, Bild %s/%s",

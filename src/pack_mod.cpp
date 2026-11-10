@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // PackMod: Ordner -> G3V0-Archiv. Format und Verhalten folgen G3PakDir (Quellcode im Union Starter, G3PakDef.pas/G3PakDir.pas) und den Archiven der Community:
 //   Kopf (0x30 Byte): Version 0, 'G3V0', Revision 0, Verschluesselung 0, Komprimierung, 'G3PD', OffsetToFiles = OffsetToFolders = Beginn des Verzeichnisses,
 //   OffsetToVolume = Ende des Verzeichnisses (= Dateigroesse - 4); danach Nutzdaten, Verzeichnis, 4 Nullbytes.

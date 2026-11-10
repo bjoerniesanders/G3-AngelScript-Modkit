@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Spiel-Ereignisse fuer Skripte (Skript-Schnittstelle ab Version 5): Inline-Hooks (MinHook) auf die Ereignis-Eintrittspunkte des
 // Questsystems in Game.dll. Das Spiel meldet dort Kills, Itemuebergaben, Betreten/Verlassen von Bereichen und Zauber an
 // gCQuestManager_PS; der Hook ruft zuerst das Originalverhalten und danach die Skript-Ereignisse aller Mods
@@ -37,8 +39,16 @@ long g_count[7] = {};
 bool g_navEvents = false;
 
 bool IsNav(const void* area) {
-    const char* t = area ? g_sb.strGetText(area) : nullptr;
+    const char* t = SafeStrText(area, nullptr);
     return t && std::strncmp(t, "Nav_", 4) == 0;
+}
+// bCPropertyID::GetText in den Rohspeicher text (bCString); false bei Fehler (dann bleibt text unberuehrt)
+bool SafeIdText(const void* id, void** text) {
+    if (!g_idText || !ReadableMem(id, 16)) return false;
+    __try {
+        g_idText(id, text);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
 void Seen(int i, const char* name) {
@@ -63,6 +73,10 @@ bool RunHook(const char* overrideDecl, const EvArg* a, int n, const std::functio
 }
 
 bool __fastcall HKilled(void* self, void*, const void* e) {
+    if (!e) {
+        NoteNull("OnNPCKilled: Entity");
+        return o_killed(self, e);
+    }
     EvArg a[] = {EvArg::Ent(e)};
     bool called;
     const bool r = RunHook(
@@ -74,6 +88,10 @@ bool __fastcall HKilled(void* self, void*, const void* e) {
     return r;
 }
 bool __fastcall HDefeated(void* self, void*, const void* e) {
+    if (!e) {
+        NoteNull("OnNPCDefeated: Entity");
+        return o_defeated(self, e);
+    }
     EvArg a[] = {EvArg::Ent(e)};
     bool called;
     const bool r = RunHook(
@@ -86,7 +104,8 @@ bool __fastcall HDefeated(void* self, void*, const void* e) {
 }
 bool __fastcall HItem(void* self, void*, const void* giver, const void* receiver, const void* itemId, DWORD count) {
     void* text = nullptr;   // bCString (4 Byte), vom Export in den Rohspeicher gebaut
-    if (g_idText && itemId) g_idText(itemId, &text);
+    if (!itemId) NoteNull("OnReceiveItem: Item-ID");
+    if (!SafeIdText(itemId, &text)) text = nullptr;
     if (!text) g_sb.strCtor(&text);
     const std::string nm = TemplateNameForId(itemId);
     SStr name(nm.empty() ? g_sb.strGetText(&text) : nm.c_str());   // ohne Namen: GUID-Text
@@ -110,7 +129,8 @@ bool __fastcall HItem(void* self, void*, const void* giver, const void* receiver
     return r;
 }
 bool __fastcall HEnter(void* self, void*, const void* e, const void* area) {
-    if (!g_navEvents && IsNav(area)) return o_enter(self, e, area);
+    if (!area) NoteNull("OnEnter: Bereichsname");
+    if (!area || (!g_navEvents && IsNav(area))) return o_enter(self, e, area);
     EvArg a[] = {EvArg::Ent(e), EvArg::Str(area)};
     bool called;
     const bool r = RunHook(
@@ -122,7 +142,8 @@ bool __fastcall HEnter(void* self, void*, const void* e, const void* area) {
     return r;
 }
 bool __fastcall HLeave(void* self, void*, const void* e, const void* area) {
-    if (!g_navEvents && IsNav(area)) return o_leave(self, e, area);
+    if (!area) NoteNull("OnLeave: Bereichsname");
+    if (!area || (!g_navEvents && IsNav(area))) return o_leave(self, e, area);
     EvArg a[] = {EvArg::Ent(e), EvArg::Str(area)};
     bool called;
     const bool r = RunHook(
@@ -310,6 +331,7 @@ void __fastcall HSetHP(void* self, void*, const long* v) {
         return;
     }
     void* victim = SafeCall0(g_psEntity, self);
+    if (!victim) NoteNull("Schaden (SetHitPoints): Opfer");
     void* attacker = g_scriptHurt ? nullptr : SafeCall0(g_proxyEntity, ps + 0x38);
     void* owner = g_scriptHurt ? nullptr : DamageOwner(victim, attacker);
     const long amount = alt - neu;
@@ -456,18 +478,6 @@ bool __fastcall HInfoAvail(const void* self, void*) {
         kDecl, a, 3, [&](const EvArg*) { return o_infoAvail(self); }, &called);
 }
 
-bool Hook(HMODULE game, const char* name, void* detour, void** original, ScriptHost& host) {
-    void* target = reinterpret_cast<void*>(GetProcAddress(game, name));
-    if (!target) {
-        host.Log(std::string("Hook: Export fehlt: ") + name);
-        return false;
-    }
-    if (MH_CreateHook(target, detour, original) != MH_OK || MH_EnableHook(target) != MH_OK) {
-        host.Log(std::string("Hook: Einhaengen fehlgeschlagen: ") + name);
-        return false;
-    }
-    return true;
-}
 
 // ---- Statuseffekte als Ereignis (API 27): OnStatusEffect(npc, effect, enabled) bei jeder Aenderung der Bitmaske gCNPC_PS::m_u32StatusEffects. Zwei Wege aendern sie:
 // EnableStatusEffect(effect, an) und SetStatusEffects(maske); beide werden gehookt, ein Zaehler verhindert doppelte Meldungen, wenn der eine den anderen aufruft.
@@ -735,23 +745,16 @@ typedef bool(__thiscall* SaveWorldFn)(void*, const void*, void*, void*, DWORD);
 SaveWorldFn o_saveWorld = nullptr;
 long g_saveDepth = 0;
 
-// Name des Spielstands als Text; Zeiger gilt nur, solange der bCString lebt (sofort kopieren)
-const char* SaveNameOf(const void* name) {
-    if (!name || !ReadableMem(name, sizeof(void*))) return "?";
-    __try {
-        const char* t = g_sb.strGetText(name);
-        return t ? t : "?";
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return "?"; }
-}
 void LogSave(const char* phase, const void* name, long depth, int result) {
     char b[256];
-    std::snprintf(b, sizeof b, "Speichern: SaveGameWorld('%.80s') %s, Thread %lu, Tiefe %ld, Ergebnis %d", SaveNameOf(name), phase,
+    std::snprintf(b, sizeof b, "Speichern: SaveGameWorld('%.80s') %s, Thread %lu, Tiefe %ld, Ergebnis %d", SafeStrText(name, "?"), phase,
                   static_cast<unsigned long>(GetCurrentThreadId()), depth, result);
     LogLine(b);
 }
 bool __fastcall HSaveWorld(void* self, void*, const void* name, void* img, void* p, DWORD k) {
     const long d = InterlockedIncrement(&g_saveDepth);
     const bool outer = d == 1;   // verschachtelte Aufrufe (nie gemessen) melden keine Ereignisse
+    if (!name) NoteNull("OnBeforeSave/OnAfterSave: Name des Spielstands");
     LogSave("Beginn", name, d, 0);
     if (outer) {
         EvArg a[] = {EvArg::Str(name)};
@@ -769,21 +772,21 @@ bool __fastcall HSaveWorld(void* self, void*, const void* name, void* img, void*
 void InstallSaveHooks(HMODULE game, ScriptHost& host) {
     g_questName = reinterpret_cast<GetNameFn>(GetProcAddress(game, "?GetName@gCQuest_PS@@QBEABVbCString@@XZ"));
     int n = 0;
-    n += Hook(game, "?LoadQuestsFromInis@gCQuestManager_PS@@QAE_NXZ", reinterpret_cast<void*>(&HLoadQuests),
+    n += HookExport(game, "?LoadQuestsFromInis@gCQuestManager_PS@@QAE_NXZ", reinterpret_cast<void*>(&HLoadQuests),
               reinterpret_cast<void**>(&o_loadQuests), host);
-    n += Hook(game, "?LoadInfosFromInis@gCInfoManager_PS@@QAE_NXZ", reinterpret_cast<void*>(&HLoadInfos),
+    n += HookExport(game, "?LoadInfosFromInis@gCInfoManager_PS@@QAE_NXZ", reinterpret_cast<void*>(&HLoadInfos),
               reinterpret_cast<void**>(&o_loadInfos), host);
-    n += Hook(game, "?ReadCompiledInfoManager@gCInfoManager_PS@@QAE_NABVbCString@@@Z", reinterpret_cast<void*>(&HReadCompiled),
+    n += HookExport(game, "?ReadCompiledInfoManager@gCInfoManager_PS@@QAE_NABVbCString@@@Z", reinterpret_cast<void*>(&HReadCompiled),
               reinterpret_cast<void**>(&o_readCompiled), host);
-    n += Hook(game, "?ResetQuests@gCQuestManager_PS@@QAEXXZ", reinterpret_cast<void*>(&HResetQuests),
+    n += HookExport(game, "?ResetQuests@gCQuestManager_PS@@QAEXXZ", reinterpret_cast<void*>(&HResetQuests),
               reinterpret_cast<void**>(&o_resetQuests), host);
-    n += Hook(game, "?ReadRuntimeData@gCQuest_PS@@QAE?AW4bEResult@@AAVbCIStream@@@Z", reinterpret_cast<void*>(&HReadRuntime),
+    n += HookExport(game, "?ReadRuntimeData@gCQuest_PS@@QAE?AW4bEResult@@AAVbCIStream@@@Z", reinterpret_cast<void*>(&HReadRuntime),
               reinterpret_cast<void**>(&o_readRuntime), host);
-    n += Hook(game, "?WriteRuntimeData@gCQuest_PS@@QAE?AW4bEResult@@AAVbCOStream@@@Z", reinterpret_cast<void*>(&HWriteRuntime),
+    n += HookExport(game, "?WriteRuntimeData@gCQuest_PS@@QAE?AW4bEResult@@AAVbCOStream@@@Z", reinterpret_cast<void*>(&HWriteRuntime),
               reinterpret_cast<void**>(&o_writeRuntime), host);
-    n += Hook(game, "?ReadSaveGame@gCInfoManager_PS@@UAE?AW4bEResult@@AAVbCIStream@@@Z", reinterpret_cast<void*>(&HReadInfoSave),
+    n += HookExport(game, "?ReadSaveGame@gCInfoManager_PS@@UAE?AW4bEResult@@AAVbCIStream@@@Z", reinterpret_cast<void*>(&HReadInfoSave),
               reinterpret_cast<void**>(&o_readInfoSave), host);
-    n += Hook(game, "?SaveGameWorld@gCWorld@@QAE_NABVbCString@@PAVeCGfxImageData@@PAXK@Z", reinterpret_cast<void*>(&HSaveWorld),
+    n += HookExport(game, "?SaveGameWorld@gCWorld@@QAE_NABVbCString@@PAVeCGfxImageData@@PAXK@Z", reinterpret_cast<void*>(&HSaveWorld),
               reinterpret_cast<void**>(&o_saveWorld), host);
     char b[96];
     std::snprintf(b, sizeof b, "Lade-/Speicher-Hooks: %d von 8 aktiv", n);
@@ -814,19 +817,19 @@ int InstallGameHooks(ScriptHost& host) {
     if (HMODULE sb = GetModuleHandleA("SharedBase.dll"))
         g_idText = reinterpret_cast<TextFn>(GetProcAddress(sb, "?GetText@bCPropertyID@@QBE?AVbCString@@XZ"));
     int n = 0;
-    n += Hook(game, "?OnNPCKilled@gCQuestManager_PS@@QAE_NABVeCEntity@@@Z", reinterpret_cast<void*>(&HKilled),
+    n += HookExport(game, "?OnNPCKilled@gCQuestManager_PS@@QAE_NABVeCEntity@@@Z", reinterpret_cast<void*>(&HKilled),
               reinterpret_cast<void**>(&o_killed), host);
-    n += Hook(game, "?OnNPCDefeated@gCQuestManager_PS@@QAE_NABVeCEntity@@@Z", reinterpret_cast<void*>(&HDefeated),
+    n += HookExport(game, "?OnNPCDefeated@gCQuestManager_PS@@QAE_NABVeCEntity@@@Z", reinterpret_cast<void*>(&HDefeated),
               reinterpret_cast<void**>(&o_defeated), host);
-    n += Hook(game, "?OnReceiveItem@gCQuestManager_PS@@QAE_NPBVeCEntity@@0ABVbCPropertyID@@K@Z", reinterpret_cast<void*>(&HItem),
+    n += HookExport(game, "?OnReceiveItem@gCQuestManager_PS@@QAE_NPBVeCEntity@@0ABVbCPropertyID@@K@Z", reinterpret_cast<void*>(&HItem),
               reinterpret_cast<void**>(&o_item), host);
-    n += Hook(game, "?OnEnter@gCQuestManager_PS@@QAE_NABVeCEntity@@ABVbCString@@@Z", reinterpret_cast<void*>(&HEnter),
+    n += HookExport(game, "?OnEnter@gCQuestManager_PS@@QAE_NABVeCEntity@@ABVbCString@@@Z", reinterpret_cast<void*>(&HEnter),
               reinterpret_cast<void**>(&o_enter), host);
-    n += Hook(game, "?OnLeave@gCQuestManager_PS@@QAE_NABVeCEntity@@ABVbCString@@@Z", reinterpret_cast<void*>(&HLeave),
+    n += HookExport(game, "?OnLeave@gCQuestManager_PS@@QAE_NABVeCEntity@@ABVbCString@@@Z", reinterpret_cast<void*>(&HLeave),
               reinterpret_cast<void**>(&o_leave), host);
-    n += Hook(game, "?OnSpellCast@gCQuestManager_PS@@QAE_NABVeCEntity@@0VbCString@@@Z", reinterpret_cast<void*>(&HSpell),
+    n += HookExport(game, "?OnSpellCast@gCQuestManager_PS@@QAE_NABVeCEntity@@0VbCString@@@Z", reinterpret_cast<void*>(&HSpell),
               reinterpret_cast<void**>(&o_spell), host);
-    n += Hook(game, "?AreConditionsFulfilled@gCInfo_PS@@IBE_NXZ", reinterpret_cast<void*>(&HInfoAvail),
+    n += HookExport(game, "?AreConditionsFulfilled@gCInfo_PS@@IBE_NXZ", reinterpret_cast<void*>(&HInfoAvail),
               reinterpret_cast<void**>(&o_infoAvail), host);
     if (HMODULE eng = GetModuleHandleA("Engine.dll")) {
         g_psEntity = reinterpret_cast<FnGetEnt>(GetProcAddress(eng, "?GetEntity@eCEntityPropertySet@@UAEPAVeCEntity@@XZ"));
@@ -839,10 +842,11 @@ int InstallGameHooks(ScriptHost& host) {
         g_entName = reinterpret_cast<FnEntName>(GetProcAddress(eng, "?GetName@eCEntity@@QBEABVbCString@@XZ"));
         g_stackFromSlot = reinterpret_cast<FnStackFromSlot>(GetProcAddress(game, "?GetStackFromSlot@gCInventory_PS@@QBEPAVeCEntity@@W4gESlot@@@Z"));
     }
-    n += Hook(game, "?SetHitPoints@gCDamageReceiver_PS@@QAEXABJ@Z", reinterpret_cast<void*>(&HSetHP), reinterpret_cast<void**>(&o_setHP),
+    n += HookExport(game, "?SetHitPoints@gCDamageReceiver_PS@@QAEXABJ@Z", reinterpret_cast<void*>(&HSetHP), reinterpret_cast<void**>(&o_setHP),
               host);
-    Hook(game, "?SetBaseValue@gCPlayerMemory_PS@@QAE_NABVbCString@@H@Z", reinterpret_cast<void*>(&HPMSetBase), reinterpret_cast<void**>(&o_pmSetBase), host);
-    Hook(game, "?OnDamage@gCEntity@@UAEXPAVeCEntity@@0HHAAVeCContactIterator@@@Z", reinterpret_cast<void*>(&HGOnDmg),
+    HookExport(game, "?SetBaseValue@gCPlayerMemory_PS@@QAE_NABVbCString@@H@Z", reinterpret_cast<void*>(&HPMSetBase),
+               reinterpret_cast<void**>(&o_pmSetBase), host);
+    HookExport(game, "?OnDamage@gCEntity@@UAEXPAVeCEntity@@0HHAAVeCContactIterator@@@Z", reinterpret_cast<void*>(&HGOnDmg),
          reinterpret_cast<void**>(&o_gOnDmg), host);
     char b[96];
     std::snprintf(b, sizeof b, "Spielereignisse: %d von 8 Hooks aktiv (Game.dll, gCQuestManager_PS, gCDamageReceiver_PS::SetHitPoints)", n);
@@ -850,8 +854,9 @@ int InstallGameHooks(ScriptHost& host) {
     g_getSE = reinterpret_cast<FnGetSE>(GetProcAddress(game, "?GetStatusEffects@gCNPC_PS@@QBEABKXZ"));
     {
         int ns = 0;
-        ns += Hook(game, "?EnableStatusEffect@gCNPC_PS@@QAEXW4gEStatusEffect@@_N@Z", reinterpret_cast<void*>(&HEnableSE), reinterpret_cast<void**>(&o_enableSE), host);
-        ns += Hook(game, "?SetStatusEffects@gCNPC_PS@@QAEXABK@Z", reinterpret_cast<void*>(&HSetSE), reinterpret_cast<void**>(&o_setSE), host);
+        ns += HookExport(game, "?EnableStatusEffect@gCNPC_PS@@QAEXW4gEStatusEffect@@_N@Z", reinterpret_cast<void*>(&HEnableSE),
+                         reinterpret_cast<void**>(&o_enableSE), host);
+        ns += HookExport(game, "?SetStatusEffects@gCNPC_PS@@QAEXABK@Z", reinterpret_cast<void*>(&HSetSE), reinterpret_cast<void**>(&o_setSE), host);
         host.Log("Statuseffekt-Hooks: " + std::to_string(ns) + " von 2 aktiv (OnStatusEffect)");
     }
     InstallQualityTooltip(game, host);
@@ -869,6 +874,19 @@ void SetScriptHurt(bool on) { g_scriptHurt = on; }
 void* CurrentAttackerOf(void* ent) {
     void *l, *c;
     return NpcAttackers(ent, &l, &c) ? c : nullptr;
+}
+
+bool HookExport(HMODULE m, const char* sym, void* detour, void** orig, ScriptHost& host) {
+    void* target = m ? reinterpret_cast<void*>(GetProcAddress(m, sym)) : nullptr;
+    if (!target) {
+        host.Log(std::string("Hook: Export fehlt: ") + sym);
+        return false;
+    }
+    if (MH_CreateHook(target, detour, orig) != MH_OK || MH_EnableHook(target) != MH_OK) {
+        host.Log(std::string("Hook: Einhaengen fehlgeschlagen: ") + sym);
+        return false;
+    }
+    return true;
 }
 
 }   // namespace og3p

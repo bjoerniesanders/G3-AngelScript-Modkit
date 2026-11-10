@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Spielskripte nach Namen (Skript-Schnittstelle ab Version 32, Roadmap 7.1).
 // Die Spielskripte der Script_*.dll (z. B. "AssessHit", "MagicTeleport", "SetHitPoints") stehen in der Tabelle gCScriptAdmin::m_Scripts (Name -> Funktion
 // int __stdcall(gCScriptProcessingUnit*, Entity* self, Entity* other, int arg)). Jeder Aufruf nach Namen laeuft ueber einen von zwei Exporten der Game.dll
@@ -115,12 +117,6 @@ void* EntityOfArg(void* arg) {
     return InModule(g_a.engine, vt) || InModule(g_a.game, vt) ? first : nullptr;
 }
 
-const char* TextOf(const void* s) {
-    if (!s || !ReadableMem(s, sizeof(void*))) return nullptr;
-    __try {
-        return g_sb.strGetText(s);
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
-}
 
 void* SafeSpuEnt(SpuEntFn fn, void* spu) {
     if (!fn || !spu) return nullptr;
@@ -365,7 +361,7 @@ int Dispatch(const void* name, void* self, void* other, int arg, Orig original) 
 int __fastcall HRun(void* admin, void*, const void* name, void* spu) {
     HookTimer t;
     const bool foreign = g_gameThread && GetCurrentThreadId() != g_gameThread;
-    const char* n = (g_stats || g_watchCount) ? TextOf(name) : nullptr;
+    const char* n = (g_stats || g_watchCount) ? SafeStrText(name, nullptr) : nullptr;
     if (g_stats) Count(n, false, foreign);
     const bool watch = !foreign && g_gameThread && g_depth < 8 && IsWatched(n);
     t.Stop();
@@ -388,7 +384,7 @@ int __fastcall HRun(void* admin, void*, const void* name, void* spu) {
 int __fastcall HRunFrom(void* admin, void*, const void* name, void* spu, void* self, void* other, int arg) {
     HookTimer t;
     const bool foreign = g_gameThread && GetCurrentThreadId() != g_gameThread;
-    const char* n = (g_stats || g_watchCount) ? TextOf(name) : nullptr;
+    const char* n = (g_stats || g_watchCount) ? SafeStrText(name, nullptr) : nullptr;
     if (g_stats) Count(n, true, foreign);
     const bool watch = !foreign && g_gameThread && g_depth < 8 && IsWatched(n);
     t.Stop();
@@ -400,14 +396,6 @@ int __fastcall HRunFrom(void* admin, void*, const void* name, void* spu, void* s
     return r;
 }
 
-bool HookExport(HMODULE m, const char* sym, void* detour, void** orig, ScriptHost& host) {
-    void* target = reinterpret_cast<void*>(GetProcAddress(m, sym));
-    if (!target) {
-        host.Log(std::string("Skriptaufrufe: Export fehlt: ") + sym);
-        return false;
-    }
-    return MH_CreateHook(target, detour, orig) == MH_OK && MH_EnableHook(target) == MH_OK;
-}
 
 }   // namespace
 
@@ -420,7 +408,7 @@ bool MakeScriptEntity(void* buf, void* ent) {
 bool RegisterScriptCallBindings(asIScriptEngine* e) {
     bool ok = true;
     OG3_REG(e->RegisterGlobalFunction("int CallScript(const bCString &in name, const Entity &in self, const Entity &in other, int arg = 0)",
-                                      asFUNCTION(CallScriptScript), asCALL_CDECL));
+                                      asFUNCTION(CallScriptScript), asCALL_CDECL));   // experimentell
     OG3_REG(e->RegisterGlobalFunction("bool ScriptExists(const bCString &in name)", asFUNCTION(ScriptExistsScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bCString GetScriptDll(const bCString &in name)", asFUNCTION(GetScriptDllScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("void WatchScript(const bCString &in name)", asFUNCTION(WatchScriptScript), asCALL_CDECL));

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 """Liest G3V0-Archive (Gothic-3-.pak/.cpt/.p00/.m00/.mod): Verzeichnis anzeigen, Dateien ansehen und entpacken, auch komprimierte (zlib).
 
 Aufruf (nur Lesen; mit  python -I  starten):

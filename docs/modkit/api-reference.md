@@ -1,6 +1,18 @@
-# API-Referenz (Skript-Schnittstelle Version 17)
+# API-Referenz (Skript-Schnittstelle Version 39)
 
-Alle Funktionen sind global, soweit nicht ein Typ davor steht. Ohne laufendes Spiel (Tests) liefern die Engine-Funktionen Standardwerte (`false`, `-1`, leerer Text).
+Alle Funktionen sind global, soweit nicht ein Typ davor steht (`Entity::...`). Ohne laufendes Spiel (Tests) liefern die Engine-Funktionen Standardwerte (`false`, `-1`, leerer Text).
+
+"ab Version N" nennt die Skript-Schnittstelle, mit der eine Funktion kam (`GetApiVersion()`); was sich zwischen Versionen ändern darf, steht in den [Versionsregeln](api-policy.md).
+
+**Vermerke** (immer am Anfang der Beschreibung):
+
+| Vermerk | Bedeutung |
+|---|---|
+| ohne | Benutzbar wie beschrieben. Wo es ausdrücklich gemessen ist, steht „Im Spiel bestätigt“ dabei |
+| **Experimentell** | Läuft, aber Wirkung oder Grenzen sind nicht vollständig gemessen. Name, Parameter und Verhalten können sich in einer kleinen Version ändern |
+| **Im Spiel nicht geprüft** | Gebaut und ohne Spiel getestet, im Spiel noch nie gemessen |
+| **Funktioniert nicht** | Bleibt aufrufbar, liefert im Spiel aber kein brauchbares Ergebnis. Nicht benutzen; der Ersatz steht dabei |
+| **Veraltet** | Bleibt aufrufbar und meldet beim ersten Aufruf je Mod eine Warnung. Der Ersatz steht dabei; Entfernen erst mit einer großen Version |
 
 ## Allgemein
 
@@ -26,7 +38,7 @@ Aus AngelScript-Add-ons: `array<T>` (`insertLast`, `length`, `[]`, ...) und `scr
 | `void PlaySystemSound()` | Windows-Systemton |
 | Konstanten `KEY_F1` ... `KEY_F12` | Tastencodes der Funktionstasten |
 
-## Anzeige
+## Bildschirmtext
 
 | Funktion | Beschreibung |
 |---|---|
@@ -34,21 +46,46 @@ Aus AngelScript-Add-ons: `array<T>` (`insertLast`, `length`, `[]`, ...) und `scr
 | `bool PrintGameMessage(const bCString &in text, int type = 0)` | Spielmeldung |
 | `int GetActivePage()` | Aktive Spielseite (Menü, Inventar, ...), Werte nur teilweise bekannt: -1 = Spiel, 5, 6, 17 treten im Spiel auf |
 
-## Spielwelt
+## Zeichnen (nur in `OnDraw`)
+
+| Funktion | Beschreibung |
+|---|---|
+| `int CreateFont(const bCString &in face, int height, bool bold = false, bool italic = false)` (global, ab Version 34) | Legt eine Schrift der Spiel-GUI an (`eCGUIAdmin::CreateFontA`) und gibt ihr Handle zurück; dieselbe Kombination liefert immer dasselbe Handle (einmal anlegen reicht, auch in `OnDraw`). `height` in Punkten der GUI-Fläche |
+| `bool DrawText(int font, int x, int y, const bCString &in text, uint argb = 0xFFFFFFFF, bool shadow = true)`, `int TextWidth(int font, const bCString &in text)` (global, ab Version 34) | Text an (`x`, `y`) = linke obere Ecke, Farbe als `0xAARRGGBB`, mit Schatten 1 Punkt versetzt. **Nur in `OnDraw()`**. Koordinaten in der GUI-Fläche (`GetScreenWidth()` x `GetScreenHeight()`, gemessen 1365x768 bei einem Fenster mit 2560x1440: die GUI skaliert). Ab Version 39 liegt alles über HUD und Inventar. Einfarbige Flächen gibt es nicht (die Rechteck-Funktionen der GUI und des Renderers sind im Spiel leer) |
+| `int LoadImage(const bCString &in name)`, `bool DrawImage(int image, int x, int y, int w, int h, float angle = 0)` (global, ab Version 38) | Bild aus den GUI-Daten des Spiels laden (je Name einmal, Rückgabe Nummer > 0, 0 = (noch) nicht ladbar; ein fehlgeschlagener Name wird nach 2 s erneut versucht, in `main()` fehlen die GUI-Daten oft noch) und in `OnDraw()` in das Rechteck (`x`, `y`, `w`, `h`) der GUI-Fläche zeichnen; `angle` dreht es (Bogenmaß, wie die Kompassnadel). Namen wie in `gui.pak` `resources/g3.gui.res`, voller Pfad (`\data\gui\icons\hud\v3\icons\misc\g3_hud_icon_misc_compass.tga`) oder nur der Dateiname (`g3_hud_icon_misc_compass.tga`); in AngelScript `\\` für jeden Rückstrich. Im Spiel bestätigt |
+| `int GetScreenWidth()`, `int GetScreenHeight()`, `bool WorldToScreen(const bCVector &in pos, float &out x, float &out y)` (global, ab Version 34) | Größe der GUI-Fläche und Umrechnung eines Weltpunkts in diese Fläche (Kameramatrix; `false` hinter der Kamera). Gemessen: `GetPosition()` eines NPCs ist der Fußpunkt, `+ bCVector(0, 100, 0)` die Körpermitte. Fläche und Umrechnung stimmen erst ab dem ersten `OnDraw` |
+
+## Zeit
+
+| Funktion | Beschreibung |
+|---|---|
+| `int GetGameDay()`, `GetGameHour()`, `GetGameMinute()` | Spielzeit, `-1` ohne Welt |
+| `bool SetGameTime(int day, int hour, int minute)` | **Im Spiel nicht geprüft.** Spielzeit setzen. `day = -1` behält den Tag |
+| `float GetTimeScale()`, `bool SetTimeScale(float)` (ab Version 36) | Geschwindigkeit der ganzen Simulation (1 = normal, erlaubt 0,05 bis 10). Wird nicht gespeichert |
+| `float GetClockFactor()`, `bool SetClockFactor(float)` (ab Version 36) | Geschwindigkeit der Spieluhr (Spielminuten je echter Minute, normal 12; erlaubt 0 bis 10000). **Steht im Spielstand:** vor dem Speichern in `OnBeforeSave` zurückstellen, in `OnAfterSave` wieder setzen |
+
+## Entities finden, erzeugen, entfernen
 
 | Funktion | Beschreibung |
 |---|---|
 | `Entity GetHero()` | Der Held |
 | `Entity GetPlayer()` | Der Spieler (gCSession) |
 | `Entity FindEntity(const bCString &in name)` | Entity nach Name (`"Jens"`, `"PC_Hero"`), ungültig wenn nicht gefunden |
-| `int GetGameDay()`, `GetGameHour()`, `GetGameMinute()` | Spielzeit, `-1` ohne Welt |
-| `bool SetGameTime(int day, int hour, int minute)` | Spielzeit setzen. `day = -1` behält den Tag |
-| `float GetTimeScale()`, `bool SetTimeScale(float)` (ab Version 36) | Geschwindigkeit der ganzen Simulation (1 = normal, erlaubt 0,05 bis 10). Wird nicht gespeichert |
-| `float GetClockFactor()`, `bool SetClockFactor(float)` (ab Version 36) | Geschwindigkeit der Spieluhr (Spielminuten je echter Minute, normal 12; erlaubt 0 bis 10000). **Steht im Spielstand:** vor dem Speichern in `OnBeforeSave` zurückstellen, in `OnAfterSave` wieder setzen |
+| `int CountEntities(const bCString &in part)` / `Entity GetEntityByPart(const bCString &in part, int index)` (global) | Entities nach Teilname suchen: Anzahl und Eintrag. Beim Entfernen rückwärts durchlaufen |
+| `Entity SpawnNPC(const bCString &in templateName, const bCVector &in position)` (global) | Erzeugt aus einer Vorlage ein Entity (NPC, Objekt) in der Spielwelt: `gCWorld::CreateDynamicEntity` + `eCEntity::CreateFromTemplate`, dann Position. Gibt das Entity zurück (ungültig bei Fehler, Code im Protokoll: `-2` Vorlage unbekannt, `-5` keine Welt, `-6`/`-7` Erzeugen fehlgeschlagen). Der Vorlagenname muss exakt stimmen, siehe `FindTemplateNames`. Im Spiel bestätigt |
+| `bool DestroyNPC(const Entity &in)` (global) | Entfernt ein mit `SpawnNPC` erzeugtes Entity wieder (`gCWorld::DestroyDynamicEntity`). Nur NPCs (Entities mit `gCNPC_PS`), und nur solche dieser Sitzung oder aus dem Systemsektor der Welt (dorthin gehören erzeugte NPCs, auch nach Speichern und Laden). Welt-Objekte (auch im Systemsektor, z. B. `G3_World_Border_001`), Welt-NPCs, Held und Spieler werden abgelehnt (`false`, Grund im Protokoll). Den Griff danach nicht mehr verwenden |
+| `bool IsNPC(const Entity &in)` (global) | `true`, wenn das Entity ein NPC ist (hat ein `gCNPC_PS`) |
+| `bool IsDynamicSpawn(const Entity &in)` (global) | `true`, wenn das Entity ein NPC im Systemsektor ist (per `SpawnNPC` erzeugt oder ähnlich dynamisch) und nicht Held/Spieler |
+| `int CountTemplateNames(const bCString &in prefix)` (global, ab Version 28) | Anzahl der Vorlagen, deren Name mit `prefix` beginnt (mit Mehrfachnennungen, wie `FindTemplateNames`); billig, ohne die Namen zu lesen. `-1` ohne Spiel |
+| `bCString FindTemplateNames(const bCString &in prefix, int max = 20)` (global) | Sucht Vorlagen, deren Name mit `prefix` **beginnt** (gemessen: `Teleport` findet `Teleport_Ardea`, aber nicht `Spl_Teleport_Ardea`; `_` findet nur Namen mit `_` am Anfang; **Groß-/Kleinschreibung wird ignoriert**, gemessen: `BEARD_HE` und `BEaRD_hE` liefern dasselbe): `"Name1;Name2;..."`, leer ohne Treffer. Jede Abfrage kostet etwa 3 ms je Treffer; Skripte werden nach 5 Sekunden abgebrochen, lange Listen deshalb auf mehrere Bilder verteilen (siehe `reference_dump`). Namen kommen meist doppelt vor. `max` ist bis 20000 möglich (bis Version 28 war es auf 200 begrenzt, längere Listen wurden abgeschnitten) |
+| `Entity GetTemplateEntity(const bCString &in name)` (global, ab Version 29) | Die Vorlage (Template-Entity) mit genau diesem Namen, z. B. `"Perk_OrcSlayer"` oder `"It_1H_OrcSlayer_01"`; ungültig, wenn es sie nicht gibt. Ihre Eigenschaftssets lassen sich mit `GetProperty`/`ListProperties` lesen, ohne etwas zu erzeugen. Wird für `set` ein Name verwendet, den `eEPropertySetType` nicht kennt, gilt er als Klassenname (`"gCSkill_PS"`) |
+| `int CloneTemplate(const bCString &in base, const bCString &in newName)` (global) | Klont die Item-Vorlage `base` im Speicher unter dem Namen `newName` (`eCNode::Clone` + `SetName`). `0` angelegt, `1` war schon da, `-2` Basis unbekannt, `-6`/`-7` Klon fehlgeschlagen. Danach `AddItems(newName, n)`. Name und Beschreibung des Items stehen in der Stringtabelle unter `FO_<newName>` und `ITEMDESC_<newName>`: mit `RegisterText` setzen, sonst bleiben sie leer. Die Vorlage bekommt eine feste ID (MD5 von `OG3Clone:<newName>`) und ist in jedem Spielstart dieselbe: Klon-Items im Spielstand bleiben nach dem Neustart erhalten. Dazu muss der Mod `CloneTemplate` in `OnQuestsLoaded` aufrufen (vor dem Einlesen des Spielstands; in `main` ist das Spiel noch nicht bereit, Code `-4`) |
 
-### Typ `Entity`
+## Typ `Entity`: Grundlagen und Lage
 
-| Methode | Beschreibung |
+Ein `Entity` ist ein Griff auf ein Spielobjekt (NPC, Held, Item, Gebäude, Vorlage). Ein leeres oder ungültiges `Entity` ist erlaubt; Methoden liefern dann Standardwerte.
+
+| Funktion | Beschreibung |
 |---|---|
 | `bool IsValid() const` | Entity existiert und ist lesbar |
 | `bCString GetName() const` | Name |
@@ -57,6 +94,20 @@ Aus AngelScript-Add-ons: `array<T>` (`insertLast`, `length`, `[]`, ...) und `scr
 | `float GetDistanceTo(const Entity &in) const` | Abstand (≈ cm), `-1` bei ungültigen Entities |
 | `bool SetPosition(const bCVector &in)` | Teleport |
 | `bool opEquals` (`==`) | Gleiche Spielobjekte |
+| `bool Entity::SetRotation(const bCQuaternion &in)` | Setzt die Drehung (`SetLocalRotation`; Y ist oben). Für erzeugte NPCs = Weltdrehung |
+| `bool Entity::LookAt(const Entity &in target, float yawOffsetDegrees = 0)` | Dreht das Entity um die Hochachse zum Ziel (Gier = atan2(dx, dz)). Schaut es vom Ziel weg, Versatz 180 angeben |
+| `bool Entity::TeleportTo(const Entity &in target)` (ab Version 33) | Teleportiert das Entity zum Ziel (`Entity::Teleport` der Script.dll, wie das Spiel es für Begleiter macht). Im Spiel bestätigt: Das Entity steht danach genau auf dem Ziel; ein Begleiter, der genau auf dem Helden landet, spricht ihn sofort an. Darum danach mit `SetPosition` etwas daneben stellen (siehe `teleport_party`) |
+| `Entity::GetCategory()` / `Entity::IsBuilding()` | Grobe Einordnung eines Entities: `"NPC"`, `"Building"`, `"Object"`, `"Landscape"`, `"Border"`, `"Unnamed"` (kein Name), `"Other"`, bei ungültigem Entity leer. Beruht auf Namensmustern, die im Spiel beobachtet wurden (`G3_Myrtana_House_*` = Gebäude, `G3_Object_*` = Interaktionsobjekte, `G3_Myrtana_Landscape_*`, `G3_World_Border_*`); unbenannte Treffer (Bäume, Steine, Kleinteile) lassen sich so nicht bestimmen |
+| `Entity::GetTemplateName()` | Name der Vorlage, aus der das Entity entstand (leer, wenn unbekannt). Hilft bei unbenannten Treffern des Fadenkreuzes |
+| `Entity::GetBoundsMin()` / `GetBoundsMax()` | Hüllquader des Entities samt Kindern in Weltkoordinaten (Größe: Max − Min). Nullvektor bei ungültigem Entity |
+| `Entity::GetParent()` | Elternobjekt (das Fadenkreuz trifft oft Teilobjekte eines Gebäudes, das Elternobjekt ist dann das Gebäude). Ungültig, wenn keines da ist |
+
+## Attribute und Inventar
+
+Alles hier sind Methoden von `Entity` (`hero.GetAttribute("STR")`).
+
+| Funktion | Beschreibung |
+|---|---|
 | `int GetAttribute(const bCString &in tag) const` | Aktueller Wert |
 | `int GetAttributeBase(tag) const`, `int GetAttributeMax(tag) const` | Grund- und Höchstwert |
 | `bool SetAttributeBase(tag, int)`, `AddAttributeBase(tag, int)` | Grundwert setzen/erhöhen (wie das Spiel bei Lernpunkten) |
@@ -64,58 +115,77 @@ Aus AngelScript-Add-ons: `array<T>` (`insertLast`, `length`, `[]`, ...) und `scr
 | `int GetItemCount(const bCString &in itemName) const` | Anzahl aller Stapel dieses Items, `-1` = Inventar nicht lesbar |
 | `int RemoveItems(const bCString &in itemName, int count)` | Entfernt bis zu `count` Stück, gibt die entfernte Zahl zurück (`-1` = Fehler) |
 | `int AddItems(const bCString &in itemName, int count)` | Erzeugt Items im Inventar (`>= 0` ok, `-1` Inventar nicht lesbar, `-2` Item unbekannt, `-4`/`-5` Funktion fehlt). Fehler stehen im Protokoll |
-| `int CloneTemplate(const bCString &in base, const bCString &in newName)` (global) | Klont die Item-Vorlage `base` im Speicher unter dem Namen `newName` (`eCNode::Clone` + `SetName`). `0` angelegt, `1` war schon da, `-2` Basis unbekannt, `-6`/`-7` Klon fehlgeschlagen. Danach `AddItems(newName, n)`. Name und Beschreibung des Items stehen in der Stringtabelle unter `FO_<newName>` und `ITEMDESC_<newName>`: mit `RegisterText` setzen, sonst bleiben sie leer. Die Vorlage bekommt eine feste ID (MD5 von `OG3Clone:<newName>`) und ist in jedem Spielstart dieselbe: Klon-Items im Spielstand bleiben nach dem Neustart erhalten. Dazu muss der Mod `CloneTemplate` in `OnQuestsLoaded` aufrufen (vor dem Einlesen des Spielstands; in `main` ist das Spiel noch nicht bereit, Code `-4`) |
-| `bCString GetProperty(const Entity &in e, const bCString &in set, const bCString &in prop)` (global, ab Version 29) | Liest eine Eigenschaft des Eigenschaftssets eines Entities **als Text**, über den allgemeinen Eigenschaftszugriff der Engine. `set` ist der Typ des Sets, z. B. `"Item"`, `"gCItem_PS"`, `"Damage"`, `"NPC"`, `"Inventory"` (alle Werte von `eEPropertySetType`, Groß-/Kleinschreibung egal); `prop` der Eigenschaftsname wie im SDK (`"GoldValue"`, `"RequiredSkill1"`, `"DamageAmount"`). Leer, wenn Entity, Set oder Eigenschaft fehlen. Nur Lesen. Der Textwert kommt von `ConvertValueToString` und ist bei Verweisen (Vorlagen, Entities) und Listen nicht immer aussagekräftig |
-| `Entity GetTemplateEntity(const bCString &in name)` (global, ab Version 29) | Die Vorlage (Template-Entity) mit genau diesem Namen, z. B. `"Perk_OrcSlayer"` oder `"It_1H_OrcSlayer_01"`; ungültig, wenn es sie nicht gibt. Ihre Eigenschaftssets lassen sich mit `GetProperty`/`ListProperties` lesen, ohne etwas zu erzeugen. Wird für `set` ein Name verwendet, den `eEPropertySetType` nicht kennt, gilt er als Klassenname (`"gCSkill_PS"`) |
-| `bool Entity::LearnSkill(name)`, `ActivateSkill(name)`, `DeactivateSkill(name)`, `bool HasLearnedSkill(name)`, `bool IsSkillActive(name)`, `int GetSkillActivationCount(name)` (ab Version 30) | Talente im Inventar des Helden (`gCInventory_PS`). `name` ist die Talent-Vorlage, z. B. `"Perk_1H_1"`. Gelernte Talente stehen als Stapel im Inventar, `ActivateSkill` zählt den Aktivierungszähler hoch (so macht es eine Waffe mit `ActivateSkill1/2`, solange sie geführt wird), `DeactivateSkill` zählt herunter. Ersatz für das nicht schreibbare `ActivateSkill2`. `false`/`-1` bei unbekanntem Talent oder ohne Inventar |
-| `bool SetTemplateRef(const Entity &in e, const bCString &in klasse, const bCString &in prop, const bCString &in ziel)` (global, ab Version 30) | Setzt eine **Verweis-Eigenschaft** auf eine Vorlage, z. B. `SetTemplateRef(waffe, "gCItem_PS", "ActivateSkill2", "Perk_Lifesteal")` oder `(lernItem, "gCItem_PS", "Skill", ...)`. `klasse` ist der Klassenname des Eigenschaftssets, `prop` der Name ohne Präfix (es wird `gCxxx_PS::Access<prop>()` aufgerufen, dann `eCTemplateEntityProxy::SetEntity`). Ersatz für `SetProperty` bei Verweisen, die per Text nicht gehen. Nur für Vorlagen, die die Mod selbst angelegt hat. Experimentell |
 | `int Entity::DeleteItemStack(const bCString &in name)` (ab Version 30) | Entfernt alle Stapel mit diesem Item-Namen samt Stapel (`gCInventory_PS::DeleteStack`); Rückgabe: Zahl entfernter Stapel, `-1` bei Fehler. Nötig bei dauerhaften Items (`Permanent`, z. B. Lern-Items von Talenten): `RemoveItems` verringert nur die Menge und lässt einen leeren Stapel stehen |
-| `bool Entity::DoDamage(const Entity &in angreifer, int amount, int type)` (ab Version 30) | **Achtung, anders als der Name:** `this` ist das **Opfer**, das Argument der **Angreifer**; der Schaden kommt aus den Schadensdaten des Angreifers (gemessen: `hero.DoDamage(wolf, 40, 6)` ließ den Wolf den Helden mit seinen 23 Punkten treffen; `amount` und `type` wirkten nicht). Für Zusatzschaden an einem NPC `HurtHitPoints` benutzen |
-| `int Entity::HurtHitPoints(int amount, int minHp = 0)` (ab Version 30) | Zieht einem NPC `amount` Lebenspunkte ab (`gCDamageReceiver_PS::SetHitPoints`), nicht unter `minHp`; liegen die Lebenspunkte schon bei oder unter `minHp`, passiert nichts. Rückgabe: neue Lebenspunkte, `-1` bei Fehler. Der Abzug erscheint in `OnDamage` **ohne Angreifer und Waffe** (Besitzer ungültig); aus `OnDamage` heraus aufgerufen wird er nicht noch einmal gemeldet. **Tötet nicht:** Bei 0 Lebenspunkten bleibt der NPC stehen (der Tod entsteht nur in der Treffer-Kette); für echten Zauberschaden siehe `beliars_klaue` (Beschwörung mit Besitzer). Experimentell |
-| `bool SetEntityRef(const Entity &in e, const bCString &in klasse, const bCString &in prop, const Entity &in ziel)` (global, ab Version 30) | Setzt eine **Entity-Verweis-Eigenschaft**, z. B. `SetEntityRef(beschwoerung, "gCInteraction_PS", "Owner", GetHero())` (wem gehört die Beschwörung/das Geschoss; davon hängt ab, wen der Schaden als Besitzer meldet). `klasse` ist der Klassenname des Sets, `prop` der Name ohne Präfix. Gegenstück zu `SetTemplateRef` (das für Vorlagen gilt). Experimentell |
-| `void SetConsoleReply(const bCString &in text)`, `bool OpenConsole()` (global, ab Version 35) | Antwort des gerade laufenden Konsolenbefehls (nur in `Override_ConsoleCommand`); `OpenConsole` öffnet die Konsole, sichtbar ist sie aber nur im Marvin-Modus |
-| `int CreateFont(const bCString &in face, int height, bool bold = false, bool italic = false)` (global, ab Version 34) | Legt eine Schrift der Spiel-GUI an (`eCGUIAdmin::CreateFontA`) und gibt ihr Handle zurück; dieselbe Kombination liefert immer dasselbe Handle (einmal anlegen reicht, auch in `OnDraw`). `height` in Punkten der GUI-Fläche |
-| `bool DrawText(int font, int x, int y, const bCString &in text, uint argb = 0xFFFFFFFF, bool shadow = true)`, `int TextWidth(int font, const bCString &in text)` (global, ab Version 34) | Text an (`x`, `y`) = linke obere Ecke, Farbe als `0xAARRGGBB`, mit Schatten 1 Punkt versetzt. **Nur in `OnDraw()`**. Koordinaten in der GUI-Fläche (`GetScreenWidth()` x `GetScreenHeight()`, gemessen 1365x768 bei einem Fenster mit 2560x1440: die GUI skaliert). Ab Version 39 liegt alles über HUD und Inventar. Einfarbige Flächen gibt es nicht (die Rechteck-Funktionen der GUI und des Renderers sind im Spiel leer) |
-| `int LoadImage(const bCString &in name)`, `bool DrawImage(int image, int x, int y, int w, int h, float angle = 0)` (global, ab Version 38) | Bild aus den GUI-Daten des Spiels laden (je Name einmal, Rückgabe Nummer > 0, 0 = (noch) nicht ladbar; ein fehlgeschlagener Name wird nach 2 s erneut versucht, in `main()` fehlen die GUI-Daten oft noch) und in `OnDraw()` in das Rechteck (`x`, `y`, `w`, `h`) der GUI-Fläche zeichnen; `angle` dreht es (Bogenmaß, wie die Kompassnadel). Namen wie in `gui.pak` `resources/g3.gui.res`, voller Pfad (`\data\gui\icons\hud\v3\icons\misc\g3_hud_icon_misc_compass.tga`) oder nur der Dateiname (`g3_hud_icon_misc_compass.tga`); in AngelScript `\\` für jeden Rückstrich. Im Spiel bestätigt |
-| `int GetScreenWidth()`, `int GetScreenHeight()`, `bool WorldToScreen(const bCVector &in pos, float &out x, float &out y)` (global, ab Version 34) | Größe der GUI-Fläche und Umrechnung eines Weltpunkts in diese Fläche (Kameramatrix; `false` hinter der Kamera). Gemessen: `GetPosition()` eines NPCs ist der Fußpunkt, `+ bCVector(0, 100, 0)` die Körpermitte. Fläche und Umrechnung stimmen erst ab dem ersten `OnDraw` |
-| `int Entity::GetPartyMemberCount()`, `Entity GetPartyMember(int)`, `Entity GetPartyLeader()`, `bool IsPartyWaiting()`, `bool SetPartyWaiting(bool)` (ab Version 33) | Gruppe (`gCParty_PS`): Die Mitglieder stehen beim **Anführer** (beim Helden seine Begleiter, Beschwörungen, Sklaven), jedes Mitglied verweist mit `GetPartyLeader` auf ihn. `-1`/ungültig ohne Gruppen-Set. Die Art steht in `GetProperty(m, "Party", "PartyMemberType")` (1 Party, 2 Mob, 3 Slave, 4 Controlled, 5 Summoned). `IsPartyWaiting` = der Held hat „Warte hier“ gesagt. Noch nicht im Spiel gemessen |
 | `int Entity::GetInventoryStackCount() const` (ab Version 37) | Zahl der Stapel im Inventar, `-1` ohne Inventar |
-| `bool Entity::GenerateTradeGoods()` (ab Version 37) | Erzeugt die Händlerware aus den Schatz-Sets des Entity neu (wie das Spiel; löst `Override_TradeGenerate`/`OnTradeGenerated` aus). Gemessen bei Jens: true, Stapelzahl 19 vorher und nachher (ob dabei andere Items entstehen, ist noch nicht geprüft) |
-| `bool Entity::TeleportTo(const Entity &in target)` (ab Version 33) | Teleportiert das Entity zum Ziel (`Entity::Teleport` der Script.dll, wie das Spiel es für Begleiter macht). Im Spiel bestätigt: Das Entity steht danach genau auf dem Ziel; ein Begleiter, der genau auf dem Helden landet, spricht ihn sofort an. Darum danach mit `SetPosition` etwas daneben stellen (siehe `teleport_party`) |
-| `int CallScript(const bCString &in name, const Entity &in self, const Entity &in other, int arg = 0)` (global, ab Version 32) | Ruft ein Spielskript der `Script_*.dll` nach Namen auf (`gCScriptAdmin::CallScriptFromScript`, so wie die Spielskripte einander aufrufen), z. B. `CallScript("GetAttitude", npc, GetHero())`. Rückgabe = Ergebnis des Skripts; 0, wenn es das Skript nicht gibt (Meldung im Protokoll) oder das Spiel gerade keine Skripte ausführt. Ein leeres `Entity` steht für „None“. Skripte mit Wirkung (z. B. `SetHitPoints`) greifen sofort ins Spiel ein. Gemessen (2026-11-09): `IsHumanoid` liefert 1 für Held und NPC; das Spiel selbst ruft z. B. `GetStaminaPoints(npc, None, 0)` (Ausdauer) und `GetAttitude(npc, anderer, 0)` (2 Neutral, 4 Feindlich). **Nicht** nach Namen erreichbar sind Skripte, die `Script_Game.dll` intern direkt aufruft (`AssessHit`, `IsDeadlyDamage`, `CanBurn`: im Spiel nie über den Namen gelaufen); für Treffer ist `OnHit` der Einstieg. Experimentell |
-| `bool ScriptExists(const bCString &in name)`, `bCString GetScriptDll(const bCString &in name)` (global, ab Version 32) | Gibt es ein Spielskript dieses Namens, und in welcher `Script_*.dll` steht es? Die Script-DLLs lädt das Spiel erst nach `main()`; ab `OnWorldActivate` fragen |
-| `void WatchScript(const bCString &in name)`, `void SetScriptResult(int value)` (global, ab Version 32) | Meldet ein Spielskript für `Override_Script`/`OnScript` an (Groß-/Kleinschreibung egal, einmal reicht, gilt für alle Mods). `SetScriptResult` setzt in `Override_Script` das Ergebnis fürs Spiel, wenn das Original nicht aufgerufen wird |
-| `bool EffectExists(const bCString &in name)` und `bool StartEffect(const bCString &in name, const Entity &in at)` (global, ab Version 30) | Prüft bzw. startet einen benannten Effekt der Effektverwaltung am Entity (`EffectSystem::StartEffect`), z. B. `"eff_magic_summonlightning_target_01"` (der Blitz von „Blitz beschwören“). Die Namen stehen in den Zaubervorlagen (`EffectItemCast`, `EffectTargetCast` ...). `false`, wenn der Effekt unbekannt ist. Der Effekt hat keinen Schaden, nur Optik |
-| `bool SetProperty(const Entity &in e, const bCString &in set, const bCString &in prop, const bCString &in value)` (global, ab Version 29) | **Schreibt** eine Eigenschaft aus Text (`ConvertStringToValue`, Zuweisen). `true`, wenn die Eigenschaft existiert und der Aufruf ohne Fehler lief; ob der Wert so gelesen wurde, mit `GetProperty` prüfen. **Textwerte (z. B. `Tag`) lassen sich schreiben; Referenz-Eigenschaften auf andere Vorlagen (z. B. `ActivateSkill2`) nicht: `true` ohne Wirkung, getestet mit 11 Schreibformen (Name, Name+GUID, GUID mit/ohne Klammern).** Nur an Vorlagen und Entities verwenden, die die Mod selbst angelegt hat (`CloneTemplate`); ob Änderungen an Vorlagen in Spielständen bleiben, ist nicht untersucht. Experimentell |
-| `bCString ListProperties(const Entity &in e, const bCString &in set, int max = 200)` (global, ab Version 29) | Alle Eigenschaften des Sets samt Basisklassen als `"Name=Wert;Name=Wert;..."` (höchstens `max`, bis 600; Semikolons in Werten werden zu Leerzeichen). Zum Herausfinden, was ein Item, ein Zauber oder ein NPC im Spiel wirklich enthält; die Mod `property_inspect` zeigt es |
 | `Entity::GetSlotItem(int slot)` (ab Version 28) | Das Item im Ausrüstungs-Slot als Entity (ungültig bei leerem Slot); `GetName()` liefert den Vorlagennamen, z. B. `It_1H_OrcSlayer_01`. Slots wie bei `GetSlotQuality` |
 | `Entity::GetSlotQuality(int slot)` / `Entity::SetSlotQuality(int slot, uint bits)` (ab Version 28) | Qualitätsbits des Inventarstapels im Ausrüstungs-Slot (`SLOT_RIGHT_HAND` 1, `SLOT_LEFT_HAND` 2, `SLOT_BACK_LEFT` 5, `SLOT_BACK_RIGHT` 6, `SLOT_BOW` 7, `SLOT_AMMO` 14). Bits: `QUALITY_DISEASED` 2, `QUALITY_POISONED` 4, `QUALITY_BURNING` 8, `QUALITY_FROZEN` 16, `QUALITY_SHARP` 32, `QUALITY_BLESSED` 64, `QUALITY_FORGED` 128, `QUALITY_WORN` 256 und **`QUALITY_LIFESTEAL` 512** (eigenes Bit dieses Patches). Die Beschreibung der Waffe zeigt gesetzte Bits als Zeile mit Symbol und Text; für `QUALITY_LIFESTEAL` kommt der Text aus dem Schlüssel `HUD_Quality_Lifesteal` der Mod-Stringtabelle (Präfix `(20 %)`, Symbol der Segnung). Verschiedene Qualitäten sind verschiedene Stapel und werden mit dem Spielstand gespeichert. `Get` liefert 0 bei leerem Slot oder ungültigem Entity, `Set` gibt `false` zurück, wenn der Slot leer ist. Die Inventaranzeige aktualisiert sich eventuell erst beim nächsten Öffnen |
-| `Entity::GetStatusEffects()` / `Entity::HasStatusEffect(int)` / `Entity::SetStatusEffect(int, bool)` (ab Version 27) | Statuseffekte eines NPCs oder des Helden als Bitmaske (`gCNPC_PS`): `STATUS_BURNING` 1, `STATUS_FROZEN` 2, `STATUS_POISONED` 4, `STATUS_DISEASED` 8, `STATUS_TRANSFORMED` 16, `STATUS_IN_FOG` 64, `STATUS_GHOST` 128, `STATUS_IN_MAGIC_BARRIER` 256, `STATUS_SOULTRAVEL` 512. Bei ungültigem Entity oder Nicht-NPC `0`/`false`. `SetStatusEffect` ruft die Spielfunktion `EnableStatusEffect` auf (löst dabei auch `OnStatusEffect` aus). Ob und wie das Spiel Folgen auslöst (z. B. keine Ausdauer-Regeneration bei Krankheit), hängt vom Spiel ab; Krankheit/Gift setzt das Spiel zusätzlich mit Zeitstempeln (`TimeStampDiseased/Poisoned`), die hier nicht gesetzt werden |
+
+Attribut-Kennungen: `"STR"`, `"DEX"`, `"INT"`, `"HP"`, `"MP"`, `"SP"` (Ausdauer), `"XP"`, `"LP"`, `"ALC"`, `"SMT"` (Schmiedekunst, laut Quest-Belohnungen), `"THF"` und weitere (wie `gCPlayerMemory_PS`); gesicherte Liste und Werte in [Referenz](reference.md).
+Item-Namen sind die Namen der Item-Vorlagen: `It_Wolf_Fur`, `It_Water`, `It_Plant_Health_02`, `It_1H_Longsword_01`, ... Sie erscheinen im Protokoll von `OnReceiveItem`.
+
+## Kampf, Statuseffekte und Effekte
+
+| Funktion | Beschreibung |
+|---|---|
 | `Entity::GetCurrentAttacker()` (ab Version 26) | Aktueller Gegner eines NPCs oder des Helden (`gCNPC_PS::CurrentAttackerEntity`), bei keinem Gegner oder Nicht-NPC ein ungültiges Entity. Beruht auf der KI-Zielwahl: im Kampf mit mehreren Gegnern nur eine Näherung für den Schläger |
-| `Entity::GetCategory()` / `Entity::IsBuilding()` | Grobe Einordnung eines Entities: `"NPC"`, `"Building"`, `"Object"`, `"Landscape"`, `"Border"`, `"Unnamed"` (kein Name), `"Other"`, bei ungültigem Entity leer. Beruht auf Namensmustern, die im Spiel beobachtet wurden (`G3_Myrtana_House_*` = Gebäude, `G3_Object_*` = Interaktionsobjekte, `G3_Myrtana_Landscape_*`, `G3_World_Border_*`); unbenannte Treffer (Bäume, Steine, Kleinteile) lassen sich so nicht bestimmen |
-| `Entity::GetTemplateName()` | Name der Vorlage, aus der das Entity entstand (leer, wenn unbekannt). Hilft bei unbenannten Treffern des Fadenkreuzes |
-| `Entity::GetBoundsMin()` / `GetBoundsMax()` | Hüllquader des Entities samt Kindern in Weltkoordinaten (Größe: Max − Min). Nullvektor bei ungültigem Entity |
-| `Entity::GetParent()` | Elternobjekt (das Fadenkreuz trifft oft Teilobjekte eines Gebäudes, das Elternobjekt ist dann das Gebäude). Ungültig, wenn keines da ist |
+| `Entity::GetStatusEffects()` / `Entity::HasStatusEffect(int)` / `Entity::SetStatusEffect(int, bool)` (ab Version 27) | Statuseffekte eines NPCs oder des Helden als Bitmaske (`gCNPC_PS`): `STATUS_BURNING` 1, `STATUS_FROZEN` 2, `STATUS_POISONED` 4, `STATUS_DISEASED` 8, `STATUS_TRANSFORMED` 16, `STATUS_IN_FOG` 64, `STATUS_GHOST` 128, `STATUS_IN_MAGIC_BARRIER` 256, `STATUS_SOULTRAVEL` 512. Bei ungültigem Entity oder Nicht-NPC `0`/`false`. `SetStatusEffect` ruft die Spielfunktion `EnableStatusEffect` auf (löst dabei auch `OnStatusEffect` aus). Ob und wie das Spiel Folgen auslöst (z. B. keine Ausdauer-Regeneration bei Krankheit), hängt vom Spiel ab; Krankheit/Gift setzt das Spiel zusätzlich mit Zeitstempeln (`TimeStampDiseased/Poisoned`), die hier nicht gesetzt werden |
+| `int Entity::HurtHitPoints(int amount, int minHp = 0)` (ab Version 30) | **Experimentell.** Zieht einem NPC `amount` Lebenspunkte ab (`gCDamageReceiver_PS::SetHitPoints`), nicht unter `minHp`; liegen die Lebenspunkte schon bei oder unter `minHp`, passiert nichts. Rückgabe: neue Lebenspunkte, `-1` bei Fehler. Der Abzug erscheint in `OnDamage` **ohne Angreifer und Waffe** (Besitzer ungültig); aus `OnDamage` heraus aufgerufen wird er nicht noch einmal gemeldet. **Tötet nicht:** Bei 0 Lebenspunkten bleibt der NPC stehen (der Tod entsteht nur in der Treffer-Kette); für echten Zauberschaden siehe `beliars_klaue` (Beschwörung mit Besitzer). |
+| `bool Entity::DoDamage(const Entity &in angreifer, int amount, int type)` (ab Version 30) | **Veraltet, nicht mehr benutzen.** Bleibt aufrufbar, schreibt aber beim ersten Aufruf je Mod eine Warnung ins Protokoll. Verdreht: `this` ist das **Opfer**, das Argument der **Angreifer**, der Schaden kommt aus den Schadensdaten des Angreifers (gemessen: `hero.DoDamage(wolf, 40, 6)` ließ den Wolf den Helden mit seinen 23 Punkten treffen; `amount` und `type` wirkten nicht). Einen Ersatz, der eine vorgegebene Menge abzieht und tötet, gibt es noch nicht. **Verletzen und töten:** Blitz-Beschwörung mit Besitzer (`SpawnNPC("Smn_Lightning", ...)` am Opfer + `SetEntityRef(blitz, "gCInteraction_PS", "Owner", GetHero())`, Muster in `examples/mods/beliars_klaue`; Schaden rechnet das Spiel selbst, trifft auch Umstehende). **Nur Lebenspunkte senken** (tötet nicht): `HurtHitPoints` |
+| `bool EffectExists(const bCString &in name)` und `bool StartEffect(const bCString &in name, const Entity &in at)` (global, ab Version 30) | Prüft bzw. startet einen benannten Effekt der Effektverwaltung am Entity (`EffectSystem::StartEffect`), z. B. `"eff_magic_summonlightning_target_01"` (der Blitz von „Blitz beschwören“). Die Namen stehen in den Zaubervorlagen (`EffectItemCast`, `EffectTargetCast` ...). `false`, wenn der Effekt unbekannt ist. Der Effekt hat keinen Schaden, nur Optik |
+
+## Talente
+
+| Funktion | Beschreibung |
+|---|---|
+| `bool Entity::LearnSkill(name)`, `ActivateSkill(name)`, `DeactivateSkill(name)`, `bool HasLearnedSkill(name)`, `bool IsSkillActive(name)`, `int GetSkillActivationCount(name)` (ab Version 30) | Talente im Inventar des Helden (`gCInventory_PS`). `name` ist die Talent-Vorlage, z. B. `"Perk_1H_1"`. Gelernte Talente stehen als Stapel im Inventar, `ActivateSkill` zählt den Aktivierungszähler hoch (so macht es eine Waffe mit `ActivateSkill1/2`, solange sie geführt wird), `DeactivateSkill` zählt herunter. Ersatz für das nicht schreibbare `ActivateSkill2`. `false`/`-1` bei unbekanntem Talent oder ohne Inventar |
+
+## Eigenschaften lesen und schreiben
+
+| Funktion | Beschreibung |
+|---|---|
+| `bCString GetProperty(const Entity &in e, const bCString &in set, const bCString &in prop)` (global, ab Version 29) | Liest eine Eigenschaft des Eigenschaftssets eines Entities **als Text**, über den allgemeinen Eigenschaftszugriff der Engine. `set` ist der Typ des Sets, z. B. `"Item"`, `"gCItem_PS"`, `"Damage"`, `"NPC"`, `"Inventory"` (alle Werte von `eEPropertySetType`, Groß-/Kleinschreibung egal); `prop` der Eigenschaftsname wie im SDK (`"GoldValue"`, `"RequiredSkill1"`, `"DamageAmount"`). Leer, wenn Entity, Set oder Eigenschaft fehlen. Nur Lesen. Der Textwert kommt von `ConvertValueToString` und ist bei Verweisen (Vorlagen, Entities) und Listen nicht immer aussagekräftig |
+| `bCString ListProperties(const Entity &in e, const bCString &in set, int max = 200)` (global, ab Version 29) | Alle Eigenschaften des Sets samt Basisklassen als `"Name=Wert;Name=Wert;..."` (höchstens `max`, bis 600; Semikolons in Werten werden zu Leerzeichen). Zum Herausfinden, was ein Item, ein Zauber oder ein NPC im Spiel wirklich enthält; die Mod `property_inspect` zeigt es |
+| `bool SetProperty(const Entity &in e, const bCString &in set, const bCString &in prop, const bCString &in value)` (global, ab Version 29) | **Experimentell.** **Schreibt** eine Eigenschaft aus Text (`ConvertStringToValue`, Zuweisen). `true`, wenn die Eigenschaft existiert und der Aufruf ohne Fehler lief; ob der Wert so gelesen wurde, mit `GetProperty` prüfen. **Textwerte (z. B. `Tag`) lassen sich schreiben; Referenz-Eigenschaften auf andere Vorlagen (z. B. `ActivateSkill2`) nicht: `true` ohne Wirkung, getestet mit 11 Schreibformen (Name, Name+GUID, GUID mit/ohne Klammern).** Nur an Vorlagen und Entities verwenden, die die Mod selbst angelegt hat (`CloneTemplate`); ob Änderungen an Vorlagen in Spielständen bleiben, ist nicht untersucht. |
+| `bool SetTemplateRef(const Entity &in e, const bCString &in klasse, const bCString &in prop, const bCString &in ziel)` (global, ab Version 30) | **Experimentell.** Setzt eine **Verweis-Eigenschaft** auf eine Vorlage, z. B. `SetTemplateRef(waffe, "gCItem_PS", "ActivateSkill2", "Perk_Lifesteal")` oder `(lernItem, "gCItem_PS", "Skill", ...)`. `klasse` ist der Klassenname des Eigenschaftssets, `prop` der Name ohne Präfix (es wird `gCxxx_PS::Access<prop>()` aufgerufen, dann `eCTemplateEntityProxy::SetEntity`). Ersatz für `SetProperty` bei Verweisen, die per Text nicht gehen. Nur für Vorlagen, die die Mod selbst angelegt hat. |
+| `bool SetEntityRef(const Entity &in e, const bCString &in klasse, const bCString &in prop, const Entity &in ziel)` (global, ab Version 30) | **Experimentell.** Setzt eine **Entity-Verweis-Eigenschaft**, z. B. `SetEntityRef(beschwoerung, "gCInteraction_PS", "Owner", GetHero())` (wem gehört die Beschwörung/das Geschoss; davon hängt ab, wen der Schaden als Besitzer meldet). `klasse` ist der Klassenname des Sets, `prop` der Name ohne Präfix. Gegenstück zu `SetTemplateRef` (das für Vorlagen gilt). |
+
+## Gruppe (Party)
+
+| Funktion | Beschreibung |
+|---|---|
+| `int Entity::GetPartyMemberCount()`, `Entity GetPartyMember(int)`, `Entity GetPartyLeader()`, `bool IsPartyWaiting()`, `bool SetPartyWaiting(bool)` (ab Version 33) | Gruppe (`gCParty_PS`): Die Mitglieder stehen beim **Anführer** (beim Helden seine Begleiter, Beschwörungen, Sklaven), jedes Mitglied verweist mit `GetPartyLeader` auf ihn. `-1`/ungültig ohne Gruppen-Set. Die Art steht in `GetProperty(m, "Party", "PartyMemberType")` (1 Party, 2 Mob, 3 Slave, 4 Controlled, 5 Summoned). `IsPartyWaiting` = der Held hat „Warte hier“ gesagt. Im Spiel bestätigt (`teleport_party`) |
+
+## Händler
+
+| Funktion | Beschreibung |
+|---|---|
+| `bool Entity::GenerateTradeGoods()` (ab Version 37) | **Experimentell.** Erzeugt die Händlerware aus den Schatz-Sets des Entity neu (wie das Spiel; löst `Override_TradeGenerate`/`OnTradeGenerated` aus). Gemessen bei Jens: true, Stapelzahl 19 vorher und nachher (ob dabei andere Items entstehen, ist noch nicht geprüft) |
+
+## Fokus und Fadenkreuz
+
+| Funktion | Beschreibung |
+|---|---|
 | `Entity GetFocusedEntity()` (global) | Das Entity, das der Held gerade anvisiert (Fokusname/Interaktion, `gCFocus_PS::GetFocusEntity`). Ungültiges Entity, wenn nichts anvisiert wird. Im Spiel bestätigt; Beispiel `examples/mods/focus_demo` (F7) |
 | `Entity PickCenter(float maxDistance = 100000)` (global) | Das Entity genau in der Bildmitte (unter dem Fadenkreuz) samt **exaktem Trefferpunkt** (`GetPickPoint()`): die Engine schießt von der aktuellen Kamera einen Strahl (`eCCameraBase::PointToRay` + `eCPhysicsScene::TraceRayNearestHit`), der **Held wird dabei ausgeschlossen** (sonst träfe die Verfolgerkamera zuerst den Helden). Ungültiges Entity, wenn nichts getroffen wird. Im Spiel bestätigt |
 | `Entity PickScreen(int x, int y, float maxDistance = 100000)` (global) | Dasselbe für einen beliebigen Bildschirmpixel (Pixel der Client-Fläche des Spielfensters), z. B. für eine Mausposition |
 | `bCVector GetPickPoint()` / `bool HasPickPoint()` (global) | Weltpunkt des letzten `PickCenter`/`PickScreen`-Treffers und ob es einen gab. Damit: `SpawnNPC("Diego", GetPickPoint())` |
 | `Entity GetCrosshairEntity()` (global) | Das Entity unter dem Fadenkreuz (`gCFocus_PS::GetCrossHairEntity` des Spielers). Ungültig, wenn keines getroffen wird. Im Spiel bestätigt |
-| `bCVector GetPickPosition()` (global) | `gCFocus_PS::GetCurrentPickPosition`. **Liefert im Spiel immer den Nullvektor** (auch bei sichtbarem Fadenkreuz); stattdessen `PickCenter()` und `GetPickPoint()` benutzen |
-| `bool SetCrosshairVisible(bool on)` (global) | Schaltet das Fadenkreuz des Spielers ein oder aus (`gCFocus_PS::SetDrawCrossHair`). Versuch, den Zielpunkt zu aktualisieren, wenn `GetPickPosition()` nur den Nullvektor liefert |
-| `Entity SpawnNPC(const bCString &in templateName, const bCVector &in position)` (global) | Erzeugt aus einer Vorlage ein Entity (NPC, Objekt) in der Spielwelt: `gCWorld::CreateDynamicEntity` + `eCEntity::CreateFromTemplate`, dann Position. Gibt das Entity zurück (ungültig bei Fehler, Code im Protokoll: `-2` Vorlage unbekannt, `-5` keine Welt, `-6`/`-7` Erzeugen fehlgeschlagen). Der Vorlagenname muss exakt stimmen, siehe `FindTemplateNames`. Im Spiel bestätigt |
-| `int CountTemplateNames(const bCString &in prefix)` (global, ab Version 28) | Anzahl der Vorlagen, deren Name mit `prefix` beginnt (mit Mehrfachnennungen, wie `FindTemplateNames`); billig, ohne die Namen zu lesen. `-1` ohne Spiel |
-| `bCString FindTemplateNames(const bCString &in prefix, int max = 20)` (global) | Sucht Vorlagen, deren Name mit `prefix` **beginnt** (gemessen: `Teleport` findet `Teleport_Ardea`, aber nicht `Spl_Teleport_Ardea`; `_` findet nur Namen mit `_` am Anfang; **Groß-/Kleinschreibung wird ignoriert**, gemessen: `BEARD_HE` und `BEaRD_hE` liefern dasselbe): `"Name1;Name2;..."`, leer ohne Treffer. Jede Abfrage kostet etwa 3 ms je Treffer; Skripte werden nach 5 Sekunden abgebrochen, lange Listen deshalb auf mehrere Bilder verteilen (siehe `reference_dump`). Namen kommen meist doppelt vor. `max` ist bis 20000 möglich (bis Version 28 war es auf 200 begrenzt, längere Listen wurden abgeschnitten) |
-| `bool DestroyNPC(const Entity &in)` (global) | Entfernt ein mit `SpawnNPC` erzeugtes Entity wieder (`gCWorld::DestroyDynamicEntity`). Nur NPCs (Entities mit `gCNPC_PS`), und nur solche dieser Sitzung oder aus dem Systemsektor der Welt (dorthin gehören erzeugte NPCs, auch nach Speichern und Laden). Welt-Objekte (auch im Systemsektor, z. B. `G3_World_Border_001`), Welt-NPCs, Held und Spieler werden abgelehnt (`false`, Grund im Protokoll). Den Griff danach nicht mehr verwenden |
-| `bool IsNPC(const Entity &in)` (global) | `true`, wenn das Entity ein NPC ist (hat ein `gCNPC_PS`) |
-| `bool IsDynamicSpawn(const Entity &in)` (global) | `true`, wenn das Entity ein NPC im Systemsektor ist (per `SpawnNPC` erzeugt oder ähnlich dynamisch) und nicht Held/Spieler |
-| `int CountEntities(const bCString &in part)` / `Entity GetEntityByPart(const bCString &in part, int index)` (global) | Entities nach Teilname suchen: Anzahl und Eintrag. Beim Entfernen rückwärts durchlaufen |
-| `bool Entity::SetRotation(const bCQuaternion &in)` | Setzt die Drehung (`SetLocalRotation`; Y ist oben). Für erzeugte NPCs = Weltdrehung |
-| `bool Entity::LookAt(const Entity &in target, float yawOffsetDegrees = 0)` | Dreht das Entity um die Hochachse zum Ziel (Gier = atan2(dx, dz)). Schaut es vom Ziel weg, Versatz 180 angeben |
+| `bCVector GetPickPosition()` (global) | **Funktioniert nicht.** `gCFocus_PS::GetCurrentPickPosition`. **Liefert im Spiel immer den Nullvektor** (auch bei sichtbarem Fadenkreuz); stattdessen `PickCenter()` und `GetPickPoint()` benutzen |
+| `bool SetCrosshairVisible(bool on)` (global) | **Experimentell.** Schaltet das Fadenkreuz des Spielers ein oder aus (`gCFocus_PS::SetDrawCrossHair`). Versuch, den Zielpunkt zu aktualisieren, wenn `GetPickPosition()` nur den Nullvektor liefert |
 
-Attribut-Kennungen: `"STR"`, `"DEX"`, `"INT"`, `"HP"`, `"MP"`, `"SP"` (Ausdauer), `"XP"`, `"LP"`, `"ALC"`, `"SMT"` (Schmiedekunst, laut Quest-Belohnungen), `"THF"` und weitere (wie `gCPlayerMemory_PS`); gesicherte Liste und Werte in [Referenz](reference.md).
-Item-Namen sind die Namen der Item-Vorlagen: `It_Wolf_Fur`, `It_Water`, `It_Plant_Health_02`, `It_1H_Longsword_01`, ... Sie erscheinen im Protokoll von `OnReceiveItem`.
+## Spielskripte
 
+| Funktion | Beschreibung |
+|---|---|
+| `int CallScript(const bCString &in name, const Entity &in self, const Entity &in other, int arg = 0)` (global, ab Version 32) | **Experimentell.** Ruft ein Spielskript der `Script_*.dll` nach Namen auf (`gCScriptAdmin::CallScriptFromScript`, so wie die Spielskripte einander aufrufen), z. B. `CallScript("GetAttitude", npc, GetHero())`. Rückgabe = Ergebnis des Skripts; 0, wenn es das Skript nicht gibt (Meldung im Protokoll) oder das Spiel gerade keine Skripte ausführt. Ein leeres `Entity` steht für „None“. Skripte mit Wirkung (z. B. `SetHitPoints`) greifen sofort ins Spiel ein. Gemessen (2026-11-09): `IsHumanoid` liefert 1 für Held und NPC; das Spiel selbst ruft z. B. `GetStaminaPoints(npc, None, 0)` (Ausdauer) und `GetAttitude(npc, anderer, 0)` (2 Neutral, 4 Feindlich). **Nicht** nach Namen erreichbar sind Skripte, die `Script_Game.dll` intern direkt aufruft (`AssessHit`, `IsDeadlyDamage`, `CanBurn`: im Spiel nie über den Namen gelaufen); für Treffer ist `OnHit` der Einstieg. |
+| `bool ScriptExists(const bCString &in name)`, `bCString GetScriptDll(const bCString &in name)` (global, ab Version 32) | Gibt es ein Spielskript dieses Namens, und in welcher `Script_*.dll` steht es? Die Script-DLLs lädt das Spiel erst nach `main()`; ab `OnWorldActivate` fragen |
+| `void WatchScript(const bCString &in name)`, `void SetScriptResult(int value)` (global, ab Version 32) | Meldet ein Spielskript für `Override_Script`/`OnScript` an (Groß-/Kleinschreibung egal, einmal reicht, gilt für alle Mods). `SetScriptResult` setzt in `Override_Script` das Ergebnis fürs Spiel, wenn das Original nicht aufgerufen wird |
+
+## Konsole
+
+| Funktion | Beschreibung |
+|---|---|
+| `void SetConsoleReply(const bCString &in text)`, `bool OpenConsole()` (global, ab Version 35) | Antwort des gerade laufenden Konsolenbefehls (nur in `Override_ConsoleCommand`); `OpenConsole` öffnet die Konsole, sichtbar ist sie aber nur im Marvin-Modus |
 ## Quests
 
 Ausführlich auf der Seite [Quests](quests.md).
@@ -132,7 +202,8 @@ Ausführlich auf der Seite [Quests](quests.md).
 | `int GetQuestCount()`, `bCString GetQuestNameAt(int)` | Alle Quests des Spiels aufzählen |
 | `bool ReloadQuestFiles()` | `LoadQuestsFromInis` |
 | `bCString GetQuestDir()`, `GetQuestFilePath(name)` | Pfade der Quest-Dateien laut Spiel |
-| `bool DumpQuest(name, path)`, `LoadQuestFile(name, path)` | Quest in/aus Datei (bisher ohne Erfolg im Spiel) |
+| `bool DumpQuest(name, path)`, `LoadQuestFile(name, path)` | **Funktioniert nicht.** Quest in/aus Datei; im Spiel immer `false` (Format der `.quest`-Dateien unbekannt) |
+| `void QuestDebug()` | Diagnose: schreibt die Rohwerte der Questliste des Spiels ins Protokoll (zur Fehlersuche bei `GetQuestCount`) |
 | `bool SetQuestReward(name, attribut, menge)`, `bCString GetQuestReward(name)` | Attribut-Belohnung der Quest (z. B. `"DEX"`, 1): erscheint in der Erfolgsmeldung und wird vom Spiel vergeben |
 | `bCString DescribeQuestRewards()` | Alle Attribut-Kennungen, die Quests des Spiels vergeben |
 | Konstanten | `QUEST_OPEN=0`, `QUEST_RUNNING=1`, `QUEST_SUCCESS=2`, `QUEST_FAILED=3`, `QUEST_OBSOLETE=4`, `QUEST_CANCELLED=5`, `QUEST_LOST=6`, `QUEST_WON=7` |
@@ -151,6 +222,7 @@ Ausführlich auf der Seite [Quests](quests.md).
 
 Siehe [Dialoge](dialogs.md): `GetInfoCount`, `GetInfoName`, `GetInfoOwner`, `DescribeInfo`, `DescribeCommands`, `InfoExists`, `CreateInfo`, `RemoveInfo`, `SetInfoQuest`, `SetInfoParent`,
 `SetInfoType`, `SetInfoCondition`, `AddInfoLine`, `RebuildInfos`, `SetInfoGiven`, `IsInfoGiven`; Konstanten `INFO_COND_*` und `INFO_TYPE_*`.
+`bool ExecuteInfo(name)` (Skript einer Info ohne Gesprächsfenster ausführen) ist aufrufbar, **funktioniert** im Spiel aber **nicht** (kein `OnInfoFinished`).
 
 ## Typen
 
@@ -171,7 +243,7 @@ Felder, `GetMagnitude()`, `Normalize()`. `bCVector2` hat zusätzlich `+`, `-`, `
 `GetElement(row, col)`, `SetElement(row, col, f)`, `SetIdentity()`, `Transpose()`, `Invert()`, `* Matrix`, `* Vektor`,
 `SetToRotationAxisX/Y/Z(Bogenmaß)`, `SetToRotation(bCQuaternion)`.
 
-### `bCMatrix4` (Standard = Einheit, Version 19)
+### `bCMatrix4` (Standard = Einheit, ab Version 19)
 4x4-Matrix der Engine (`bCMatrix`), Speicherlage 16 Floats zeilenweise. **Zeilenvektor-Konvention** (`v' = v * M`): Zeilen 0 bis 2 sind die Achsen X, Y, Z, Zeile 3 die Verschiebung.
 `GetElement(row, col)`, `SetElement(row, col, f)`, `SetIdentity()`, `Transpose()`, `Invert()`, `GetInverted()`, `GetDeterminant()`, `* bCMatrix4`, `* bCVector` (Punkt mit Verschiebung transformieren),
 `GetTranslation()`, `SetTranslation(v)`, `GetXAxis()`, `GetYAxis()`, `GetZAxis()`, `SetToTranslation(v)`, `SetToScaling(v)`, `SetToRotation(bCQuaternion)`,

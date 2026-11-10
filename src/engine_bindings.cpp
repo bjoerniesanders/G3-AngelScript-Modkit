@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Engine-/Game-Bindings des OG3-Patches (Skript-Schnittstelle ab Version 2): Typ Entity (Held, Spieler, Entity nach Namen),
 // Name, Position, Rotation, Abstand, Position setzen.
 // Alle Funktionen werden bei der ersten Benutzung aus Engine.dll/Game.dll aufgeloest (die DLLs laden nach dem Proxy).
@@ -12,6 +14,7 @@
 #include <cstring>
 #include <map>
 #include <new>
+#include <set>
 #include <string>
 
 #include "sb_api.h"
@@ -1853,8 +1856,10 @@ int EntDeleteItemStack(Entity& e, const SStr& name) {
     return inv && SafeDeleteStacks(inv, &name, &r) ? r : -1;
 }
 
-// Schaden verursachen (API 30): Script.dll Entity::DoDamage(victim, amount, gEDamageType) ruft gCEntity::DoDamage mit diesem Entity als Angreifer (this) auf.
-// Der Treffer geht durch die Schadensberechnung des Spiels (OnDamage mit owner = this). Entity in Script.dll = Zeiger auf eCEntity, wie unsere Struktur Entity.
+// VERALTET (markiert bei API 39, bleibt aufrufbar): Script.dll Entity::DoDamage(other, amount, gEDamageType). Gemessen 2026-11-06: verdreht - this (hier "attacker") ist das
+// OPFER, das Argument der Angreifer, und die Menge kommt aus dessen Schadensdaten; amount und type wirken nicht. Verletzen und toeten: Blitz-Beschwoerung
+// (beliars_klaue), nur Lebenspunkte senken: HurtHitPoints. Beim ersten Aufruf je Mod eine Warnung im Protokoll.
+// Entity in Script.dll = Zeiger auf eCEntity, wie unsere Struktur Entity.
 typedef void(__thiscall* DoDamageFn)(const Entity*, const Entity*, unsigned, int);
 bool SafeDoDamage(DoDamageFn fn, const Entity& attacker, const Entity& victim, int amount, int type) {
     __try {
@@ -1862,11 +1867,18 @@ bool SafeDoDamage(DoDamageFn fn, const Entity& attacker, const Entity& victim, i
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
+void WarnDeprecatedOnce(const char* what, const char* hint) {
+    static std::set<std::string> warned;
+    ScriptHost* h = ScriptHost::s_current;
+    if (!h) return;
+    const std::string key = std::string(h->CurrentMod()) + "|" + what;
+    if (!warned.insert(key).second) return;
+    h->Log(std::string("[") + h->CurrentMod() + "] VERALTET: " + what + " - " + hint);
+}
 bool EntDoDamage(const Entity& attacker, const Entity& victim, int amount, int type) {
+    WarnDeprecatedOnce("Entity.DoDamage", "this ist das Opfer, Menge/Art wirken nicht; siehe api-reference.md (Blitz-Beschwoerung, HurtHitPoints)");
     static DoDamageFn fn = nullptr;
-    static bool tried = false;
-    if (!tried) {
-        tried = true;
+    if (!fn) {   // Script.dll laedt erst nach main(): erst festhalten, wenn gefunden
         if (HMODULE script = GetModuleHandleA("Script.dll")) fn = reinterpret_cast<DoDamageFn>(GetProcAddress(script, "?DoDamage@Entity@@QAEXABV1@KW4gEDamageType@@@Z"));
     }
     if (!fn || !EntIsValid(attacker) || !EntIsValid(victim) || amount <= 0) return false;
@@ -2152,8 +2164,8 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterObjectMethod("Entity", "bool IsSkillActive(const bCString &in) const", asFUNCTION(EntIsSkillActive), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "int GetSkillActivationCount(const bCString &in) const", asFUNCTION(EntSkillActivationCount), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "int DeleteItemStack(const bCString &in)", asFUNCTION(EntDeleteItemStack), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool DoDamage(const Entity &in attacker, int amount, int type)", asFUNCTION(EntDoDamage), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "int HurtHitPoints(int amount, int minHp = 0)", asFUNCTION(EntHurtHP), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool DoDamage(const Entity &in attacker, int amount, int type)", asFUNCTION(EntDoDamage), asCALL_CDECL_OBJFIRST));   // veraltet (markiert bei API 39)
+    OG3_REG(e->RegisterObjectMethod("Entity", "int HurtHitPoints(int amount, int minHp = 0)", asFUNCTION(EntHurtHP), asCALL_CDECL_OBJFIRST));   // experimentell
     OG3_REG(e->RegisterGlobalFunction("int CloneTemplate(const bCString &in base, const bCString &in newName)", asFUNCTION(CloneTemplate),
                                       asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("Entity SpawnNPC(const bCString &in templateName, const bCVector &in position)", asFUNCTION(SpawnNPC),
@@ -2164,8 +2176,8 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("bool HasPickPoint()", asFUNCTION(HasPickPoint), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("Entity GetFocusedEntity()", asFUNCTION(GetFocusedEntity), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("Entity GetCrosshairEntity()", asFUNCTION(GetCrosshairEntity), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetCrosshairVisible(bool)", asFUNCTION(SetCrosshairVisible), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCVector GetPickPosition()", asFUNCTION(GetPickPosition), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool SetCrosshairVisible(bool)", asFUNCTION(SetCrosshairVisible), asCALL_CDECL));   // experimentell
+    OG3_REG(e->RegisterGlobalFunction("bCVector GetPickPosition()", asFUNCTION(GetPickPosition), asCALL_CDECL));   // funktioniert nicht (immer Nullvektor)
     OG3_REG(e->RegisterGlobalFunction("bool DestroyNPC(const Entity &in)", asFUNCTION(DestroyNPC), asCALL_CDECL));
     OG3_REG(e->RegisterObjectMethod("Entity", "bCString GetCategory() const", asFUNCTION(EntCategory), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetCurrentAttacker() const", asFUNCTION(EntCurrentAttacker), asCALL_CDECL_OBJFIRST));
@@ -2203,9 +2215,9 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
         }
     }
     OG3_REG(e->RegisterGlobalFunction("bCString GetProperty(const Entity &in, const bCString &in set, const bCString &in prop)", asFUNCTION(GetPropertyText), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetProperty(const Entity &in, const bCString &in set, const bCString &in prop, const bCString &in value)", asFUNCTION(SetPropertyText), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetTemplateRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const bCString &in target)", asFUNCTION(SetTemplateRefScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetEntityRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const Entity &in target)", asFUNCTION(SetEntityRefScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool SetProperty(const Entity &in, const bCString &in set, const bCString &in prop, const bCString &in value)", asFUNCTION(SetPropertyText), asCALL_CDECL));   // experimentell
+    OG3_REG(e->RegisterGlobalFunction("bool SetTemplateRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const bCString &in target)", asFUNCTION(SetTemplateRefScript), asCALL_CDECL));   // experimentell
+    OG3_REG(e->RegisterGlobalFunction("bool SetEntityRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const Entity &in target)", asFUNCTION(SetEntityRefScript), asCALL_CDECL));   // experimentell
     OG3_REG(e->RegisterObjectMethod("Entity", "int GetPartyMemberCount() const", asFUNCTION(EntPartyCount), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetPartyMember(int index) const", asFUNCTION(EntPartyMember), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetPartyLeader() const", asFUNCTION(EntPartyLeader), asCALL_CDECL_OBJFIRST));
@@ -2213,7 +2225,7 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterObjectMethod("Entity", "bool SetPartyWaiting(bool)", asFUNCTION(EntSetPartyWaiting), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "bool TeleportTo(const Entity &in target)", asFUNCTION(EntTeleportTo), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "int GetInventoryStackCount() const", asFUNCTION(EntStackCount), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool GenerateTradeGoods()", asFUNCTION(EntGenerateTradeGoods), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool GenerateTradeGoods()", asFUNCTION(EntGenerateTradeGoods), asCALL_CDECL_OBJFIRST));   // experimentell
     OG3_REG(e->RegisterGlobalFunction("bool EffectExists(const bCString &in name)", asFUNCTION(EffectExistsScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool StartEffect(const bCString &in name, const Entity &in at)", asFUNCTION(StartEffectScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("Entity GetTemplateEntity(const bCString &in name)", asFUNCTION(GetTemplateEntityScript), asCALL_CDECL));
@@ -2237,7 +2249,7 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("int GetGameDay()", asFUNCTION(GameDay), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("int GetGameHour()", asFUNCTION(GameHour), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("int GetGameMinute()", asFUNCTION(GameMinute), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetGameTime(int day, int hour, int minute)", asFUNCTION(SetGameTime), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool SetGameTime(int day, int hour, int minute)", asFUNCTION(SetGameTime), asCALL_CDECL));   // im Spiel nicht geprueft
     OG3_REG(e->RegisterGlobalFunction("float GetTimeScale()", asFUNCTION(GetTimeScaleScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool SetTimeScale(float scale)", asFUNCTION(SetTimeScaleScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("float GetClockFactor()", asFUNCTION(GetClockFactorScript), asCALL_CDECL));

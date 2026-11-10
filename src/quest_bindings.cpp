@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Quest-Bindings des OG3-Patches (Skript-Schnittstelle ab Version 6): Questsystem des Spiels steuern.
 // Quellen im Spiel: Game.dll gCQuestManager_PS (Singleton, GetInstance) und gCQuest_PS. Quests liegen als ini-Dateien im Quest-Verzeichnis
 // (Data\Quests.pak bzw. Ordner Quests); der Manager laedt sie beim Start (LoadQuestsFromInis).
@@ -603,9 +605,9 @@ bool RegisterQuestBindings(asIScriptEngine* e) {
         e->RegisterGlobalFunction("bool SetQuestTopic(const bCString &in, const bCString &in)", asFUNCTION(SetQuestTopic), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool SetQuestDescription(const bCString &in, const bCString &in)", asFUNCTION(SetQuestDescription),
                                       asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool DumpQuest(const bCString &in, const bCString &in)", asFUNCTION(DumpQuest), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool DumpQuest(const bCString &in, const bCString &in)", asFUNCTION(DumpQuest), asCALL_CDECL));   // funktioniert nicht
     OG3_REG(
-        e->RegisterGlobalFunction("bool LoadQuestFile(const bCString &in, const bCString &in)", asFUNCTION(LoadQuestFile), asCALL_CDECL));
+        e->RegisterGlobalFunction("bool LoadQuestFile(const bCString &in, const bCString &in)", asFUNCTION(LoadQuestFile), asCALL_CDECL));   // funktioniert nicht
     OG3_REG(e->RegisterGlobalFunction("int GetQuestCount()", asFUNCTION(GetQuestCount), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bCString GetQuestNameAt(int)", asFUNCTION(GetQuestNameAt), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool SetQuestReward(const bCString &in, const bCString &in, int)", asFUNCTION(SetQuestReward),

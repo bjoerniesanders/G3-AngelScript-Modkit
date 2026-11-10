@@ -1,58 +1,99 @@
 # Grenzen und Stand
 
-Stand: 2026-11-02, Skript-Schnittstelle Version 28.
+Stand: 2026-11-10, Skript-Schnittstelle Version 39 (Alpha). Was sich zwischen Versionen ändern darf: [Versionsregeln](api-policy.md).
+Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke **Experimentell**, **Im Spiel nicht geprüft**, **Funktioniert nicht** oder **Veraltet**.
 
 ## Im Spiel geprüft
 
-- Mods laden, Hot-Reload, Fehlerisolation; Ereignisse `OnKey`, `OnFrame`, `OnWorldActivate/Deactivate`
-- Alle sechs Spielereignisse (`OnNPCKilled`, `OnNPCDefeated`, `OnReceiveItem` mit Itemname, `OnEnter`/`OnLeave`, `OnSpellCast`)
-- Attribute lesen und ändern, `PrintScreen`
-- Quests anlegen, starten, abschließen, scheitern lassen, Status lesen, Titel, Beschreibung, XP, Attribut-Belohnung (Erfolgsmeldung zeigt sie)
-- Inventar: Items zählen, entfernen und erzeugen (`AddItems`)
-- Dialoge lesen (4593 Infos) und eigene anlegen: Optionen erscheinen im Gesprächsmenü, Zeilen kommen ins Questlog, `OnInfoFinished`
-- Speichern und Laden: eigene Quests und Dialoge kommen mit Status und Questlog zurück (über `OnQuestsLoaded`/`OnInfosLoaded`), auch nach erneutem Speichern
-- Schalter im Spielstand (`SetGameEvent` und Co.)
-- Vorlagen klonen (`CloneTemplate`) mit fester ID, eigenem Namen/Text (`RegisterText`): Klon-Items bleiben nach Speichern, Laden und Neustart im Inventar (ein Neustart-Test, Stapel mit neuen Items funktioniert)
-- NPCs erzeugen und entfernen (`SpawnNPC`, `DestroyNPC`, `LookAt`, `IsNPC`), auch NPCs aus früheren Sitzungen nach dem Laden (Systemsektor + NPC-Prüfung); Welt-NPCs, Held und Welt-Objekte werden abgelehnt
-- Fokus und Fadenkreuz: `GetFocusedEntity` (anvisierter NPC/Objekt), `PickCenter`/`GetPickPoint` (Entity unter dem Fadenkreuz mit exaktem Weltpunkt, Held ausgeschlossen), Kategorien `NPC`/`Building`/`Object`/`Landscape`/`Border`; Spawn am Zielpunkt bestätigt
-- Override-Hooks mit `Super()`: `Override_ReceiveItem` (Protokoll) und `Override_InfoAvailable` (Dialogoption nachts verborgen)
+**Grundlagen**
+- Mods laden, Hot-Reload, Fehlerisolation, Mods standardmäßig aus (`mod.ini`) und per `load_order.txt` zuschaltbar; Ereignisse `OnKey`, `OnFrame`, `OnWorldActivate/Deactivate`
+- Eine Spielsitzung mit 14 Beispiel-Mods ohne Fehlerzeilen, auch nach der Absicherung aller Hooks gegen Nullzeiger der Engine (2026-11-10)
+- Gleitkomma-Zustand der Engine bleibt erhalten (x87-Steuerwort durchgehend `007F`)
+
+**Ereignisse und Overrides**
+- Die sechs Questsystem-Ereignisse (`OnNPCKilled`, `OnNPCDefeated`, `OnReceiveItem` mit Itemname, `OnEnter`/`OnLeave`, `OnSpellCast`)
+- Schaden: `Override_Damage`/`OnDamage` für NPCs und den Helden, bei Menschen, Tieren, Zaubern und Sturz, mit Waffe/Geschoss, Verursacher und Trefferart; Menge ändern und Treffer verhindern
+- `OnStatusEffect` (Krankheit beim Waranbiss), `Override_InfoAvailable`, `Override_ReceiveItem`
+- Speichern: `OnBeforeSave`/`OnAfterSave` laufen genau einmal je Speichern (Menü und Schnellspeichern) im Spiel-Thread
+- Spielskripte nach Namen: `CallScript`, `Override_Script`/`OnScript` für angemeldete Namen (`WatchScript`)
+- Konsole (`Override_ConsoleCommand`), Quest-Status (`OnQuestStatus`), Berührung (`OnTouch`), Händlerware (`OnTradeGenerated`)
+
+**Spielwelt**
+- Attribute lesen und ändern, Inventar (zählen, entfernen, erzeugen, Stapel löschen), Item-Qualität mit eigener Zeile „Lebensraub“ in der Beschreibung
+- Eigene Talente mit Kachel im Charakterbogen (`perk_lifesteal`); Abschalten mit `ENTFERNEN = true`, dann Spielstand ohne Mod ohne Absturz
+- Verletzen und Töten über die Blitz-Beschwörung mit Besitzer (`beliars_klaue`), Effekte starten (`StartEffect`)
+- Vorlagen klonen (`CloneTemplate`) mit fester ID; Klon-Items bleiben nach Speichern, Laden und Neustart erhalten
+- NPCs erzeugen und entfernen (`SpawnNPC`, `DestroyNPC`), auch aus früheren Sitzungen; Welt-NPCs, Held und Welt-Objekte werden abgelehnt
+- Fokus und Fadenkreuz (`GetFocusedEntity`, `PickCenter`/`GetPickPoint`, Kategorien), Gruppe und Teleport (`TeleportTo`, `SetPosition`, `teleport_party`)
+- Zeitrate (`SetTimeScale`) und Uhrfaktor (`SetClockFactor`)
+- Eigenschaften lesen (`GetProperty`, `ListProperties`, `property_inspect`)
+
+**Quests, Dialoge, Dateien**
+- Quests anlegen, starten, abschließen, scheitern lassen, Status, Titel, Beschreibung, XP, Attribut-Belohnung; Questliste aller 571 Quests
+- Dialoge lesen (4593 Infos) und eigene anlegen: Optionen im Gesprächsmenü, Zeilen im Questlog, `OnInfoFinished`
+- Eigene Quests und Dialoge kommen nach Speichern und Laden mit Status und Questlog zurück (`OnQuestsLoaded`/`OnInfosLoaded`); Schalter im Spielstand (`SetGameEvent`)
+- Datei-Patches auf Quest-Dateien (`patch_demo`); Mod-Archive (`PackMod`) werden geladen und überschreiben vorhandene Dateien
+- Zeichnen über HUD und Inventar: Text (`DrawText`) und Bilder aus den GUI-Daten (`DrawImage`), `WorldToScreen`
+
+**Installationen:** Entwicklerinstallation und eine stark gemoddete Steam-Kopie, siehe `docs/compatibility.md` im Repository.
 
 ## Nicht oder nur teilweise geprüft
 
-- **Datei-Patches** ([Datei-Patches](patches.md)): im Spiel bestätigt für Quest-Dateien (`patch_demo`: `Abbas_Artefakt` XP 300 → 600, Skript liest 600). Offen: ob `.info`-Patches ankommen, weil das Spiel Infos aus
-  der kompilierten `Infos.cpt` lädt, und komprimierte Archiveinträge (`Strings.pak`).
-- **Teleport (`SetPosition`) und Spielzeit (`SetGameTime`)** sind implementiert und ohne Spiel getestet, im Spiel aber nicht bestätigt.
+- **Verwandlung** (`OnTransformStart`/`OnTransformEnd`): eingehängt, im Spiel noch nie ausgelöst.
+- **`SetGameTime`:** ohne Spiel getestet, im Spiel nicht bestätigt.
+- **Spielstand ohne Mod nach automatischem Entfernen:** `perk_lifesteal` nimmt Talent und Stapel in `OnBeforeSave` heraus (beim Laden war der Stapel 0). Der
+  vollständige Prüfablauf (mit der Mod speichern, Mod aus, laden, Charakterbogen öffnen, Waffe ausrüsten) steht noch aus. Ob der Verweis `ActivateSkill2` an der
+  Waffe im Spielstand hängt, ist nicht geprüft.
+- **Datei-Patches auf `.info`-Dateien:** offen, weil das Spiel Infos aus der kompilierten `Infos.cpt` lädt; ebenso komprimierte Archiveinträge (`Strings.pak`).
+- **`GenerateTradeGoods`:** liefert `true`, ob dabei andere Items entstehen, ist nicht geprüft.
+- **`owner` im Gruppenkampf** ist eine Näherung (der aktuelle Gegner des Opfers, nicht zwingend der Schläger).
 - **Attribut `"XP"`** las im Test 0. Quest-XP zahlt das Spiel selbst aus.
-- **`DumpQuest` / `LoadQuestFile`** gaben im Spiel `false`; das Format der `.quest`-Dateien ist unbekannt.
-- **Questliste:** `GetQuestCount()`/`GetQuestNameAt(i)` liefern im Spiel die echten Namen, Status und XP aller 571 Quests (Element der Liste = Zeiger auf ein `bTPOPureSmartPtr`, das Quest-Objekt liegt bei +8).
-- **`ExecuteInfo`:** Skript einer Info ohne Gesprächsfenster ausführen. Läuft im Spiel nicht durch (kein `OnInfoFinished`), für Mods nicht zu empfehlen.
+- **Funktioniert nicht:** `DumpQuest`/`LoadQuestFile` (immer `false`), `ExecuteInfo` (kein `OnInfoFinished`), `GetPickPosition` (immer Nullvektor).
+
+## Bekannte Risiken
+
+- **Dauerhafte Zustände im Spielstand.** Was ein Mod ins Spiel schreibt (Item-Stapel aus Klon-Vorlagen, Talente, Uhrfaktor), steht im Spielstand. Fehlt der
+  Mod beim Laden, zeigen solche Einträge ins Leere; ein Spielstand mit dem Talent-Stapel ohne `perk_lifesteal` **stürzte beim Öffnen des Charakterbogens ab**
+  (gemessen). Mods müssen solche Zustände in `OnBeforeSave` entfernen und in `OnAfterSave` wiederherstellen, siehe [Speichern und Laden](saving.md).
+- **Feste Adressen.** Die Lebensraub-Zeile in der Item-Beschreibung hängt an zwei festen Adressen in `Game.dll`. Weichen ihre Bytes ab (z. B. in der
+  Steam-Fassung), wird dieser eine Hook ausgelassen und das Protokoll sagt es; alle anderen Hooks hängen an exportierten Namen.
+- **Andere Script-Plugins** mit eigenen Hooks (z. B. CombatFix) sind nicht zusammen mit dem Patch geprüft.
 
 ## Fehlt noch
 
 | Funktion | Zustand |
 |---|---|
-| **Talente (Perks)** | Eigenes Talent mit Kachel im Charakterbogen und Bonustalent an einer Waffe geht (Beispiel `perk_lifesteal`): Talent-Vorlage klonen (`CloneTemplate` + Tag, Name über `FO_It_Perk_<Tag>`), Lern-Item `It_Perk_<Name>` klonen und dessen `Skill`-Verweis mit `SetTemplateRef` auf das neue Talent setzen, den Item-Stapel dem Helden geben (`AddItems`; der Bogen listet die Lern-Item-Stapel im Inventar, ausgegraut wenn nicht gelernt) und `ActivateSkill2` der Waffe auf das Talent setzen (die Engine zählt es dann beim Ausrüsten mit). Zustand lesen: `HasLearnedSkill`, `IsSkillActive`, `GetSkillActivationCount`. **Zu beachten:** Der Stapel steht im Spielstand; ohne die Mod zeigt er auf eine fehlende Vorlage, und das Spiel **stürzt beim Öffnen des Charakterbogens ab** (gemessen). Zum Abschalten die Mod einmal mit `ENTFERNEN = true` laufen lassen (nimmt Talent und Stapel mit `DeleteItemStack` heraus; `RemoveItems` genügt nicht, weil Lern-Items `Permanent` sind und ein leerer Stapel bleibt), speichern, dann die Mod abschalten. Getestet: Spielstand danach ohne Mod laden und den Charakterbogen öffnen läuft ohne Absturz. Es gibt noch kein Ereignis vor dem Speichern, mit dem sich das automatisch machen ließe. `LearnSkill` am Klon liefert `false` (Voraussetzungen des Originals). Die Wirkung eines eigenen Talents muss die Mod selbst herstellen (z. B. `OnDamage`) |
-| **Weitere Einstiegspunkte** | Override gibt es für die sieben Quest-/Dialog-Funktionen ([Hooks](hooks.md)); Zahlenargumente lassen sich mit `SetOverrideArg` ändern (ohne Spiel getestet, im Spiel zu bestätigen mit `hooks_demo`). Schaden, Treffer, Statuseffekte und Item-Qualität sind inzwischen vorhanden ([Hooks](hooks.md), [Referenz](reference.md)). |
-| **Entities erzeugen / NPCs spawnen** | `SpawnNPC` ist gebaut (Version 23), im Spiel aber noch nicht bestätigt. Offen: Tagesablauf/Routine, Speichern der erzeugten NPCs, Aufräumen. |
-| **Bedingungen von Infos** | Items, Reputation, Fähigkeiten als Bedingung einer eigenen Info: die Listen (`CondItems`, ...) sind noch nicht schreibbar. Bedingungen prüfst du in `OnInfoFinished` im Skript. |
-| **Mod-Archive (`PackMod`)** | Schreiben ist gebaut und gegen echte Community-Archive geprüft ([Mod-Archive](archives.md)); das Laden und das Überschreiben vorhandener Dateien sind im Spiel bestätigt (mit der Einschränkung zu den vom Spiel angelegten Kopien, siehe Archive). Offen: Komprimierung, komprimierte Einträge lesen, Datei-Patches auf die Schichten `.mod`/`.m00` ausdehnen. |
-| **Questlog selbst schreiben** | Einträge entstehen über Dialogzeilen (`SetInfoQuest`); direkt in das Log schreiben geht nicht. |
-| **Truhen und Schlösser** | Inhalt (zufällig über Schatzsets oder fest), Schlosshärte (offen bis schwer, nur mit Schlüssel), Schlüssel; auch für Türen. Idee aus dem Editor AdanosEdit, nichts verbindlich. |
-| **Tagesabläufe (Routinen) von NPCs** | Arbeit, Freizeit, Schlaf mit Routinepunkten; mehrere Abläufe pro NPC, per Dialog umschaltbar (damit ein NPC nach einer Quest bleibt). Idee aus AdanosEdit. |
-| **Eigene Zonen und die Navigationskarte** | Nötig, damit `OnEnter`/`OnLeave` auch eigene Bereiche erkennen: Gothic 3 erkennt Zonen nur, wenn sie in der Navigationskarte der Mod stehen. Mods mit eigener Navigationskarte dürfen nur einzeln integriert werden. Idee aus AdanosEdit. |
-| **NPC-Aussehen und -Ausstattung** | Kopf, Haare, Bart, Kleidung, Gruppe und Enklave, Händlerwaren, Waffen, Beute, Taschendiebstahl. Idee aus AdanosEdit. |
-| **Quest-Vorlagen** | Ein Katalog gängiger Quest-Arten mit automatisch erzeugten Dialogen: Gegenstände bringen, etwas ausrichten, töten, besiegen (Zweikampf), jemanden zu einer Person bringen, jemandem folgen, vertreiben, Arenakampf, Ort erreichen, Truhe ausrauben. Eher ein Baustein für spätere Mods als für das Kit selbst. Idee aus AdanosEdit. |
-| **Eigenschaften schreiben** | Lesen geht (`GetProperty`, `ListProperties`), Schreiben nicht. Damit ließe sich zum Beispiel das „Bonustalent“ (`ActivateSkill2` ist bei Waffen frei) für eigene Eigenschaften nutzen: mit einer geklonten Talent-Vorlage (`CloneTemplate` von `Perk_OrcSlayer`) und einem Schreibzugriff auf `ActivateSkill`. Unklar, ob das für Item-Instanzen speichert und stapelt; nicht untersucht. |
-| **Spielseiten** | `GetActivePage()` liefert Zahlen (-1, 4, 5, 6, 17), die Bedeutung ist nur teilweise bekannt. |
+| **Animationen** | Abspielen, Namen der Engine abfangen, eigene Animationen aus Blender: geplant, noch nichts gebaut |
+| **Abhängigkeiten zwischen Mods** | `mod.ini` kennt nur an/aus; keine Angabe „braucht Mod X ab Version Y“ oder „braucht Skript-Schnittstelle N“ |
+| **Schaden mit fester Menge, der tötet** | `HurtHitPoints` tötet nicht, `DoDamage` ist verdreht und veraltet; tödlicher Schaden nur über die Blitz-Beschwörung |
+| **Verweis-Eigenschaften schreiben** | `SetProperty` schreibt Textwerte, Verweise auf andere Vorlagen nicht; dafür gibt es `SetTemplateRef`/`SetEntityRef` (experimentell) |
+| **Bedingungen von Infos** | Items, Reputation, Fähigkeiten als Bedingung einer eigenen Info: die Listen (`CondItems`, ...) sind nicht schreibbar. Bedingungen prüfst du im Skript (`Override_InfoAvailable`) |
+| **Questlog selbst schreiben** | Einträge entstehen über Dialogzeilen (`SetInfoQuest`); direkt ins Log schreiben geht nicht |
+| **Talente vom Spiel lernen lassen** | `LearnSkill` am Klon liefert `false` (Voraussetzungen des Originals); die Wirkung eines eigenen Talents stellt die Mod selbst her |
+| **Spielseiten** | `GetActivePage()` liefert Zahlen (-1, 4, 5, 6, 17), die Bedeutung ist nur teilweise bekannt |
+| **Einfarbige Flächen zeichnen** | Die Rechteck-Funktionen von GUI und Renderer sind im Spiel leer; Ersatz ist ein Bild aus den GUI-Daten |
+| **Selbsttest in der CI** | Die CI baut und packt; Selbsttest und Kompilierprüfung der Beispiele brauchen die `SharedBase.dll` des Spiels und laufen nur lokal |
+| **Englische Dokumentation** | Die Doku ist deutsch |
+
+Ideen aus dem Editor AdanosEdit, nichts davon verbindlich: Truhen und Schlösser (Inhalt, Schlosshärte, Schlüssel, auch für Türen); Tagesabläufe von NPCs
+(Routinen, per Dialog umschaltbar); eigene Zonen in der Navigationskarte (nötig, damit `OnEnter`/`OnLeave` eigene Bereiche erkennen; Mods mit eigener
+Navigationskarte dürfen nur einzeln integriert werden); NPC-Aussehen und -Ausstattung (Kopf, Haare, Kleidung, Gruppe, Waren, Beute); Quest-Vorlagen
+(bringen, ausrichten, töten, besiegen, begleiten, Arenakampf, Ort erreichen).
 
 ## Vergleich mit dem G1R-Modkit
+
+Der Kernunterschied: Im Gothic-1-Remake ist die Spiellogik selbst in AngelScript geschrieben, und das Modkit liefert die Spielskripte mit. Ein Mod kann dort jede
+Skriptklasse ableiten oder per Patch ändern. In Gothic 3 liegt die Logik in nativen DLLs; ein Mod kann nur an den Stellen eingreifen, die der Patch freilegt.
 
 | G1R-Modkit | OG3 |
 |---|---|
 | Skripte in AngelScript | ja, AngelScript 2.38 |
-| Mod-Pakete mit Reihenfolge | ja, `mods\<Name>\main.as` und `load_order.txt` |
-| Script Hooking (Vererbung, `ReplaceParentClass`, `Super::`) | teilweise: die Spiellogik liegt in nativen DLLs, nicht in Skripten. Stattdessen `Override_...` mit `Super()` auf ausgewählten Game.dll-Funktionen und Spielereignisse |
-| Script Patches (UnifiedDiff auf Spielskripte) | ja, als Unified-Diff auf die Textdateien des Spiels (`ScriptPatches\*.patch`), siehe [Datei-Patches](patches.md) |
+| Mod-Pakete mit Reihenfolge | ja, `mods\<Name>\main.as`, `mod.ini` und `load_order.txt` |
+| Abhängigkeiten mit Versionsangaben | nein, siehe „Fehlt noch“ |
+| Script Hooking (Vererbung, `ReplaceParentClass`, `Super::`) | teilweise: `Override_...` mit `Super()` an ausgewählten Spielfunktionen (Questsystem, Schaden, Dialog, Quest-Status, Konsole, Händler, Spielskripte nach Namen) und Ereignisse |
+| Script Patches (Unified-Diff auf Spielskripte) | ja, als Unified-Diff auf die Textdateien des Spiels (`ScriptPatches\*.patch`), siehe [Datei-Patches](patches.md) |
 | Konversationen (`UConversationTopic`) | ja, als Infos mit Skriptzeilen und `OnInfoFinished` |
 | Quests (`UQuest`) | ja, als Funktionen auf dem Questsystem des Spiels |
+| Eigene Inhalte (Modelle, Levels) über den Unreal-Editor | nein; `PackMod` packt fertige Dateien in Archive, Werkzeuge dafür kommen von außen |
+| Verteilung über den Steam Workshop | nein; Mods werden von Hand in den Mod-Ordner gelegt |
 | Blueprint-Varianten | nicht übertragbar (Gothic 3 hat keine Blueprints) |

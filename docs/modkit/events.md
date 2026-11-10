@@ -16,8 +16,8 @@ Ein Mod definiert die Funktionen, auf die er reagieren will. Alle sind **optiona
 
 ## Spielereignisse
 
-Diese kommen aus dem Questsystem des Spiels (`gCQuestManager_PS` in `Game.dll`). Das Spiel meldet sie bei **jedem** Vorfall, nicht nur bei aktiven Quests.
-Das Originalverhalten läuft zuerst, dann deine Funktion.
+Die ersten sechs kommen aus dem Questsystem des Spiels (`gCQuestManager_PS` in `Game.dll`), die übrigen aus den genannten Spielfunktionen. Das Spiel meldet sie bei
+**jedem** Vorfall, nicht nur bei aktiven Quests. Das Originalverhalten läuft zuerst, dann deine Funktion.
 
 | Funktion | Wann |
 |---|---|
@@ -34,7 +34,7 @@ Das Originalverhalten läuft zuerst, dann deine Funktion.
 | `void OnQuestStatus(const bCString &in name, int oldStatus, int newStatus)` (ab Version 35) | Der Status einer Quest hat sich geändert (`gCQuest_PS::SetStatus`; 0 Open, 1 Running, 2 Success, 3 Failed, 4 Obsolete, 5 Cancelled, 6 Lost, 7 Won). Nur bei echter Änderung, im Spiel-Thread. Gemessen: Annehmen eines Auftrags meldet 0 -> 1. Siehe `Override_QuestStatus` |
 | `void OnTouch(Entity self, Entity other)` (ab Version 37) | `other` berührt `self` (`eCDynamicEntity::OnTouch` der Engine.dll, im Spiel-Thread). Meist NPCs und Tiere gegen Navigationszonen. Gemessen: etwa 7500 Aufrufe in den ersten 10 s nach dem Laden, danach 2 bis 10 je Sekunde; Aufwand je Meldung etwa 2 µs ohne Ausgabe. Der Patch ruft es nur, wenn ein Mod die Funktion hat; zuerst filtern (z. B. `self == GetHero() \|\| other == GetHero()`), dann arbeiten |
 | `void OnTradeGenerated(Entity trader, int ok)` (ab Version 37) | Das Spiel hat die Ware eines Händlers aus seinen Schatz-Sets erzeugt (`gCInventory_PS::GenerateTradeInvFromTreasureSets`); `ok` = Ergebnis (1/0). Siehe `Override_TradeGenerate` und `Entity::GenerateTradeGoods` |
-| `void OnTransformStart(Entity self, Entity target)`, `void OnTransformEnd(Entity self)` (ab Version 37) | Beginn und Ende einer Verwandlung (`Entity::StartTransform`/`EndTransform` der Script.dll). Noch nicht im Spiel gemessen |
+| `void OnTransformStart(Entity self, Entity target)`, `void OnTransformEnd(Entity self)` (ab Version 37) | Beginn und Ende einer Verwandlung (`Entity::StartTransform`/`EndTransform` der Script.dll). **Im Spiel nicht geprüft** |
 | `void OnDraw()` (ab Version 34) | Einmal je Bild, am Ende des GUI-Bildes (ab Version 39 kurz vor `eCGUIRenderer::EndFrame` des Haupt-Renderers, Bildrate). Alles hier Gezeichnete liegt über allen Fenstern, auch über HUD und Inventar. Bis Version 38 lief es beim ersten GUI-Fenster und lag unter dem HUD; das bleibt der Rückfall, falls das Bildende einmal ausbleibt. Nur hier gehen `DrawText`/`TextWidth`/`DrawImage`. Läuft auch im Hauptmenü und in Menüseiten; wer nur im Spiel zeichnen will, prüft `GetHero().IsValid()` und `GetActivePage()`. Kurz halten: alles hier kostet Bildrate |
 | `void OnScript(const bCString &in name, Entity self, Entity other, int arg, int result)` (ab Version 32) | Ein mit `WatchScript(name)` angemeldetes Spielskript ist gelaufen (`result` = sein Rückgabewert). Nur wenn das Original lief, siehe `Override_Script` in [Overrides](hooks.md) |
 | `void OnDamage(Entity victim, Entity attacker, int amount, int type)` | Alte Form ohne `owner`, weiter unterstützt; `attacker` ist dasselbe wie `inflictor` |

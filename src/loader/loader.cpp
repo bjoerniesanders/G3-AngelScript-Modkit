@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // OG3-Loader: schlanke Ersatz-"dbghelp.dll" fuer den OG3-Patch (Gothic 3, 32 Bit). Eigenstaendig, ohne das OpenGothic3-Hauptrepo.
 //
 // SharedBase.dll importiert dbghelp.dll (nur MiniDumpWriteDump) und laedt sie aus dem Spielordner. Dieser Loader steht an dieser Stelle:

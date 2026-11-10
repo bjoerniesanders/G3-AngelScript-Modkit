@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // og3_packmod: Kommandozeilenwerkzeug zum Packen und Pruefen von Gothic-3-Mod-Archiven (G3V0), Gegenstueck zu G3PakDir.
 //   og3_packmod pack    <Ordner> <Archiv>                  Ordner als Archiv schreiben (z. B. Quests.mod)
 //   og3_packmod install <Ordner> <Data-Ordner> <Volume> [m|n]   als naechste freie Generation ablegen (Quests.mod, Quests.m00, ...; n = .nod/.n00)

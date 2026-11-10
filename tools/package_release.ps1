@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 param([Parameter(Mandatory)][string]$BuildDir, [Parameter(Mandatory)][string]$Version, [string]$OutDir = "dist")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -22,7 +24,7 @@ Copy-Item (Join-Path $root "examples") $stage -Recurse
 Copy-Item (Join-Path $root "docs\modkit") (Join-Path $stage "docs") -Recurse
 # Private planning files live next to the public docs on the maintainer's machine only (git-excluded); never ship them in a package.
 foreach ($p in "roadmap.md", "plugin-analyse.md") { Remove-Item (Join-Path $stage "docs\modkit\$p") -Force -ErrorAction SilentlyContinue }
-foreach ($f in "README.md", "LICENSE") { if (Test-Path (Join-Path $root $f)) { Copy-Item (Join-Path $root $f) $stage } }
+foreach ($f in "README.md", "LICENSE", "LICENSE-EXCEPTIONS.md") { if (Test-Path (Join-Path $root $f)) { Copy-Item (Join-Path $root $f) $stage } }
 
 $install = @"
 OG3-Patch $Version - AngelScript modkit for Gothic 3 (original game, 32-bit)

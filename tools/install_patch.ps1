@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 # Baut den OG3-Patch (AngelScript) in eine Spielkopie ein bzw. aus. Original-SharedBase, PU-Patch und Hybridbetrieb bleiben unveraendert.
 #   powershell -NoProfile -File tools\install_patch.ps1 [-Game G:\Gothic3]      Einbau (Skript nur, wenn noch keins existiert)
 #   powershell -NoProfile -File tools\install_patch.ps1 -Uninstall               Rueckbau aus der juengsten Sicherung

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 #pragma once
 // AngelScript-Host des OG3-Patches: Engine, Bindings der Genome-Grundtypen (ueber die geladene SharedBase), Laden der Mod-Skripte,
 // Ereignisse und Overrides fuer Skripte, Neuladen bei Dateiaenderung.
@@ -16,6 +18,7 @@ class asIScriptContext;
 class asIScriptModule;
 class asIScriptFunction;
 struct HWND__;
+struct HINSTANCE__;
 
 namespace og3p {
 
@@ -177,5 +180,11 @@ HWND__* GameWindow();
 // Ist [p, p + n) lesbar (eingecheckter Speicher, Leseschutz)? Prueft per VirtualQuery ohne Ausnahme. Dient dazu, geratene Zeiger vorab zu verwerfen, statt den
 // Zugriffsfehler per SEH abzufangen (jede abgefangene Ausnahme erscheint im Absturzprotokoll des Proxys als "ABSTURZ-Kandidat" und kostet Zeit).
 bool ReadableMem(const void* p, size_t n);
+// Text eines bCString (SharedBase), fallback bei Nullzeiger, unlesbarem Speicher oder Ausnahme. Der Zeiger gilt nur, solange der bCString lebt.
+const char* SafeStrText(const void* s, const char* fallback);
+// Exportierte Funktion sym aus Modul m per MinHook umleiten und einschalten; Fehler (Export fehlt, Einhaengen fehlgeschlagen) stehen im Protokoll.
+bool HookExport(HINSTANCE__* m, const char* sym, void* detour, void** orig, ScriptHost& host);
+// Unerwarteter Nullzeiger aus der Engine in einem Hook: einmal je Stelle protokollieren ("where" muss ein fester Text sein, er dient als Schluessel).
+void NoteNull(const char* where);
 
 }   // namespace og3p

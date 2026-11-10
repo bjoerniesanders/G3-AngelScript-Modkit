@@ -170,12 +170,13 @@ void main() {
 
 int frames = 0;
 void OnFrame(float dt) { frames++; }
-int items = 0, kills = 0;
+int items = 0, kills = 0, enters = 0;
 void OnReceiveItem(Entity giver, Entity receiver, const bCString &in name, const bCString &in id, uint count) {
     items++;
     check(!giver.IsValid() && !receiver.IsValid(), "OnReceiveItem: ungueltige Entities ohne Spiel");
     check(name == "It_Test" && id == "GUID-123" && count == 7, "OnReceiveItem: Texte und Zahl");
 }
+void OnEnter(Entity e, const bCString &in area) { enters++; check(!e.IsValid() && area.IsEmpty(), "OnEnter: Nulltext kommt als leerer Text an"); }
 void OnNPCKilled(Entity victim) { kills++; check(!victim.IsValid(), "OnNPCKilled: Entity ungueltig ohne Spiel"); }
 bool Override_Test(uint v) { check(v == 5, "Override_Test: Argument"); bool r = Super(); return !r; }
 bool Override_TestCancel(uint v) { return true; }
@@ -190,5 +191,5 @@ void OnKey(int vk, bool down) { check(vk == 0x7A, "OnKey: VK-Code"); if (down) k
 void OnShutdown() {
     check(frames == 1, "OnFrame genau einmal aufgerufen");
     check(keysDown == 1 && keysUp == 1, "OnKey: je einmal gedrueckt und losgelassen");
-    check(items == 1 && kills == 1, "Spielereignisse genau einmal zugestellt");
+    check(items == 1 && kills == 1 && enters == 1, "Spielereignisse genau einmal zugestellt");
 }

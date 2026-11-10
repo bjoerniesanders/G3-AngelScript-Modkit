@@ -29,7 +29,7 @@ Ausgabe: `build32/patch/` (og3_patch.dll, Tests, og3_packmod) und `build32/loade
 - `.github/workflows/release.yml`: beim Push eines Tags `v*` dasselbe plus GitHub-Release mit dem Zip:
       git tag v0.30.0
       git push origin v0.30.0
-- Paket lokal: `powershell -NoProfile -File tools\package_release.ps1 -BuildDir build32 -Version v0.30.0` (Ergebnis in `dist\`). Inhalt: Loader, `og3_patch.dll`,
+- Paket lokal: `powershell -NoProfile -File tools\package_release.ps1 -BuildDir build32 -Version v0.39.0` (Ergebnis in `dist\`). Inhalt: Loader, `og3_patch.dll`,
   `og3_packmod.exe`, `tools\install_loader.ps1`, Beispiel-Mods (standardmaessig aus), Doku, `INSTALL.txt`; keine Spieldateien.
 - Nicht in der CI: Selbsttest, Mod-Tests, Kompilierpruefung der Beispiele, Loader-Test und PackMod-Rundlauf. Sie brauchen die `SharedBase.dll` bzw. Archive des
   Spiels, die nicht ins Repo gehoeren, und laufen lokal (Abschnitt Test).
@@ -49,7 +49,12 @@ Beides gleichzeitig geht nicht, beide ersetzen dieselbe `dbghelp.dll`.
 Keine. Zur Laufzeit braucht der Patch die `SharedBase.dll` des Spiels (Original; die Tests laufen auch mit dem Nachbau) und den Loader aus diesem Repo. Quellcode und Build sind eigenstaendig.
 
 ## Lizenz
-MIT, siehe `LICENSE`. AngelScript (zlib-Lizenz) und MinHook (BSD-2-Clause) werden beim Bauen geladen und liegen nicht im Repo. Das Projekt enthaelt keine Spieldaten.
+GPL-3.0-or-later, siehe `LICENSE`, mit zwei Zusatzerlaubnissen nach Abschnitt 7 in `LICENSE-EXCEPTIONS.md`: Der Patch darf mit den Programmdateien
+von Gothic 3 zusammen weitergegeben werden, und Mods, die nur die Skript-Schnittstelle nutzen, duerfen unter jeder Lizenz stehen. Die Beispiel-Mods in
+`examples/` sind gemeinfrei (CC0 1.0, `examples/LICENSE`). Bis zum Wechsel (vor dem ersten Release) stand das Repo unter MIT.
+
+AngelScript (zlib-Lizenz) und MinHook (BSD-2-Clause) werden beim Bauen geladen und liegen nicht im Repo. Das Projekt enthaelt keine Spieldaten. Speicher-Layouts
+der Engine sind dem [Gothic 3 SDK](https://github.com/georgeto/gothic3sdk) (Georgeto, GPL-3.0-or-later) entnommen; Code des SDK enthaelt das Repo nicht.
 
 ## Danksagung
 

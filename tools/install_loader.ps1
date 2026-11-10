@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 # Baut den OG3-Patch mit dem schlanken Loader (src/loader) in eine Gothic-3-Kopie ein bzw. aus. Eigenstaendig, ohne das OpenGothic3-Hauptrepo.
 #   powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner> [-BuildDir build32]      Einbau
 #   powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner> -Uninstall               Rueckbau aus der juengsten Sicherung

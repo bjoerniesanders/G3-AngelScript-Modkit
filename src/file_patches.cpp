@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Datei-Patches ("Script Patches"): Mods liefern Unified-Diff-Dateien <Mod>\ScriptPatches\*.patch, die auf die Datendateien des Spiels (Quests, Infos, ...) angewendet werden,
 // BEVOR das Spiel sie liest. Das Spiel liest seine Textdaten (z. B. Data\Quests.pak -> G3_World_01\<Name>_quest_G3_World_01.quest) ueber das Dateisystem-Modul, bei dem
 // physische Dateien Vorrang vor Archiveintraegen haben. Der Patch erzeugt deshalb die gepatchte Fassung als physische Datei unter <Spiel>\Data\<Archiv>\<Pfad>

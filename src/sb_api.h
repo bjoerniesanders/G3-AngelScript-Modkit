@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 #pragma once
 // Bruecke zur geladenen SharedBase.dll (Original, Classic oder og3-Nachbau): Funktionszeiger werden ueber die dekorierten Exportnamen
 // aufgeloest, die Huellklassen haben exakt das Speicherlayout der Genome-Typen. Damit arbeiten Skripte auf echten Original-Objekten
