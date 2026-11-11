@@ -53,11 +53,18 @@ jobs:
         shell: pwsh
         run: |
           $out = ./build/patch/og3_patch_test.exe build/sbstub/SharedBase.dll examples/mods 2>&1 | Out-String
+          $rc = $LASTEXITCODE
           $out
+          # exit code = number of failed checks (1 = the expected override-chain failure); >= 100 means the test runner itself failed
+          if ($rc -ge 100) { throw "test runner failed to start ($rc)" }
           if ($out -match 'Skript enthaelt Fehler|nicht ladbar|Skript nicht geladen') { throw "an example mod does not compile" }
           $fails = ([regex]::Matches($out, 'PRUEFUNG FEHLGESCHLAGEN: (.*)') | ForEach-Object { $_.Groups[1].Value.Trim() })
           $unexpected = $fails | Where-Object { $_ -notlike 'Override-Kette ueber mehrere Mods*' }
           if ($unexpected) { throw "unexpected failures: $($unexpected -join '; ')" }
+          if ($rc -ne $fails.Count) { throw "exit code $rc does not match $($fails.Count) reported failure(s)" }
+          "Only the expected override-chain failure: OK"
+          # GitHub appends 'exit $LASTEXITCODE' to pwsh steps; the runner's expected exit code 1 must not fail the step
+          exit 0
 
       - name: Loader test (stub SharedBase, system dbghelp)
         shell: pwsh
