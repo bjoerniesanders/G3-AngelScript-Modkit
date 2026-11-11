@@ -149,6 +149,36 @@ Ab Version 36. Umschalt + Ziffernblock + / - verdoppelt bzw. halbiert die Zeitra
 auf das Zehnfache (`SetClockFactor`) und zurück. Weil der Uhrfaktor im Spielstand steht, stellt die Mod ihn in `OnBeforeSave` zurück und setzt ihn in
 `OnAfterSave` wieder. Die Werte stehen oben links (`OnDraw`). Standardmäßig aus (`+time_probe`).
 
+## 12. KI-Skripte und Untertitel (`ki_probe`, Messmod)
+
+Ab Version 41. Meldet die Namen an, die das Plugin G3Fixes umleitet (`ZS_ObserveSuspect`, `_AI_UseInventoryItem`, `OnFollowPlayer`, `OnGuidePlayer`), reicht
+sie in `Override_AI` unverändert durch und schreibt die ersten fünf Aufrufe je Name ins Protokoll (`OnAI`). Jeder gesprochene Satz (`OnAIOutput`) kommt mit
+ID und Text (`GetSpeechText`) ins Protokoll und steht vier Sekunden unten in der Bildmitte: ein einfacher Nachbau des Plugins Subtitles. Standardmäßig aus (`+ki_probe`).
+
+## 13. Monsterschaden (`monster_damage`, Messmod)
+
+Ab Version 42. Ersetzt die Teilung des Monsterschadens an NPCs (durch 10, bei Beschworenen durch 2) durch den Faktor 0,2 wie das Plugin MonsterDamage
+(Standardwert `Game.MonsterDamageMultiplicator=0.2`): Monster richten an NPCs doppelt so viel Schaden an wie im Original. Die ersten zehn Treffer stehen mit
+rohem, originalem und neuem Wert im Protokoll. Standardmäßig aus (`+monster_damage`).
+
+## 14. Lernkosten (`learn_cost`, Messmod)
+
+Ab Version 42. Halbiert bei Lehrern die Lernpunkte (aufgerundet) und das Gold für Attribute; hat das Spiel wegen „Alternative Balance“ ab 250 verdoppelt,
+nimmt der Mod das zuerst zurück (wie der Modus `NoThreshold` des Plugins LearningThresholdTweaks). Die ersten zehn Abfragen stehen im Protokoll.
+Standardmäßig aus (`+learn_cost`).
+
+## 15. Schema der Eigenschaften (`schema_dump`, Messmod)
+
+Ab Version 43. Ruft `DumpPropertySchema` bei den ersten beiden Weltaktivierungen auf (Hauptmenü, dann nach dem Laden) und schreibt
+`<Spiel>\og3\property_schema_1.json` und `_2.json`; die Zahl der Klassen steht im Protokoll. Keine Taste, etwa 0,1 s je Dump.
+Standardmäßig aus (`+schema_dump`).
+
+## 16. Angriffsgeschwindigkeit (`attack_speed`, Messmod)
+
+Ab Version 45. Ändert in `Override_CombatMove` die Geschwindigkeit der Kampfbewegungen des Helden um `Faktor` aus den Einstellungen
+(`mod.ini [settings]`, Standard 2,0, damit es deutlich sichtbar ist; `AlleNPCs=ja` gilt für alle). Die ersten 20 Änderungen stehen im Protokoll.
+Zeigt nebenbei die Einstellungen je Mod (Version 44). Standardmäßig aus (`+attack_speed`).
+
 ## Tastenbelegung der Beispiel-Mods
 
 Die Mods werden einzeln zum Testen zugeschaltet; einige teilen sich Tasten (`spawn_demo` mit `lifesteal_demo` bei `*` und mit `reference_dump` bei `/`), dann nicht beide gleichzeitig zuschalten. **Nicht benutzt werden Tasten, die das Spiel selbst belegt:** Numblock 7, 8, 9 (Debug-Zähler), F1 bis F4, F6 bis F9 (Zeitlupe, Spieler zurücksetzen, Schnellladen) und F12,

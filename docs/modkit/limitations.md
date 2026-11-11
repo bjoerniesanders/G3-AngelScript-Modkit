@@ -1,6 +1,6 @@
 # Grenzen und Stand
 
-Stand: 2026-11-10, Skript-Schnittstelle Version 39 (Alpha). Was sich zwischen Versionen ändern darf: [Versionsregeln](api-policy.md).
+Stand: 2026-11-11, Skript-Schnittstelle Version 45 (Alpha). Was sich zwischen Versionen ändern darf: [Versionsregeln](api-policy.md).
 Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke **Experimentell**, **Im Spiel nicht geprüft**, **Funktioniert nicht** oder **Veraltet**.
 
 ## Im Spiel geprüft
@@ -21,6 +21,9 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 **Spielwelt**
 - Attribute lesen und ändern, Inventar (zählen, entfernen, erzeugen, Stapel löschen), Item-Qualität mit eigener Zeile „Lebensraub“ in der Beschreibung
 - Eigene Talente mit Kachel im Charakterbogen (`perk_lifesteal`); Abschalten mit `ENTFERNEN = true`, dann Spielstand ohne Mod ohne Absturz
+- Spielstand ohne Mod (2026-11-10): mit `perk_lifesteal` gespeichert (Talent und Stapel in `OnBeforeSave` entnommen), Mod abgeschaltet, Neustart, geladen,
+  Charakterbogen geöffnet, Waffe ab- und wieder ausgerüstet: kein Absturz, keine Fehlerzeilen. Der Verweis `ActivateSkill2` an der Waffe, der beim Speichern
+  noch auf das Talent zeigt, stört ohne die Mod nicht
 - Verletzen und Töten über die Blitz-Beschwörung mit Besitzer (`beliars_klaue`), Effekte starten (`StartEffect`)
 - Vorlagen klonen (`CloneTemplate`) mit fester ID; Klon-Items bleiben nach Speichern, Laden und Neustart erhalten
 - NPCs erzeugen und entfernen (`SpawnNPC`, `DestroyNPC`), auch aus früheren Sitzungen; Welt-NPCs, Held und Welt-Objekte werden abgelehnt
@@ -41,9 +44,14 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 
 - **Verwandlung** (`OnTransformStart`/`OnTransformEnd`): eingehängt, im Spiel noch nie ausgelöst.
 - **`SetGameTime`:** ohne Spiel getestet, im Spiel nicht bestätigt.
-- **Spielstand ohne Mod nach automatischem Entfernen:** `perk_lifesteal` nimmt Talent und Stapel in `OnBeforeSave` heraus (beim Laden war der Stapel 0). Der
-  vollständige Prüfablauf (mit der Mod speichern, Mod aus, laden, Charakterbogen öffnen, Waffe ausrüsten) steht noch aus. Ob der Verweis `ActivateSkill2` an der
-  Waffe im Spielstand hängt, ist nicht geprüft.
+- **Schema-Dump** (`DumpPropertySchema`, Version 43): im Spiel bestätigt (2026-11-11, 273 Klassen, Hauptmenü und nach dem Laden gleich); drei Eigenschaften ohne Namen. Die Getter `bCPOTypeListItem::GetBaseClassName` und `bCPropertyObjectTypeBase::GetPropertyType(int)` blieben im Test hängen (vermutlich ein Assert-Dialog der Original-DLL); die Liste wird deshalb direkt aus dem Speicher gelesen (SDK-Aufbau).
+- **KI-Tracer** (`aitrace=1` in `og3_patch.ini`, nur Protokoll): sechs Hooks auf `gCScriptRoutine_PS` (Zustand, Aufgabe, Routine, KI-Modus, Aktion) und `gCNavigation_PS::SetRoutine`. Im Spiel gemessen (2026-11-11, 3,5 min, 40 NPCs, 574 Zeilen, kein Ruckeln): Es kommen nur **Aufgabe**, **KI-Modus** und **Aktion**; Zustand, Routine und Navigation-Routine wurden nie gesetzt. Die Aufgabe trägt die Zustandsnamen (`ZS_Ambient`, `ZS_HangAround`, `ZS_Guard`, `ZS_WatchFight`, `ZS_Sleep`, beim Helden `PS_Normal`, `ZS_Talk`, `PS_Interact`); Zustandswechsel sieht man also über `SetCurrentTask`.
+- **Angriffsgeschwindigkeit:** noch kein Override. Messpunkt gebaut (`anispeedlog=1`): `eCWrapper_emfx2Actor::SetPlaySpeed`/`GetPlaySpeed` der Engine.dll, die Game.dll importiert. Erste Messung (2026-11-11): fast alle Aufrufe von `Game.dll+0xDC5AA` mit fließenden Werten 0,34 bis 0,98 für die Bewegungsarten 0 bis 3 (vermutlich Überblendung der Laufbewegung), einmal `Game.dll+0xDA21A` mit 1,778. Die Messung lief nur 2 s (Zeilenzahl erschöpft) und erfasste keinen Kampf. Zweite Messung mit Kampf (2026-11-11) und Assembler: `SetPlaySpeed` steuert nur die **Laufbewegung** (`+0xDC5AA`, Schleife über vier Bewegungsschichten, Wert aus dem Betrag der Bewegungsgeschwindigkeit, daher Werte bis über 10000) und das **Drehen auf der Stelle** (`+0xDA031`/`+0xDA21A`, Wert = Winkel × Länge / 90). Die Kampfschleife `gCScriptProcessingUnit::sAICombatMoveItlLoop` liest die Geschwindigkeit nur, um eine Pause (0) zu erkennen. Angriffe starten über `eCVisualAnimation_PS::PlayMotion(Art, eSMotionDesc*)`; der Aufbau von `eSMotionDesc` ist im SDK leer; gemessen: +8 Geschwindigkeit, +0x10 Gewicht. Angriffe kommen aus `gCScriptProcessingUnit::sAICombatMoveStart`, das die Geschwindigkeit aus seinen Argumenten (+0x10) übernimmt (ein NPC mit 1,3). Daraus `Override_CombatMove` (Version 45, experimentell), im Spiel bestätigt (2026-11-11: Faktor 2 sichtbar schneller, Schaden normal; `Recover` meldet einmal die Waffe als `self`).
+- **Lernkosten** (`Override_LearnCost`, Version 42): im Spiel bestätigt (Messmod `learn_cost`, 2026-11-11): STR +5 bei Bufford zeigte und kostete 3 LP und 125 Gold statt 5 LP und 250 Gold, der Held bekam +5 STR; die Bezahlung der Lernpunkte lief genau einmal, auch `ALC` geht durch den Hook. Sieben feste Stellen; Bytes und Stapelaufbau stimmen in der Entwicklerinstallation und der Steam-Game.dll überein. Nur Attribute, keine Talente. Nicht ausgelöst: die Verdopplung mit „Alternative Balance“ ab 250 (nur am Code gelesen; im Test war der Wert darunter oder der Schalter aus).
+- **Monsterschaden** (`Override_MonsterDamage`, Version 42): im Spiel bestätigt (Wolf gegen NPC, 2026-11-10); der Teiler 2 für beschworene Angreifer ist nicht ausgelöst. Als einziger Hook an einer festen Stelle statt an einem Export; die Bytes der Stelle und des Codes davor stimmen in der Entwicklerinstallation, im Steam-Original und in der Steam-Kopie überein, obwohl sich die Script_Game.dll sonst unterscheidet. Nicht zusammen mit `Script_MonsterDamage.dll`, die dieselbe Stelle ändert.
+- **KI-Zustände** (`Override_AI`/`OnAI` mit `AI_STATE`, Version 41): Zustand, Callback und KI-Funktion sind im Spiel bestätigt (Zustand nach der Korrektur mit kopiertem Namen, 2026-11-10). Routinen (`AI_ROUTINE`) sind nie ausgelöst worden.
+- **Satztexte:** `GetSpeechText` liefert Dialogzeilen und Befehle des Helden; das Umgebungsgerede (`SVM_..._Smalltalk_NN`) hat keinen gefundenen Text.
+- **Abhängigkeiten in `mod.ini`** (`version`, `api`, `requires`, Version 40): ohne Spiel getestet (Testmods in `tests/mods`), im Spiel noch nicht.
 - **Datei-Patches auf `.info`-Dateien:** offen, weil das Spiel Infos aus der kompilierten `Infos.cpt` lädt; ebenso komprimierte Archiveinträge (`Strings.pak`).
 - **`GenerateTradeGoods`:** liefert `true`, ob dabei andere Items entstehen, ist nicht geprüft.
 - **`owner` im Gruppenkampf** ist eine Näherung (der aktuelle Gegner des Opfers, nicht zwingend der Schläger).
@@ -54,7 +62,7 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 
 - **Dauerhafte Zustände im Spielstand.** Was ein Mod ins Spiel schreibt (Item-Stapel aus Klon-Vorlagen, Talente, Uhrfaktor), steht im Spielstand. Fehlt der
   Mod beim Laden, zeigen solche Einträge ins Leere; ein Spielstand mit dem Talent-Stapel ohne `perk_lifesteal` **stürzte beim Öffnen des Charakterbogens ab**
-  (gemessen). Mods müssen solche Zustände in `OnBeforeSave` entfernen und in `OnAfterSave` wiederherstellen, siehe [Speichern und Laden](saving.md).
+  (gemessen). Mods müssen solche Zustände in `OnBeforeSave` entfernen und in `OnAfterSave` wiederherstellen, siehe [Speichern und Laden](saving.md). Mit diesem Muster lädt der Spielstand auch ohne den Mod (geprüft mit `perk_lifesteal`).
 - **Feste Adressen.** Die Lebensraub-Zeile in der Item-Beschreibung hängt an zwei festen Adressen in `Game.dll`. Weichen ihre Bytes ab (z. B. in der
   Steam-Fassung), wird dieser eine Hook ausgelassen und das Protokoll sagt es; alle anderen Hooks hängen an exportierten Namen.
 - **Andere Script-Plugins** mit eigenen Hooks (z. B. CombatFix) sind nicht zusammen mit dem Patch geprüft.
@@ -64,7 +72,6 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 | Funktion | Zustand |
 |---|---|
 | **Animationen** | Abspielen, Namen der Engine abfangen, eigene Animationen aus Blender: geplant, noch nichts gebaut |
-| **Abhängigkeiten zwischen Mods** | `mod.ini` kennt nur an/aus; keine Angabe „braucht Mod X ab Version Y“ oder „braucht Skript-Schnittstelle N“ |
 | **Schaden mit fester Menge, der tötet** | `HurtHitPoints` tötet nicht, `DoDamage` ist verdreht und veraltet; tödlicher Schaden nur über die Blitz-Beschwörung |
 | **Verweis-Eigenschaften schreiben** | `SetProperty` schreibt Textwerte, Verweise auf andere Vorlagen nicht; dafür gibt es `SetTemplateRef`/`SetEntityRef` (experimentell) |
 | **Bedingungen von Infos** | Items, Reputation, Fähigkeiten als Bedingung einer eigenen Info: die Listen (`CondItems`, ...) sind nicht schreibbar. Bedingungen prüfst du im Skript (`Override_InfoAvailable`) |
@@ -89,7 +96,9 @@ Skriptklasse ableiten oder per Patch ändern. In Gothic 3 liegt die Logik in nat
 |---|---|
 | Skripte in AngelScript | ja, AngelScript 2.38 |
 | Mod-Pakete mit Reihenfolge | ja, `mods\<Name>\main.as`, `mod.ini` und `load_order.txt` |
-| Abhängigkeiten mit Versionsangaben | nein, siehe „Fehlt noch“ |
+| Abhängigkeiten mit Versionsangaben | ja, `version`, `api` und `requires` in der `mod.ini` (ab Version 40); keine Angabe für Unverträglichkeiten |
+| Einstellungen je Mod | ja, Vorgaben in `mod.ini [settings]`, Benutzerwerte in `og3\settings\<Mod>.ini` (ab Version 44); kein Einstellungsmenü im Spiel |
+| Schnittstellen zwischen Mods (Klassen, Interfaces) | teilweise: Funktionsaufruf mit Text (`CallMod`) und Nachrichten (`SendModMessage`/`OnModMessage`, ab Version 44); keine gemeinsamen Klassen oder Typen |
 | Script Hooking (Vererbung, `ReplaceParentClass`, `Super::`) | teilweise: `Override_...` mit `Super()` an ausgewählten Spielfunktionen (Questsystem, Schaden, Dialog, Quest-Status, Konsole, Händler, Spielskripte nach Namen) und Ereignisse |
 | Script Patches (Unified-Diff auf Spielskripte) | ja, als Unified-Diff auf die Textdateien des Spiels (`ScriptPatches\*.patch`), siehe [Datei-Patches](patches.md) |
 | Konversationen (`UConversationTopic`) | ja, als Infos mit Skriptzeilen und `OnInfoFinished` |

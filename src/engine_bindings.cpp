@@ -26,6 +26,7 @@ bool RegisterDialogBindings(asIScriptEngine* e);   // dialog_bindings.cpp
 bool RegisterScriptCallBindings(asIScriptEngine* e);   // script_calls.cpp
 bool RegisterDrawBindings(asIScriptEngine* e);         // draw_api.cpp
 bool RegisterMoreEventBindings(asIScriptEngine* e);    // more_events.cpp
+bool RegisterSchemaBindings(asIScriptEngine* e);       // schema_dump.cpp
 namespace {
 
 struct Entity {
@@ -2267,6 +2268,7 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     if (!RegisterScriptCallBindings(e)) ok = false;
     if (!RegisterDrawBindings(e)) ok = false;
     if (!RegisterMoreEventBindings(e)) ok = false;
+    if (!RegisterSchemaBindings(e)) ok = false;
     return ok;
 }
 

@@ -60,7 +60,7 @@ set_target_properties(og3_angelscript PROPERTIES MSVC_RUNTIME_LIBRARY MultiThrea
 enable_language(C)
 file(GLOB OG3P_MINHOOK_SRCS ${OG3P_MINHOOK_DIR}/src/*.c ${OG3P_MINHOOK_DIR}/src/hde/*.c)
 set(OG3P_SRCS src/patch_main.cpp src/script_host.cpp src/sb_api.cpp src/engine_bindings.cpp src/game_hooks.cpp
-              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp)
+              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp src/combat_patches.cpp src/schema_dump.cpp src/ai_trace.cpp src/mod_settings.cpp)
 list(TRANSFORM OG3P_SRCS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
 add_library(og3_patch SHARED ${OG3P_SRCS} ${OG3P_MINHOOK_SRCS})
 target_include_directories(og3_patch PRIVATE src ${OG3P_MINHOOK_DIR}/include)
@@ -81,5 +81,11 @@ add_library(og3_loader SHARED src/loader/loader.cpp src/loader/loader.def)
 set_target_properties(og3_loader PROPERTIES OUTPUT_NAME dbghelp MSVC_RUNTIME_LIBRARY MultiThreaded
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/loader RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/loader
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/loader)
+# Ersatz-SharedBase.dll fuer Tests ohne Spieldateien (CI): <build>/sbstub/SharedBase.dll
+add_library(og3_sb_stub SHARED tests/sb_stub/sb_stub.cpp)
+target_link_libraries(og3_sb_stub PRIVATE dbghelp)
+set_target_properties(og3_sb_stub PROPERTIES OUTPUT_NAME SharedBase MSVC_RUNTIME_LIBRARY MultiThreaded
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/sbstub RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/sbstub
+    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/sbstub)
 add_executable(og3_loader_test tests/loader_test.cpp)
 set_target_properties(og3_loader_test PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/patch)

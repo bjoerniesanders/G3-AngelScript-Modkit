@@ -331,6 +331,7 @@ void __fastcall HWorldActivate(void* self, void*) {
     g_orig[kWorldActivate](self);
     FpuState("Welt aktiviert");
     LogScriptModuleVersions();
+    InstallScriptGamePatches(g_host);
     g_inWorldLoad = false;
     g_lastActivate = GetTickCount();
     if (!g_lastActivate) g_lastActivate = 1;
@@ -426,6 +427,10 @@ bool InitCommon(HMODULE sb, const char* gameDir, void (*hostLog)(const char*)) {
 // Fuer Tests: Host ohne Spiel-Hooks anlegen
 extern "C" __declspec(dllexport) int og3_patch_init(HMODULE sharedBase, const char* logDir, void (*hostLog)(const char*)) {
     SetLoadDefaultOffMods(true);   // Testprogramm: auch Beispiel-Mods mit mod.ini enabled=0 laden (Kompilierpruefung aller Beispiele)
+    if (const char* ai = std::getenv("OG3_TEST_AITRACE")) {   // Testprogramm: Einhaengen von KI-Tracer und Geschwindigkeitsmessung pruefen
+        SetAiTraceOptions(*ai == '1', "", 50);
+        SetAniSpeedLog(*ai == '1');
+    }
     return InitCommon(sharedBase, logDir, hostLog) ? 1 : 0;
 }
 
@@ -445,6 +450,19 @@ extern "C" __declspec(dllexport) int og3_patch_run_file(const char* path) {
         g_host.SetModsDir(path);
         g_host.ScanMods();
         if (!g_host.Loaded()) return -1;
+        const std::vector<std::string> names = DiscoverModNames(path);
+        auto idx = [&](const char* n) {
+            for (size_t i = 0; i < names.size(); ++i)
+                if (_stricmp(names[i].c_str(), n) == 0) return int(i);
+            return -1;
+        };
+        if (idx("a_nach_alpha") >= 0) {   // tests\mods: Abhaengigkeiten aus mod.ini (API 40)
+            g_host.Check(idx("a_nach_alpha") > idx("alpha") && idx("a_nach_alpha") > idx("zeta"),
+                         "Abhaengigkeit: benoetigte Mods laden vor der Mod, die sie braucht");
+            g_host.Check(idx("braucht_fehlt") < 0 && idx("braucht_gesperrt") < 0 && idx("braucht_aus") < 0 && idx("braucht_neu") < 0 &&
+                             idx("api_zukunft") < 0,
+                         "Abhaengigkeit: Mods mit unerfuellten Bedingungen werden nicht geladen");
+        }
     } else if (!g_host.Load(path))
         return -1;
     g_host.CallMain();
@@ -527,6 +545,10 @@ extern "C" __declspec(dllexport) int og3_patch_start(HMODULE sharedBase, const c
         g_loadPauseMs = unsigned(GetPrivateProfileIntA("patch", "loadpause", 0, ini)) * 1000u;
         g_memLog = GetPrivateProfileIntA("patch", "memlog", 0, ini) != 0;
         SetScriptCallOptions(GetPrivateProfileIntA("patch", "scriptlog", 0, ini) != 0);
+        char aiFilter[128] = "";
+        GetPrivateProfileStringA("patch", "aitracefilter", "", aiFilter, sizeof aiFilter, ini);
+        SetAiTraceOptions(GetPrivateProfileIntA("patch", "aitrace", 0, ini) != 0, aiFilter, GetPrivateProfileIntA("patch", "aitracemax", 2000, ini));
+        SetAniSpeedLog(GetPrivateProfileIntA("patch", "anispeedlog", 0, ini) != 0);
         GetPrivateProfileStringA("patch", "mods", modsRel, modsRel, MAX_PATH, ini);
     }
     g_modsDir = (modsRel[1] == ':' || modsRel[0] == '\\') ? std::string(modsRel) : g_gameDir + modsRel;

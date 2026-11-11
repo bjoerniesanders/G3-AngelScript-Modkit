@@ -41,6 +41,8 @@ int main(int argc, char** argv) {
     }
     char tmp[MAX_PATH];
     GetTempPathA(MAX_PATH, tmp);
+    if (!std::getenv("OG3_SETTINGS_DIR"))   // Einstellungen je Mod (API 44) in den Temp-Ordner statt neben den Test-Mods
+        _putenv_s("OG3_SETTINGS_DIR", (std::string(tmp) + "og3_test_settings").c_str());
     if (!init(sb, tmp, HostLog)) {
         std::printf("og3_patch_init fehlgeschlagen\n");
         return 103;

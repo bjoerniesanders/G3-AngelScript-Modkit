@@ -7,7 +7,7 @@ AngelScript 2.38 und bindet Spielereignisse, Quests, Inventar, Dialoge und Datei
 | Ordner | Inhalt |
 |---|---|
 | `src/` | DLL-Quellen (`patch_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`), `src/loader/` (Loader = `dbghelp.dll`) |
-| `tests/` | `test_runner.cpp` (og3_patch_test), `scripts/selftest.as`, `mods/` (Ordner-Test) |
+| `tests/` | `test_runner.cpp` (og3_patch_test), `scripts/selftest.as`, `mods/` (Ordner-Test), `sb_stub/` (Ersatz-SharedBase.dll fuer Tests ohne Spieldateien) |
 | `examples/` | Beispiel-Mods (`mods/`) und Mini-Mod (`scripts/main.as`) |
 | `docs/` | `og3_patch.md` (Stand/Technik), `modkit/` (Modder-Doku) |
 | `tools/` | `g3pak_read.py` (Archive lesen, auch komprimierte Eintraege), `reference_from_log.py` (Referenz aus dem Dump), `install_loader.ps1` (Ein-/Ausbau mit dem Loader), `install_patch.ps1` (nur mit dem Proxy des Hauptrepos), `graphify_modding_sync.ps1` |
@@ -15,21 +15,24 @@ AngelScript 2.38 und bindet Spielereignisse, Quests, Inventar, Dialoge und Datei
 
 ## Bauen (32 Bit)
     cmake -S . -B build32 -A Win32
-    cmake --build build32 --config Release --target og3_patch og3_patch_test og3_loader og3_loader_test
+    cmake --build build32 --config Release --target og3_patch og3_patch_test og3_loader og3_loader_test og3_sb_stub
 Ausgabe: `build32/patch/` (og3_patch.dll, Tests, og3_packmod) und `build32/loader/dbghelp.dll` (Loader). Im Hauptrepo `OpenGothic3` wird der Ordner per `add_subdirectory(og3-patch)` eingebunden.
 
 ## Test
     og3_patch_test.exe <SharedBase.dll> tests\scripts\selftest.as
     og3_patch_test.exe <SharedBase.dll> tests\mods
     powershell -NoProfile -File tests\run_loader_test.ps1 -SharedBase <SharedBase.dll> -DbghelpOrig <dbghelp_orig.dll>   (Loader in einem Wegwerf-Ordner)
+Ohne Spieldateien: als `<SharedBase.dll>` die Ersatz-DLL `build32\sbstub\SharedBase.dll` nehmen (Ziel `og3_sb_stub`), als `<dbghelp_orig.dll>`
+die System-DLL `%WINDIR%\SysWOW64\dbghelp.dll`. Die Ersatz-DLL hat nur die Exporte, die der Patch fuer bCString und die Mathe-Typen braucht,
+und rechnet nicht bitgenau wie das Original; Messungen am Verhalten des Originals nur mit der echten SharedBase.dll.
 
 ## CI und Release (GitHub Actions)
 - `.github/workflows/ci.yml` (jeder Push auf `main`, Pull-Requests, von Hand): baut 32 Bit mit MSVC, prueft, dass `og3_patch.dll` kein `fninit` enthaelt
-  (`tools/check_no_fninit.ps1`, Schutz fuer den FPU-Fix), fuehrt `tests/packmod_generations.py` aus und packt probeweise ein Zip (Artefakt, 7 Tage).
+  (`tools/check_no_fninit.ps1`, Schutz fuer den FPU-Fix), fuehrt Selbsttest, Test-Mods, Kompilierpruefung der Beispiel-Mods und Loader-Test mit der Ersatz-SharedBase aus, dazu `tests/packmod_generations.py`, und packt probeweise ein Zip (Artefakt, 7 Tage).
 - `.github/workflows/release.yml`: beim Push eines Tags `v*` dasselbe plus GitHub-Release mit dem Zip:
       git tag v0.30.0
       git push origin v0.30.0
-- Paket lokal: `powershell -NoProfile -File tools\package_release.ps1 -BuildDir build32 -Version v0.39.0` (Ergebnis in `dist\`). Inhalt: Loader, `og3_patch.dll`,
+- Paket lokal: `powershell -NoProfile -File tools\package_release.ps1 -BuildDir build32 -Version v0.42.0` (Ergebnis in `dist\`). Inhalt: Loader, `og3_patch.dll`,
   `og3_packmod.exe`, `tools\install_loader.ps1`, Beispiel-Mods (standardmaessig aus), Doku, `INSTALL.txt`; keine Spieldateien.
 - Nicht in der CI: Selbsttest, Mod-Tests, Kompilierpruefung der Beispiele, Loader-Test und PackMod-Rundlauf. Sie brauchen die `SharedBase.dll` bzw. Archive des
   Spiels, die nicht ins Repo gehoeren, und laufen lokal (Abschnitt Test).

@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#define OG3_SCRIPT_API_VERSION 39
+#define OG3_SCRIPT_API_VERSION 45
 
 class asIScriptEngine;
 class asIScriptContext;
@@ -62,7 +62,7 @@ public:
     // true = ein Mod hat uebernommen: *result ist das Ergebnis fuer das Spiel, *originalCalled sagt, ob das Original gelaufen ist; false = niemand hat die Funktion
     // original(args): das Original der Spielfunktion; bekommt die Argumente der Kette (ein Mod kann sie mit SetOverrideArg veraendert haben)
     bool CallOverride(const char* decl, const EvArg* args, int n, std::function<bool(const EvArg*)> original, bool* result,
-                      bool* originalCalled);
+                      bool* originalCalled, EvArg* finalArgs = nullptr);   // finalArgs: Argumente nach der Kette (n Stueck)
     // Argument der gerade laufenden Override-Kette setzen (nur Zahlen: Kind UInt); Super() reicht den neuen Wert an den naechsten Mod und das Original weiter
     bool SetOverrideArg(int index, unsigned value);
     bool GetOverrideArg(int index, unsigned* value) const;
@@ -75,6 +75,15 @@ public:
         if (log_) log_(s);
     }
     const char* CurrentMod() const { return curMod_.c_str(); }
+    // Mod-Ordner (leer im Einzelskript-Betrieb) und Ordner eines geladenen Mods (Verzeichnis seiner main.as; leer, wenn unbekannt)
+    const std::string& ModsDir() const { return modsDir_; }
+    std::string ModDir(const std::string& mod) const;
+    // Zwischen Mods (ab Version 44): "bCString <func>(const bCString &in)" im Mod <mod> aufrufen. false, wenn Mod oder Funktion fehlt, bei Skriptfehler
+    // oder zu tiefer Verschachtelung (hoechstens 8). out (SStr*) bekommt den Rueckgabetext. HasModTextFunction: gibt es die Funktion dort?
+    bool CallModText(const std::string& mod, const std::string& func, const void* arg, void* out);
+    bool HasModTextFunction(const std::string& mod, const std::string& func);
+    // "void OnModMessage(const bCString &in sender, const bCString &in topic, const bCString &in data)" in allen anderen Mods; Rueckgabe: Zahl der Empfaenger
+    int SendModMessage(const void* topic, const void* data);
 
     // fuer die Bindings
     static ScriptHost* s_current;
@@ -101,7 +110,8 @@ private:
     std::vector<Chain> chain_;
     asIScriptFunction* FindFn(Mod& m, const char* decl);
     bool Execute(void* func, float* argFloat, const int* argInt = nullptr, const bool* argBool = nullptr, const EvArg* ev = nullptr,
-                 int nev = 0, bool* retBool = nullptr);
+                 int nev = 0, bool* retBool = nullptr, void* retText = nullptr);   // retText: SStr* fuer Funktionen mit bCString-Rueckgabe
+    int modCallDepth_ = 0;
     bool Build(Mod& m);   // (neu) uebersetzen; vorher OnShutdown + Verwerfen des alten Moduls
     void Unload(Mod& m);
     Mod* Find(const std::string& name);
@@ -170,7 +180,16 @@ void DrawFrameTick();
 bool OnGameThread();
 // Ereignisse 7.3 (more_events.cpp): Konsole, Quest-Status
 int InstallMoreEventHooks(ScriptHost& host);
-void MoreEventsFrame();   // einmal je Bild (Spiel-Takt): OnTouch-Handler, Verwandlungs-Hooks, Messung
+void MoreEventsFrame();
+// Einstellungen je Mod (mod_settings.cpp, ab Version 44): Bindings; ModSettingsForget beim Neuladen eines Mods (Zwischenspeicher verwerfen)
+bool RegisterModSettingsBindings(asIScriptEngine* e);
+void ModSettingsForget(const std::string& mod);
+// KI-Tracer (ai_trace.cpp): nur Protokoll, ini [patch] aitrace/aitracefilter/aitracemax; InstallAiTrace haengt nur ein, wenn eingeschaltet
+void SetAiTraceOptions(bool enabled, const char* filter, int maxLines);
+void SetAniSpeedLog(bool enabled);   // ini [patch] anispeedlog: Messung SetPlaySpeed/GetPlaySpeed (Roadmap 6.3)
+int InstallAiTrace(ScriptHost& host);
+// Eingriffe mitten in Spielskripten (combat_patches.cpp, Originalbytes geprueft): Override_MonsterDamage; bei jeder Weltaktivierung aufrufen (einmalig wirksam)
+int InstallScriptGamePatches(ScriptHost& host);   // einmal je Bild (Spiel-Takt): OnTouch-Handler, Verwandlungs-Hooks, Messung
 // Script.dll-Entity-Objekt (0xA8 Byte, gemessen) per Konstruktor der Script.dll bauen; Puffer mit kScriptEntityBytes, Ausrichtung 8
 constexpr unsigned kScriptEntityBytes = 0x100;
 bool MakeScriptEntity(void* buf, void* ent);                // Messung jetzt schreiben (beim Entladen einer Welt)

@@ -17,6 +17,17 @@
 //   void OnScript(const bCString &in name, Entity self, Entity other, int arg, int result)  - danach, nur wenn das Original lief
 //   SetScriptResult(int)                     - Ergebnis fuers Spiel, wenn Override_Script das Original NICHT aufruft (sonst 1 bei true, 0 bei false)
 // Messung (ini [patch] scriptlog=1): alle 60 s die haeufigsten Skriptnamen je Weg, Aufrufe aus anderen Threads und die Zeit in unseren Hooks.
+//
+// KI-Skripte (API 41): Neben m_Scripts hat gCScriptAdmin vier weitere Tabellen (gemessen am Assembler der Game.dll 2026-11-10): Zustaende (+0x1B0, "ZS_..."),
+// KI-Funktionen (+0x1C0, "_AI_..."), Callbacks (+0x1D0) und Routinen (+0x1E0). Je Tabelle gibt es genau einen Export, der nachschlaegt und aufruft:
+//   RunScriptState/RunScriptFunction(Name, Zustandsstapel, SPU) -> bool, aufgerufen von gCScriptProcessingUnit::ProcessScript und aus den Script-DLLs,
+//   RunScriptCallback/RunScriptRoutine(Name, SPU) -> bool, aufgerufen von RunLocalCallback/RunTaskCallback bzw. der Tagesablauf-Erkennung.
+// Zustaende und KI-Funktionen laufen in Abschnitten ueber mehrere Bilder: false = noch nicht fertig (naechstes Bild weiter), true = fertig. Ein Zustand
+// wird darum jedes Bild erneut gerufen. Unbekannte Namen meldet das Spiel und liefert true.
+// Fuer Mods (gleiche Namensliste wie WatchScript):
+//   bool Override_AI(const bCString &in name, int kind, Entity self, Entity target)    - kind AI_STATE/AI_FUNCTION/AI_CALLBACK/AI_ROUTINE; Super() = Original;
+//                                                                                         die Rueckgabe geht ans Spiel (auch ohne Super)
+//   void OnAI(const bCString &in name, int kind, Entity self, Entity target, int result) - danach, nur wenn das Original lief
 #include <windows.h>
 
 #include <angelscript.h>
@@ -56,7 +67,7 @@ struct Api {
     FindModuleFn findModule = nullptr;
     CallFromScriptFn callFromScript = nullptr;
     ScriptDllFn scriptDll = nullptr;
-    SpuEntFn spuSelf = nullptr, spuOther = nullptr;
+    SpuEntFn spuSelf = nullptr, spuOther = nullptr, spuTarget = nullptr;
     SpuIntFn spuInt = nullptr;
     SpuSetIntFn spuSetInt = nullptr;
     void* admin = nullptr;
@@ -78,6 +89,7 @@ bool ResolveApi() {
     g_a.scriptDll = reinterpret_cast<ScriptDllFn>(G("?GetScriptDLLWithScript@gCScriptAdmin@@UBE_NABVbCString@@AAV2@@Z"));
     g_a.spuSelf = reinterpret_cast<SpuEntFn>(G("?GetSelfEntity@gCScriptProcessingUnit@@QAEPAVeCEntity@@XZ"));
     g_a.spuOther = reinterpret_cast<SpuEntFn>(G("?GetOtherEntity@gCScriptProcessingUnit@@QAEPAVeCEntity@@XZ"));
+    g_a.spuTarget = reinterpret_cast<SpuEntFn>(G("?GetTargetEntity@gCScriptProcessingUnit@@QAEPAVeCEntity@@XZ"));
     g_a.spuInt = reinterpret_cast<SpuIntFn>(G("?GetIntParameter@gCScriptProcessingUnit@@QAEHXZ"));
     g_a.spuSetInt = reinterpret_cast<SpuSetIntFn>(G("?SetIntParameter@gCScriptProcessingUnit@@QAEXH@Z"));
     return true;
@@ -330,7 +342,9 @@ struct HookTimer {
 // Gemeinsamer Ablauf beider Hooks fuer beobachtete Namen: Override-Kette, dann OnScript
 template <class Orig>
 int Dispatch(const void* name, void* self, void* other, int arg, Orig original) {
-    EvArg a[] = {EvArg::Str(name), EvArg::Ent(self), EvArg::Ent(other), EvArg::U(static_cast<unsigned>(arg))};
+    const char* nm = SafeStrText(name, nullptr);   // Kopie fuer die Skripte: der Name des Aufrufers muss das Original nicht ueberleben
+    const SStr copy(nm ? nm : "");
+    EvArg a[] = {EvArg::Str(&copy), EvArg::Ent(self), EvArg::Ent(other), EvArg::U(static_cast<unsigned>(arg))};
     int result = 0, used = arg;   // used: Zahl, mit der das Original wirklich lief (SetOverrideArg)
     bool origRan = false;
     g_results.emplace_back();
@@ -352,7 +366,7 @@ int Dispatch(const void* name, void* self, void* other, int arg, Orig original) 
     } else if (!origRan)
         result = rf.set ? rf.value : (res ? 1 : 0);
     if (origRan) {
-        EvArg e[] = {EvArg::Str(name), EvArg::Ent(self), EvArg::Ent(other), EvArg::U(static_cast<unsigned>(used)), EvArg::U(static_cast<unsigned>(result))};
+        EvArg e[] = {EvArg::Str(&copy), EvArg::Ent(self), EvArg::Ent(other), EvArg::U(static_cast<unsigned>(used)), EvArg::U(static_cast<unsigned>(result))};
         g_host->CallEvent(kEvent, e, 5);
     }
     return result;
@@ -396,6 +410,93 @@ int __fastcall HRunFrom(void* admin, void*, const void* name, void* spu, void* s
     return r;
 }
 
+// ---- KI-Skripte (API 41)
+typedef bool(__thiscall* RunAIStackFn)(void*, const void*, void*, void*);
+typedef bool(__thiscall* RunAISpuFn)(void*, const void*, void*);
+RunAIStackFn o_runState = nullptr, o_runFunction = nullptr;
+RunAISpuFn o_runCallback = nullptr, o_runRoutine = nullptr;
+const int kAIState = 1, kAIFunction = 2, kAICallback = 3, kAIRoutine = 4;
+const char* kOverrideAI = "bool Override_AI(const bCString &in, int, Entity, Entity)";
+const char* kEventAI = "void OnAI(const bCString &in, int, Entity, Entity, int)";
+
+// Der Name zeigt in den Zustandsstapel des NPCs (ProcessScript uebergibt &Eintrag.m_strScriptName, gemessen 2026-11-10). Zustaende und KI-Funktionen bauen
+// den Stapel beim Laufen um, danach zeigt der Zeiger auf freigegebenen Speicher: im Spieltest kam OnAI fuer ZS_ObserveSuspect mit zerstoertem Namen an.
+// Skripte bekommen darum eine Kopie des Namens; das Original bekommt den Zeiger des Spiels.
+// Messzeilen: die ersten 8 Aufrufe je Art. Die Tiefe wird ueber ein Objekt zurueckgezaehlt.
+int g_aiDiag[5] = {};
+bool g_aiDeepLogged = false;
+void AIDiag(int kind, const std::string& s) {
+    if (kind < 0 || kind > 4 || g_aiDiag[kind] >= 8 * 5 || !g_host) return;
+    ++g_aiDiag[kind];
+    g_host->Log("KI-Messung: " + s);
+}
+struct DepthGuard {
+    long before;
+    DepthGuard() : before(g_depth) { ++g_depth; }
+    ~DepthGuard() { g_depth = before; }
+};
+bool WatchAI(const void* name) {
+    if (!g_watchCount || !g_gameThread || GetCurrentThreadId() != g_gameThread) return false;
+    const char* n = SafeStrText(name, nullptr);
+    if (!IsWatched(n)) return false;
+    if (g_depth >= 8) {
+        if (!g_aiDeepLogged && g_host) g_host->Log(std::string("KI: '") + (n ? n : "?") + "' ausgelassen, Verschachtelung " + std::to_string(g_depth) + " (nur einmal gemeldet)");
+        g_aiDeepLogged = true;
+        return false;
+    }
+    return true;
+}
+template <class Orig>
+bool DispatchAI(const void* name, int kind, void* spu, Orig original) {
+    DepthGuard guard;
+    const char* nm = SafeStrText(name, nullptr);
+    const SStr copy(nm ? nm : "");
+    const std::string tag = std::string(nm ? nm : "?") + " (Art " + std::to_string(kind) + ", Tiefe " + std::to_string(guard.before) + ")";
+    AIDiag(kind, "Beginn " + tag);
+    void* self = SafeSpuEnt(g_a.spuSelf, spu);
+    void* target = SafeSpuEnt(g_a.spuTarget, spu);
+    EvArg a[] = {EvArg::Str(&copy), EvArg::U(unsigned(kind)), EvArg::Ent(self), EvArg::Ent(target)};
+    bool result = false, origRan = false, res = false, called = false;
+    const bool taken = g_host->CallOverride(
+        kOverrideAI, a, 4,
+        [&](const EvArg*) {
+            AIDiag(kind, "Original startet " + tag);
+            result = original();
+            origRan = true;
+            AIDiag(kind, std::string("Original zurueck ") + tag + ", Ergebnis " + (result ? "1" : "0"));
+            return result;
+        },
+        &res, &called);
+    AIDiag(kind, std::string("Override fertig ") + tag + ": uebernommen " + (taken ? "1" : "0") + ", Original lief " + (origRan ? "1" : "0") + ", Rueckgabe " +
+           (res ? "1" : "0"));
+    if (!taken) {
+        result = original();
+        origRan = true;
+    } else
+        result = res;
+    if (origRan) {
+        EvArg e[] = {EvArg::Str(&copy), EvArg::U(unsigned(kind)), EvArg::Ent(self), EvArg::Ent(target), EvArg::U(result ? 1u : 0u)};
+        g_host->CallEvent(kEventAI, e, 5);
+        AIDiag(kind, "OnAI gesendet " + tag);
+    }
+    return result;
+}
+bool __fastcall HRunState(void* admin, void*, const void* name, void* stack, void* spu) {
+    if (!WatchAI(name)) return o_runState(admin, name, stack, spu);
+    return DispatchAI(name, kAIState, spu, [&] { return o_runState(admin, name, stack, spu); });
+}
+bool __fastcall HRunFunction(void* admin, void*, const void* name, void* stack, void* spu) {
+    if (!WatchAI(name)) return o_runFunction(admin, name, stack, spu);
+    return DispatchAI(name, kAIFunction, spu, [&] { return o_runFunction(admin, name, stack, spu); });
+}
+bool __fastcall HRunCallback(void* admin, void*, const void* name, void* spu) {
+    if (!WatchAI(name)) return o_runCallback(admin, name, spu);
+    return DispatchAI(name, kAICallback, spu, [&] { return o_runCallback(admin, name, spu); });
+}
+bool __fastcall HRunRoutine(void* admin, void*, const void* name, void* spu) {
+    if (!WatchAI(name)) return o_runRoutine(admin, name, spu);
+    return DispatchAI(name, kAIRoutine, spu, [&] { return o_runRoutine(admin, name, spu); });
+}
 
 }   // namespace
 
@@ -413,6 +514,10 @@ bool RegisterScriptCallBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("bCString GetScriptDll(const bCString &in name)", asFUNCTION(GetScriptDllScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("void WatchScript(const bCString &in name)", asFUNCTION(WatchScriptScript), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("void SetScriptResult(int value)", asFUNCTION(SetScriptResultScript), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalProperty("const int AI_STATE", const_cast<int*>(&kAIState)));
+    OG3_REG(e->RegisterGlobalProperty("const int AI_FUNCTION", const_cast<int*>(&kAIFunction)));
+    OG3_REG(e->RegisterGlobalProperty("const int AI_CALLBACK", const_cast<int*>(&kAICallback)));
+    OG3_REG(e->RegisterGlobalProperty("const int AI_ROUTINE", const_cast<int*>(&kAIRoutine)));
     return ok;
 }
 
@@ -449,8 +554,18 @@ int InstallScriptCallHooks(ScriptHost& host) {
                     reinterpret_cast<void**>(&o_run), host);
     n += HookExport(game, "?RunScriptFromScript@gCScriptAdmin@@QAEHABVbCString@@PAVgCScriptProcessingUnit@@PAX2H@Z",
                     reinterpret_cast<void*>(&HRunFrom), reinterpret_cast<void**>(&o_runFrom), host);
-    char b[160];
-    std::snprintf(b, sizeof b, "Skriptaufrufe: %d von 2 Hooks aktiv (RunScript, RunScriptFromScript)%s; CallScript %s", n,
+    const char* aiState = "?RunScriptState@gCScriptAdmin@@QAE_NABVbCString@@AAV?$bTObjStack@UgScriptRunTimeSingleState@@@@PAVgCScriptProcessingUnit@@@Z";
+    const char* aiFunction = "?RunScriptFunction@gCScriptAdmin@@QAE_NABVbCString@@AAV?$bTObjStack@UgScriptRunTimeSingleState@@@@PAVgCScriptProcessingUnit@@@Z";
+    int ai = 0;
+    ai += HookExport(game, aiState, reinterpret_cast<void*>(&HRunState), reinterpret_cast<void**>(&o_runState), host);
+    ai += HookExport(game, aiFunction, reinterpret_cast<void*>(&HRunFunction), reinterpret_cast<void**>(&o_runFunction), host);
+    ai += HookExport(game, "?RunScriptCallback@gCScriptAdmin@@QAE_NABVbCString@@PAVgCScriptProcessingUnit@@@Z", reinterpret_cast<void*>(&HRunCallback),
+                     reinterpret_cast<void**>(&o_runCallback), host);
+    ai += HookExport(game, "?RunScriptRoutine@gCScriptAdmin@@QAE_NABVbCString@@PAVgCScriptProcessingUnit@@@Z", reinterpret_cast<void*>(&HRunRoutine),
+                     reinterpret_cast<void**>(&o_runRoutine), host);
+    n += ai;
+    char b[200];
+    std::snprintf(b, sizeof b, "Skriptaufrufe: %d von 6 Hooks aktiv (RunScript, RunScriptFromScript, KI: %d von 4)%s; CallScript %s", n, ai,
                   g_stats ? ", Messung an (scriptlog=1)" : "", g_a.callFromScript ? "bereit" : "NICHT verfuegbar");
     host.Log(b);
     return n;

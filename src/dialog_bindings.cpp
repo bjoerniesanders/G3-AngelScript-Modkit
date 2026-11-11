@@ -9,11 +9,13 @@
 
 #include <angelscript.h>
 
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <map>
 #include <string>
+#include <vector>
 
 #include <MinHook.h>
 
@@ -371,6 +373,64 @@ bool SafeAddCmd(void* script, const void* c, const void* e1, const void* e2, con
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
+// Text zu einer ID der Stringtabelle (API 41), z. B. die Satz-ID aus OnAIOutput: eCLocString(id).GetString(), mit Texten aus RegisterText und den Mod-Stringtabellen
+bool SafeLocText(const void* id, std::wstring* out) {
+    void* loc = nullptr;
+    __try {
+        g_d.locCtor(&loc, id);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    const bool ok = SafeUnicode(g_d.locGetString, &loc, out);
+    __try {
+        g_d.locDtor(&loc);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    return ok;
+}
+SStr GetLocText(const SStr& id) {
+    Resolve();
+    std::wstring w;
+    if (!g_d.locCtor || !g_d.locDtor || !g_d.locGetString || !g_d.uniText || !g_d.uniDtor || !SafeLocText(&id, &w)) return SStr();
+    return SStr(Narrow(w).c_str());
+}
+
+// Text eines gesprochenen Satzes (API 41) aus der Satz-ID von OnAIOutput. Die ID ist der Name der Sprachdatei, z. B.
+// "INFO_Hum_Elite_Hard_Bufford_SKALVERAM3638_German" (gemessen 2026-11-10), die Schluessel der Stringtabelle heissen dagegen "INFO_<Zeile>"
+// (z. B. INFO_NSCHNEIDER20060321163431). Wo die Stimme endet und die Zeile beginnt, steht nicht fest (Zeilen koennen "_3" enthalten): darum werden die
+// moeglichen Schluessel von kurz nach lang probiert (zuerst die ID selbst), die Sprache am Ende wird abgeschnitten. Erster nicht leerer Text gewinnt.
+std::string LocLookup(const std::string& key) {
+    std::wstring w;
+    SStr k(key.c_str());
+    if (!SafeLocText(&k, &w) || w.empty()) return std::string();
+    const std::string t = Narrow(w);
+    return t == key ? std::string() : t;   // falls das Spiel bei unbekannten Schluesseln den Schluessel selbst liefert
+}
+SStr GetSpeechText(const SStr& id) {
+    Resolve();
+    if (!g_d.locCtor || !g_d.locDtor || !g_d.locGetString || !g_d.uniText || !g_d.uniDtor) return SStr();
+    const std::string full = id.c_str();
+    std::string t = LocLookup(full);
+    if (!t.empty()) return SStr(t.c_str());
+    std::vector<std::string> parts;
+    for (size_t b = 0;;) {
+        const size_t e = full.find('_', b);
+        parts.push_back(full.substr(b, e == std::string::npos ? std::string::npos : e - b));
+        if (e == std::string::npos) break;
+        b = e + 1;
+    }
+    if (parts.size() < 3) return SStr();
+    bool lang = parts.back().size() >= 4;   // "German", "English": nur Buchstaben
+    for (char c : parts.back())
+        if (!std::isalpha(static_cast<unsigned char>(c))) lang = false;
+    const size_t end = lang ? parts.size() - 1 : parts.size();
+    for (size_t first = end - 1; first >= 1; --first) {   // Zeile = parts[first..end)
+        std::string key = parts[0];
+        for (size_t i = first; i < end; ++i) key += "_" + parts[i];
+        t = LocLookup(key);
+        if (!t.empty()) return SStr(t.c_str());
+        if (first == 1) break;
+    }
+    return SStr();
+}
+
 bool WriteReady() {
     return Resolve() && g_d.addInfo && g_d.setOwner && g_d.accessType && g_d.accessCond && g_d.addCmd && g_d.locCtor && g_d.locDtor;
 }
@@ -517,6 +577,8 @@ void __fastcall HInfoFinished(void* self, void*, const void* info) {
 bool RegisterDialogBindings(asIScriptEngine* e) {
     bool ok = true;
     OG3_REG(e->RegisterGlobalFunction("int GetInfoCount()", asFUNCTION(GetInfoCount), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bCString GetLocText(const bCString &in id)", asFUNCTION(GetLocText), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bCString GetSpeechText(const bCString &in id)", asFUNCTION(GetSpeechText), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bCString GetInfoName(int)", asFUNCTION(GetInfoName), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bCString GetInfoOwner(int)", asFUNCTION(GetInfoOwner), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bCString DescribeInfo(const bCString &in)", asFUNCTION(DescribeInfo), asCALL_CDECL));

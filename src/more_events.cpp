@@ -11,6 +11,7 @@
 #include <angelscript.h>
 
 #include <cstdio>
+#include <cstring>
 #include <string>
 
 #include <MinHook.h>
@@ -255,6 +256,88 @@ void __fastcall HEndTr(void* self) {
 }
 
 
+// ---- Sprachausgabe (API 41): Game gCScriptProcessingUnit::sAIOutputInstr(args, SPU, fullStop), die KI-Anweisung "Satz sprechen" (gemessen am Assembler
+// 2026-11-10). Sie laeuft jedes Bild, solange der Satz laeuft: Beim Start ist args = {eCEntity* Sprecher, bCString Satz-ID} (die ID ist auch der Name der
+// Sprachdatei ohne ".wav", die Mindestdauer setzt das Spiel auf (Laenge der ID + 10) * 100 ms); danach args = nullptr, zum Abbrechen fullStop = true.
+// OnAIOutput(sprecher, id) kommt einmal je Satz, nach dem Start der Ausgabe. Den Text liefert GetLocText(id).
+typedef bool(__stdcall* OutputFn)(void*, void*, bool);
+OutputFn o_output = nullptr;
+int g_outLogged = 0;
+
+bool __stdcall HOutput(void* args, void* spu, bool fullStop) {
+    const bool r = o_output(args, spu, fullStop);
+    if (fullStop || !args || !g_host || !OnGameThread() || !ReadableMem(args, 8)) return r;
+    void* speaker = *static_cast<void**>(args);
+    const void* id = static_cast<const char*>(args) + 4;
+    const char* t = SafeStrText(id, nullptr);
+    if (!speaker || !t || !*t) return r;
+    if (g_outLogged < 20) {
+        ++g_outLogged;
+        g_host->Log("Sprachausgabe: '" + EntName(speaker) + "' sagt '" + t + "'");
+    }
+    EvArg a[] = {EvArg::Ent(speaker), EvArg::Str(id)};
+    g_host->CallEvent("void OnAIOutput(Entity, const bCString &in)", a, 2);
+    return r;
+}
+
+// ---- Kampfbewegung (API 45): Game.dll gCScriptProcessingUnit::sAICombatMoveStart(void* args, gCScriptProcessingUnit*) stdcall -> bool.
+// Gemessen (2026-11-11, Assembler + PlayMotion-Messung): args+0x0C bCString (das Spiel prueft ihn auf "Hit"), args+0x10 float = Abspielgeschwindigkeit
+// der Kampfbewegung; die Funktion kopiert sie nach SPU+0x160 und in die Bewegungsbeschreibung (SPU+0x13C = eSMotionDesc+8) fuer PlayMotion. Ein NPC
+// (Gamal) griff mit 1,3 an. Override_CombatMove(self, move, speedPercent): SetOverrideArg(2, p) setzt die Geschwindigkeit in Prozent fuer diesen Aufruf;
+// der Wert in args wird nach dem Original zurueckgestellt (falls dieselben Argumente erneut benutzt werden, soll nichts aufaddiert werden).
+typedef bool(__stdcall* CmStartFn)(void*, void*);
+typedef void*(__thiscall* SpuEntityFn)(void*);
+CmStartFn o_cmStart = nullptr;
+SpuEntityFn g_spuSelf = nullptr;
+int g_cmLogged = 0;
+
+void* SafeSpuSelf(void* spu) {
+    if (!spu || !g_spuSelf) return nullptr;
+    __try {
+        return g_spuSelf(spu);
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
+}
+bool __stdcall HCmStart(void* args, void* spu) {
+    float* speed = args && ReadableMem(args, 0x14) ? reinterpret_cast<float*>(static_cast<char*>(args) + 0x10) : nullptr;
+    if (!speed || !g_host) {
+        if (!speed) NoteNull("Override_CombatMove: Argumente der Kampfbewegung");
+        return o_cmStart(args, spu);
+    }
+    const float orig = *speed;
+    void* self = SafeSpuSelf(spu);
+    const SStr move(SafeStrText(static_cast<char*>(args) + 0x0C, ""));
+    float applied = orig;
+    bool res = false, called = false, taken = false;
+    if (OnGameThread()) {
+        const unsigned pct = orig > 0 && orig < 1000 ? static_cast<unsigned>(orig * 100.0f + 0.5f) : 0;
+        EvArg a[] = {EvArg::Ent(self), EvArg::Str(&move), EvArg::U(pct)};
+        taken = g_host->CallOverride(
+            "bool Override_CombatMove(Entity, const bCString &in, uint)", a, 3,
+            [&](const EvArg* ar) {
+                applied = ar[2].value != pct ? static_cast<float>(ar[2].value) / 100.0f : orig;   // unveraendert: Originalwert ohne Rundung
+                *speed = applied;
+                const bool r = o_cmStart(args, spu);
+                *speed = orig;
+                return r;
+            },
+            &res, &called);
+    }
+    if (!taken) res = o_cmStart(args, spu);
+    if (g_cmLogged < 40) {
+        ++g_cmLogged;
+        char b[260];
+        std::snprintf(b, sizeof b, "Kampfbewegung: %.60s '%.60s' Geschwindigkeit %.3f%s", SafeEntName(self), move.c_str(), orig,
+                      taken ? (called ? (applied != orig ? " -> geaendert" : " (Override, unveraendert)") : " (Override ohne Original)") : "");
+        if (taken && called && applied != orig) {
+            char c[40];
+            std::snprintf(c, sizeof c, " %.3f", applied);
+            std::strncat(b, c, sizeof b - std::strlen(b) - 1);
+        }
+        g_host->Log(b);
+    }
+    return res;
+}
+
 }   // namespace
 
 bool RegisterMoreEventBindings(asIScriptEngine* e) {
@@ -271,6 +354,7 @@ int InstallMoreEventHooks(ScriptHost& host) {
     if (game) {
         g_getStatus = reinterpret_cast<GetRefFn>(GetProcAddress(game, "?GetStatus@gCQuest_PS@@QBEABV?$bTPropertyContainer@W4gEQuestStatus@@@@XZ"));
         g_getName = reinterpret_cast<GetRefFn>(GetProcAddress(game, "?GetName@gCQuest_PS@@QBEABVbCString@@XZ"));
+        g_spuSelf = reinterpret_cast<SpuEntityFn>(GetProcAddress(game, "?GetSelfEntity@gCScriptProcessingUnit@@QAEPAVeCEntity@@XZ"));
     }
     if (eng) {
         g_accessConsole = reinterpret_cast<AccessConsoleFn>(GetProcAddress(eng, "?AccessConsole@eCConsole@@SGAAV1@XZ"));
@@ -287,7 +371,12 @@ int InstallMoreEventHooks(ScriptHost& host) {
                  reinterpret_cast<void**>(&o_touch), host);
     n += HookExport(game, "?GenerateTradeInvFromTreasureSets@gCInventory_PS@@QAE_NXZ", reinterpret_cast<void*>(&HGenTrade),
                  reinterpret_cast<void**>(&o_genTrade), host);
-    host.Log("Ereignisse 7.3: " + std::to_string(n) + " von 4 Hooks aktiv (Konsole, Quest-Status, Beruehrung, Haendlerware)");
+    n += HookExport(game, "?sAIOutputInstr@gCScriptProcessingUnit@@SG_NPAXPAV1@_N@Z", reinterpret_cast<void*>(&HOutput),
+                 reinterpret_cast<void**>(&o_output), host);
+    n += HookExport(game, "?sAICombatMoveStart@gCScriptProcessingUnit@@KG_NPAXPAV1@@Z", reinterpret_cast<void*>(&HCmStart),
+                 reinterpret_cast<void**>(&o_cmStart), host);
+    host.Log("Ereignisse 7.3: " + std::to_string(n) +
+             " von 6 Hooks aktiv (Konsole, Quest-Status, Beruehrung, Haendlerware, Sprachausgabe, Kampfbewegung)");
     return n;
 }
 

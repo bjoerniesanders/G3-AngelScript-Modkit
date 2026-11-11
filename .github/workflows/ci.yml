@@ -20,12 +20,12 @@ jobs:
         run: cmake -S . -B build -A Win32
 
       - name: Build
-        run: cmake --build build --config Release --parallel --target og3_patch og3_loader og3_packmod og3_patch_test og3_loader_test
+        run: cmake --build build --config Release --parallel --target og3_patch og3_loader og3_packmod og3_patch_test og3_loader_test og3_sb_stub
 
       - name: Check build output
         shell: pwsh
         run: |
-          foreach ($f in 'build/patch/og3_patch.dll', 'build/loader/dbghelp.dll', 'build/patch/og3_packmod.exe', 'build/patch/og3_patch_test.exe', 'build/patch/og3_loader_test.exe') {
+          foreach ($f in 'build/patch/og3_patch.dll', 'build/loader/dbghelp.dll', 'build/patch/og3_packmod.exe', 'build/patch/og3_patch_test.exe', 'build/patch/og3_loader_test.exe', 'build/sbstub/SharedBase.dll') {
             if (-not (Test-Path $f)) { throw "$f is missing" }
             "{0,-32} {1,9} bytes" -f $f, (Get-Item $f).Length
           }
@@ -33,6 +33,37 @@ jobs:
       - name: FPU fix active (no fninit)
         shell: pwsh
         run: ./tools/check_no_fninit.ps1 -Dll build/patch/og3_patch.dll
+
+      # The real SharedBase.dll is a game file and not in the repository; tests/sb_stub builds a stand-in with the same exports.
+      - name: Self test (stub SharedBase)
+        shell: pwsh
+        run: |
+          ./build/patch/og3_patch_test.exe build/sbstub/SharedBase.dll tests/scripts/selftest.as
+          if ($LASTEXITCODE -ne 0) { throw "self test failed ($LASTEXITCODE)" }
+
+      - name: Test mods (stub SharedBase)
+        shell: pwsh
+        run: |
+          ./build/patch/og3_patch_test.exe build/sbstub/SharedBase.dll tests/mods
+          if ($LASTEXITCODE -ne 0) { throw "test mods failed ($LASTEXITCODE)" }
+
+      # Compile check of all example mods. The example set deliberately breaks the override-chain check (several mods override the
+      # same hook), so exactly that one failure is expected; any script error or other failure fails the step.
+      - name: Example mods compile (stub SharedBase)
+        shell: pwsh
+        run: |
+          $out = ./build/patch/og3_patch_test.exe build/sbstub/SharedBase.dll examples/mods 2>&1 | Out-String
+          $out
+          if ($out -match 'Skript enthaelt Fehler|nicht ladbar|Skript nicht geladen') { throw "an example mod does not compile" }
+          $fails = ([regex]::Matches($out, 'PRUEFUNG FEHLGESCHLAGEN: (.*)') | ForEach-Object { $_.Groups[1].Value.Trim() })
+          $unexpected = $fails | Where-Object { $_ -notlike 'Override-Kette ueber mehrere Mods*' }
+          if ($unexpected) { throw "unexpected failures: $($unexpected -join '; ')" }
+
+      - name: Loader test (stub SharedBase, system dbghelp)
+        shell: pwsh
+        run: |
+          ./tests/run_loader_test.ps1 -SharedBase build/sbstub/SharedBase.dll -DbghelpOrig "$env:WINDIR\SysWOW64\dbghelp.dll" -BuildDir build
+          if ($LASTEXITCODE -ne 0) { throw "loader test failed ($LASTEXITCODE)" }
 
       - name: PackMod numbering
         run: python -I tests/packmod_generations.py build/patch/og3_packmod.exe

@@ -865,6 +865,7 @@ int InstallGameHooks(ScriptHost& host) {
     InstallScriptCallHooks(host);
     InstallDrawHooks(host);
     InstallMoreEventHooks(host);
+    InstallAiTrace(host);   // nur mit ini [patch] aitrace=1
     return n;
 }
 

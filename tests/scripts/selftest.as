@@ -164,6 +164,9 @@ void main() {
     TestMatrix4();
     TestPackMod();
     check(!SetOverrideArg(0, 1), "SetOverrideArg ausserhalb eines Overrides wird abgelehnt");
+    check(AI_STATE == 1 && AI_FUNCTION == 2 && AI_CALLBACK == 3 && AI_ROUTINE == 4, "KI-Konstanten");
+    check(GetLocText("OG3_Gibt_Es_Nicht").IsEmpty() && !IsModActive("gibts_nicht") && GetModVersion("gibts_nicht").IsEmpty() && GetSpeechText("INFO_A_B_German").IsEmpty(), "GetLocText/GetSpeechText/IsModActive ohne Spiel");
+    check(DumpPropertySchema("../x.json") == -2 && DumpPropertySchema("a/b.json") == -2 && DumpPropertySchema("") == -2, "DumpPropertySchema: nur schlichte Dateinamen");
     TestEntity();
     print("Selbsttest fertig");
 }

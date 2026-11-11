@@ -6,11 +6,15 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <new>
+#include <set>
 #include <string>
 #include <unordered_map>
 
@@ -352,6 +356,17 @@ unsigned GetTimeStamp() {
     return f ? unsigned(f()) : GetTickCount();
 }
 int GetApiVersion() { return OG3_SCRIPT_API_VERSION; }
+bool IsModActive(const SStr& name);   // Mod-Abhaengigkeiten, weiter unten bei DiscoverMods
+SStr CallModScript(const SStr& mod, const SStr& func, const SStr& arg) {
+    SStr out;
+    if (ScriptHost::s_current) ScriptHost::s_current->CallModText(mod.c_str(), func.c_str(), &arg, &out);
+    return out;
+}
+bool ModFunctionExistsScript(const SStr& mod, const SStr& func) {
+    return ScriptHost::s_current && ScriptHost::s_current->HasModTextFunction(mod.c_str(), func.c_str());
+}
+int SendModMessageScript(const SStr& topic, const SStr& data) { return ScriptHost::s_current ? ScriptHost::s_current->SendModMessage(&topic, &data) : 0; }
+SStr GetModVersion(const SStr& name);
 
 // Fenster/Eingabe/Ton (Windows): das Spielfenster = groesstes sichtbares Hauptfenster dieses Prozesses
 HWND FindGameWindow() {
@@ -575,6 +590,15 @@ bool RegisterAll(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("float GetFrameTime()", asFUNCTION(GetFrameTime), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("uint GetTimeStamp()", asFUNCTION(GetTimeStamp), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("int GetApiVersion()", asFUNCTION(GetApiVersion), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool IsModActive(const bCString &in)", asFUNCTION(IsModActive), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bCString GetModVersion(const bCString &in)", asFUNCTION(GetModVersion), asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bCString CallMod(const bCString &in mod, const bCString &in func, const bCString &in arg)", asFUNCTION(CallModScript),
+                                      asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("bool ModFunctionExists(const bCString &in mod, const bCString &in func)", asFUNCTION(ModFunctionExistsScript),
+                                      asCALL_CDECL));
+    OG3_REG(e->RegisterGlobalFunction("int SendModMessage(const bCString &in topic, const bCString &in data)", asFUNCTION(SendModMessageScript),
+                                      asCALL_CDECL));
+    if (!RegisterModSettingsBindings(e)) ok = false;
     OG3_REG(e->RegisterGlobalFunction("void SetWindowTitle(const bCString &in)", asFUNCTION(SetWindowTitle), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool IsKeyDown(int)", asFUNCTION(IsKeyDown), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("void PlaySystemSound()", asFUNCTION(PlaySystemSound), asCALL_CDECL));
@@ -694,6 +718,7 @@ void ScriptHost::Unload(Mod& m) {
     }
     m.module->Discard();
     m.module = nullptr;
+    ModSettingsForget(m.name);
     m.fMain = m.fFrame = m.fKey = nullptr;
     m.fnCache.clear();
     m.mainDone = false;
@@ -790,11 +815,19 @@ struct FpuRestore {
 };
 }   // namespace
 
-bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const bool* argBool, const EvArg* ev, int nev, bool* retBool) {
+bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const bool* argBool, const EvArg* ev, int nev, bool* retBool, void* retText) {
     asIScriptFunction* f = static_cast<asIScriptFunction*>(fp);
     FpuRestore fpu(this, f);
     const bool nested = ctx_->GetState() == asEXECUTION_ACTIVE;   // Ereignis feuert, waehrend ein Skript laeuft
-    if (nested && ctx_->PushState() < 0) return false;
+    auto failOnce = [&](const char* what, int code) {   // sonst stille Fehlschlaege: je Funktion einmal melden
+        static std::set<const void*> seen;
+        if (seen.insert(f).second) Log(std::string(what) + " fehlgeschlagen (" + std::to_string(code) + ") fuer " + f->GetDeclaration() + " in [" + curMod_ + "]");
+        return false;
+    };
+    if (nested) {
+        const int rp = ctx_->PushState();
+        if (rp < 0) return failOnce("Verschachtelter Skriptaufruf (PushState)", rp);
+    }
     struct Pop {
         asIScriptContext* c;
         bool on;
@@ -802,7 +835,8 @@ bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const boo
             if (on) c->PopState();
         }
     } pop{ctx_, nested};
-    if (ctx_->Prepare(f) < 0) return false;
+    const int rprep = ctx_->Prepare(f);
+    if (rprep < 0) return failOnce("Skriptaufruf vorbereiten (Prepare)", rprep);
     if (argFloat) ctx_->SetArgFloat(0, *argFloat);
     if (argInt) ctx_->SetArgDWord(0, static_cast<asDWORD>(*argInt));
     if (argBool) ctx_->SetArgByte(1, *argBool ? 1 : 0);
@@ -831,6 +865,8 @@ bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const boo
     ctx_->ClearLineCallback();
     if (r == asEXECUTION_FINISHED) {
         if (retBool) *retBool = ctx_->GetReturnByte() != 0;
+        if (retText)
+            if (void* o = ctx_->GetReturnObject()) *static_cast<SStr*>(retText) = *static_cast<const SStr*>(o);
         return true;
     }
     char b[1024];
@@ -883,7 +919,7 @@ bool ScriptHost::HasHandler(const char* decl) {
 }
 
 bool ScriptHost::CallOverride(const char* decl, const EvArg* args, int n, std::function<bool(const EvArg*)> original, bool* result,
-                              bool* originalCalled) {
+                              bool* originalCalled, EvArg* finalArgs) {
     if (!HasHandler(decl)) return false;
     chain_.emplace_back();
     const size_t idx = chain_.size() - 1;
@@ -910,6 +946,8 @@ bool ScriptHost::CallOverride(const char* decl, const EvArg* args, int n, std::f
     }
     if (result) *result = ret;
     if (originalCalled) *originalCalled = chain_[idx].originalCalled;
+    if (finalArgs)
+        for (int i = 0; i < chain_[idx].n; ++i) finalArgs[i] = chain_[idx].args[i];
     chain_.pop_back();
     return true;
 }
@@ -991,6 +1029,81 @@ void ScriptHost::CallKey(int vk, bool down) {
     busyKey_ = false;
 }
 
+// ---------------------------------------------------------------- Zwischen Mods (ab Version 44)
+std::string ScriptHost::ModDir(const std::string& mod) const {
+    for (const Mod& m : mods_)
+        if (_stricmp(m.name.c_str(), mod.c_str()) == 0) {
+            const size_t s = m.path.find_last_of("\\/");
+            return s == std::string::npos ? std::string() : m.path.substr(0, s);
+        }
+    return std::string();
+}
+
+static bool ValidFuncName(const std::string& f) {
+    if (f.empty() || f.size() > 100 || std::isdigit(static_cast<unsigned char>(f[0]))) return false;
+    for (char c : f)
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_') return false;
+    return true;
+}
+
+bool ScriptHost::HasModTextFunction(const std::string& mod, const std::string& func) {
+    if (!ValidFuncName(func)) return false;
+    const std::string decl = "bCString " + func + "(const bCString &in)";
+    for (Mod& m : mods_)
+        if (_stricmp(m.name.c_str(), mod.c_str()) == 0) return FindFn(m, decl.c_str()) != nullptr;
+    return false;
+}
+
+bool ScriptHost::CallModText(const std::string& mod, const std::string& func, const void* arg, void* out) {
+    if (!ValidFuncName(func)) {
+        Log("CallMod: ungueltiger Funktionsname '" + func + "' (nur Buchstaben, Ziffern, _)");
+        return false;
+    }
+    if (modCallDepth_ >= 8) {
+        Log("CallMod: zu tief verschachtelt (mehr als 8 Aufrufe zwischen Mods), abgebrochen bei " + mod + "::" + func);
+        return false;
+    }
+    const std::string decl = "bCString " + func + "(const bCString &in)";
+    for (Mod& m : mods_) {
+        if (_stricmp(m.name.c_str(), mod.c_str()) != 0) continue;
+        asIScriptFunction* f = FindFn(m, decl.c_str());
+        if (!f) return false;
+        const EvArg a = EvArg::Str(arg);
+        const std::string saved = curMod_;
+        curMod_ = m.name;
+        ++modCallDepth_;
+        const bool ok = Execute(f, nullptr, nullptr, nullptr, &a, 1, nullptr, out);
+        --modCallDepth_;
+        curMod_ = saved;
+        return ok;
+    }
+    return false;
+}
+
+int ScriptHost::SendModMessage(const void* topic, const void* data) {
+    static const char* const kDecl = "void OnModMessage(const bCString &in, const bCString &in, const bCString &in)";
+    if (modCallDepth_ >= 8) {
+        Log("SendModMessage: zu tief verschachtelt (mehr als 8 Aufrufe zwischen Mods), Nachricht verworfen");
+        return 0;
+    }
+    const std::string sender = curMod_;
+    const SStr senderText(sender.c_str());
+    const EvArg a[3] = {EvArg::Str(&senderText), EvArg::Str(topic), EvArg::Str(data)};
+    int n = 0;
+    ++modCallDepth_;
+    for (size_t i = 0; i < mods_.size(); ++i) {
+        Mod& m = mods_[i];
+        if (!m.module || m.name == sender) continue;
+        if (asIScriptFunction* f = FindFn(m, kDecl)) {
+            curMod_ = m.name;
+            if (Execute(f, nullptr, nullptr, nullptr, a, 3)) ++n;
+        }
+    }
+    --modCallDepth_;
+    curMod_ = sender;
+    return n;
+}
+
 // stringtable.ini eines Mods: im Mod-Ordner oder, wie beim Union Starter, unter ModFiles\ (leer, wenn keine vorhanden ist)
 static std::string ModStringTablePath(const std::string& modBase) {
     const std::string a = modBase + "\\stringtable.ini", b = modBase + "\\ModFiles\\stringtable.ini";
@@ -1002,23 +1115,126 @@ static std::string ModStringTablePath(const std::string& modBase) {
 // Mod-Namen in Ladereihenfolge (load_order.txt, dann alphabetisch), abgeschaltete weggelassen
 // Beispiel- und Test-Mods sind standardmaessig aus: <Mod>\mod.ini mit [mod] enabled=0. Sie werden nur geladen, wenn load_order.txt sie mit "+name"
 // zuschaltet. Mods ohne mod.ini (oder mit enabled=1) laden wie bisher, ausser "-name" schaltet sie ab. Das Testprogramm laedt alle (SetLoadDefaultOffMods).
+// Abhaengigkeiten (API 40), ebenfalls in [mod]: version=1.2.0 (eigene Version), api=39 (mindestens noetige Skript-Schnittstelle),
+// requires=andere_mod >= 1.0, dritte_mod (Komma-getrennt, Version optional). Eine Mod, deren Bedingungen nicht erfuellt sind, wird nicht geladen
+// (auch ihre Datei-Patches und Stringtabellen nicht); das zieht abhaengige Mods mit. Benoetigte Mods laden vor der Mod, die sie braucht.
+// Jede Aenderung des Zustands wird einmal protokolliert.
 static bool g_loadDefaultOff = false;
 void SetLoadDefaultOffMods(bool on) { g_loadDefaultOff = on; }
-static std::vector<std::string> DiscoverMods(const std::string& dir, bool withPatchOnly = false, bool withStrings = false) {
+
+namespace {
+struct ModDep {
+    std::string name, minVersion;
+};
+struct ModMeta {
+    std::string version;
+    int api = 0;
+    std::vector<ModDep> deps;
+    unsigned kinds = 0;   // 1 Skript, 2 Datei-Patches, 4 Stringtabelle
+};
+std::mutex g_modStateMu;
+std::map<std::string, std::string> g_modVersions;   // aktive Mods (alle Arten) -> Version, Schluessel klein geschrieben
+std::map<std::string, std::string> g_modBlockLog;   // Mod -> zuletzt gemeldeter Grund, warum sie nicht laedt
+std::map<std::string, std::string> g_modOrderLog;   // Mod -> zuletzt gemeldete Umstellung der Reihenfolge
+
+std::string LowerName(std::string s) {
+    for (char& c : s) c = char(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+std::string TrimText(const std::string& s) {
+    const size_t b = s.find_first_not_of(" \t\r\n");
+    if (b == std::string::npos) return std::string();
+    const size_t e = s.find_last_not_of(" \t\r\n");
+    return s.substr(b, e - b + 1);
+}
+// Eine Zahl je Teil ("1.10.2"); Text nach den Ziffern eines Teils (z. B. "0-beta") wird ignoriert, fehlende Teile zaehlen als 0
+std::vector<unsigned long> VersionParts(const std::string& v) {
+    std::vector<unsigned long> parts;
+    size_t i = 0;
+    while (i < v.size()) {
+        unsigned long x = 0;
+        while (i < v.size() && std::isdigit(static_cast<unsigned char>(v[i]))) {
+            if (x < 100000000) x = x * 10 + unsigned(v[i] - '0');
+            ++i;
+        }
+        parts.push_back(x);
+        while (i < v.size() && v[i] != '.') ++i;
+        if (i < v.size()) ++i;
+    }
+    return parts;
+}
+int CompareVersions(const std::string& a, const std::string& b) {
+    const std::vector<unsigned long> x = VersionParts(a), y = VersionParts(b);
+    for (size_t i = 0; i < x.size() || i < y.size(); ++i) {
+        const unsigned long p = i < x.size() ? x[i] : 0, q = i < y.size() ? y[i] : 0;
+        if (p != q) return p < q ? -1 : 1;
+    }
+    return 0;
+}
+ModMeta ReadModMeta(const std::string& base) {
+    ModMeta m;
+    const std::string ini = base + "\\mod.ini";
+    char buf[1024];
+    GetPrivateProfileStringA("mod", "version", "", buf, sizeof buf, ini.c_str());
+    m.version = TrimText(buf);
+    m.api = int(GetPrivateProfileIntA("mod", "api", 0, ini.c_str()));
+    GetPrivateProfileStringA("mod", "requires", "", buf, sizeof buf, ini.c_str());
+    const std::string req(buf);
+    size_t pos = 0;
+    while (pos < req.size()) {
+        size_t c = req.find(',', pos);
+        if (c == std::string::npos) c = req.size();
+        const std::string item = TrimText(req.substr(pos, c - pos));
+        pos = c + 1;
+        if (item.empty()) continue;
+        ModDep d;
+        const size_t ge = item.find(">=");
+        if (ge != std::string::npos) {
+            d.name = TrimText(item.substr(0, ge));
+            d.minVersion = TrimText(item.substr(ge + 2));
+        } else
+            d.name = item;
+        if (!d.name.empty()) m.deps.push_back(d);
+    }
+    return m;
+}
+// Meldet eine Aenderung des Zustands einer Mod genau einmal; leerer Text = Zustand aufgehoben
+void ModStateLog(std::map<std::string, std::string>& seen, const std::string& mod, const std::string& msg, const char* cleared) {
+    if (!ScriptHost::s_current) return;   // vor dem Start des Hosts: beim ersten Scan danach melden
+    auto it = seen.find(mod);
+    if (msg.empty()) {
+        if (it == seen.end()) return;
+        seen.erase(it);
+        if (cleared) ScriptHost::s_current->Log("[" + mod + "] " + cleared);
+        return;
+    }
+    if (it != seen.end() && it->second == msg) return;
+    seen[mod] = msg;
+    ScriptHost::s_current->Log("[" + mod + "] " + msg);
+}
+}   // namespace
+
+// kinds: welche Mods zurueckgegeben werden (1 Skript, 2 Datei-Patches, 4 Stringtabelle). Abhaengigkeiten werden immer ueber alle Arten geprueft.
+static std::vector<std::string> DiscoverModsOfKind(const std::string& dir, unsigned kinds) {
     std::vector<std::string> found, order, off, on, defaultOff, result;
+    std::map<std::string, ModMeta> meta;
     WIN32_FIND_DATAA fd;
     HANDLE h = FindFirstFileA((dir + "\\*").c_str(), &fd);
     if (h != INVALID_HANDLE_VALUE) {
         do {
             if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || fd.cFileName[0] == '.') continue;
             const std::string base = dir + "\\" + fd.cFileName;
-            const DWORD pa = withPatchOnly ? GetFileAttributesA((base + "\\ScriptPatches").c_str())
-                                           : INVALID_FILE_ATTRIBUTES;   // Mod nur mit Datei-Patches, ohne Skript
-            if (FileTime(base + "\\main.as") || (pa != INVALID_FILE_ATTRIBUTES && (pa & FILE_ATTRIBUTE_DIRECTORY)) ||
-                (withStrings && !ModStringTablePath(base).empty())) {
-                found.push_back(fd.cFileName);
-                if (GetPrivateProfileIntA("mod", "enabled", 1, (base + "\\mod.ini").c_str()) == 0) defaultOff.push_back(fd.cFileName);
-            }
+            const DWORD pa = GetFileAttributesA((base + "\\ScriptPatches").c_str());   // Mod nur mit Datei-Patches, ohne Skript
+            unsigned k = 0;
+            if (FileTime(base + "\\main.as")) k |= 1;
+            if (pa != INVALID_FILE_ATTRIBUTES && (pa & FILE_ATTRIBUTE_DIRECTORY)) k |= 2;
+            if (!ModStringTablePath(base).empty()) k |= 4;
+            if (!k) continue;
+            found.push_back(fd.cFileName);
+            ModMeta m = ReadModMeta(base);
+            m.kinds = k;
+            meta[fd.cFileName] = m;
+            if (GetPrivateProfileIntA("mod", "enabled", 1, (base + "\\mod.ini").c_str()) == 0) defaultOff.push_back(fd.cFileName);
         } while (FindNextFileA(h, &fd));
         FindClose(h);
     }
@@ -1048,13 +1264,105 @@ static std::vector<std::string> DiscoverMods(const std::string& dir, bool withPa
             if (_stricmp(x.c_str(), n.c_str()) == 0) return true;
         return false;
     };
+    auto spelled = [](const std::vector<std::string>& v, const std::string& n) {   // Schreibweise des Ordners, leer wenn nicht enthalten
+        for (const std::string& x : v)
+            if (_stricmp(x.c_str(), n.c_str()) == 0) return x;
+        return std::string();
+    };
     auto enabled = [&](const std::string& n) { return !has(off, n) && (g_loadDefaultOff || !has(defaultOff, n) || has(on, n)); };
-    for (const std::string& n : order)
-        if (has(found, n) && enabled(n) && !has(result, n)) result.push_back(n);
+    for (const std::string& n : order) {
+        const std::string e = spelled(found, n);
+        if (!e.empty() && enabled(e) && !has(result, e)) result.push_back(e);
+    }
     for (const std::string& n : found)
         if (enabled(n) && !has(result, n)) result.push_back(n);
-    return result;
+
+    // Bedingungen pruefen, bis sich nichts mehr aendert (eine gesperrte Mod sperrt die Mods, die sie brauchen)
+    std::map<std::string, std::string> blocked;
+    for (bool changed = true; changed;) {
+        changed = false;
+        for (size_t i = 0; i < result.size() && !changed; ++i) {
+            const ModMeta& m = meta[result[i]];
+            std::string why;
+            if (m.api > OG3_SCRIPT_API_VERSION)
+                why = "braucht Skript-Schnittstelle " + std::to_string(m.api) + ", vorhanden ist " + std::to_string(OG3_SCRIPT_API_VERSION) +
+                      " (OG3-Patch aktualisieren)";
+            for (size_t j = 0; j < m.deps.size() && why.empty(); ++j) {
+                const ModDep& d = m.deps[j];
+                const std::string dep = spelled(result, d.name);
+                if (dep.empty()) {
+                    const std::string f = spelled(found, d.name);
+                    if (f.empty())
+                        why = "braucht die Mod '" + d.name + "', die nicht installiert ist";
+                    else if (blocked.count(f))
+                        why = "braucht die Mod '" + f + "', die selbst nicht geladen wird";
+                    else
+                        why = "braucht die Mod '" + f + "', die abgeschaltet ist (in load_order.txt mit +" + f + " zuschalten)";
+                } else if (!d.minVersion.empty() && CompareVersions(meta[dep].version, d.minVersion) < 0)
+                    why = "braucht die Mod '" + dep + "' ab Version " + d.minVersion + ", vorhanden ist " +
+                          (meta[dep].version.empty() ? std::string("eine ohne Versionsangabe") : "Version " + meta[dep].version);
+            }
+            if (why.empty()) continue;
+            blocked[result[i]] = why;
+            result.erase(result.begin() + i);
+            changed = true;
+        }
+    }
+
+    // Benoetigte Mods vor die Mod stellen, die sie braucht (sonst bleibt die Reihenfolge); Kreise werden gemeldet und nicht aufgeloest
+    std::vector<std::string> sorted, stack;
+    std::map<std::string, std::string> moved, cycles;
+    std::function<void(const std::string&)> place = [&](const std::string& n) {
+        if (has(sorted, n)) return;
+        stack.push_back(n);
+        for (const ModDep& d : meta[n].deps) {
+            const std::string dep = spelled(result, d.name);
+            if (dep.empty() || has(sorted, dep)) continue;
+            if (has(stack, dep)) {
+                cycles[n] = "Abhaengigkeiten im Kreis mit '" + dep + "': Reihenfolge zwischen beiden bleibt wie in load_order.txt";
+                continue;
+            }
+            moved[n] = "laedt nach '" + dep + "', weil sie diese Mod braucht";
+            place(dep);
+        }
+        stack.pop_back();
+        sorted.push_back(n);
+    };
+    for (const std::string& n : result) place(n);
+
+    {
+        std::lock_guard<std::mutex> lock(g_modStateMu);
+        g_modVersions.clear();
+        for (const std::string& n : sorted) g_modVersions[LowerName(n)] = meta[n].version;
+        for (const std::string& n : found) {
+            auto b = blocked.find(n);
+            ModStateLog(g_modBlockLog, n, b == blocked.end() ? std::string() : "wird nicht geladen: " + b->second, "Abhaengigkeiten jetzt erfuellt");
+            auto c = cycles.find(n);
+            auto mv = moved.find(n);
+            ModStateLog(g_modOrderLog, n, c != cycles.end() ? c->second : mv != moved.end() ? mv->second : std::string(), nullptr);
+        }
+    }
+    std::vector<std::string> out;
+    for (const std::string& n : sorted)
+        if (meta[n].kinds & kinds) out.push_back(n);
+    return out;
 }
+static std::vector<std::string> DiscoverMods(const std::string& dir, bool withPatchOnly = false, bool withStrings = false) {
+    return DiscoverModsOfKind(dir, 1u | (withPatchOnly ? 2u : 0u) | (withStrings ? 4u : 0u));
+}
+
+// Skript-Funktionen (API 40): ist eine Mod aktiv (Bedingungen erfuellt, nicht abgeschaltet), und welche Version nennt ihre mod.ini
+namespace {
+bool IsModActive(const SStr& name) {
+    std::lock_guard<std::mutex> lock(g_modStateMu);
+    return g_modVersions.count(LowerName(name.c_str())) != 0;
+}
+SStr GetModVersion(const SStr& name) {
+    std::lock_guard<std::mutex> lock(g_modStateMu);
+    auto it = g_modVersions.find(LowerName(name.c_str()));
+    return SStr(it == g_modVersions.end() ? "" : it->second.c_str());
+}
+}   // namespace
 
 // ---------------------------------------------------------------- Mod-Stringtabellen (<Mod>\stringtable.ini)
 // Format wie die stringtable.ini des Spiels: "Schluessel=Text;;Text;;..." je Zeile. Steht oben eine Zeile "Languages=English;German;...", sind die Spalten

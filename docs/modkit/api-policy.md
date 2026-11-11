@@ -7,7 +7,7 @@ Diese Seite legt fest, was sich an der Skript-Schnittstelle zwischen zwei Versio
 
 - Die Skript-Schnittstelle hat **eine** fortlaufende Zahl: `GetApiVersion()` (im Code `OG3_SCRIPT_API_VERSION`). Jede Version, die etwas an der
   Schnittstelle ändert, erhöht sie um 1.
-- Releases heißen `v0.<API>.<Fix>`, zum Beispiel `v0.39.0-alpha.1`: die mittlere Zahl ist die Skript-Schnittstelle, die letzte zählt Fehlerbehebungen
+- Releases heißen `v0.<API>.<Fix>`, zum Beispiel `v0.42.0-alpha.1`: die mittlere Zahl ist die Skript-Schnittstelle, die letzte zählt Fehlerbehebungen
   ohne Änderung an der Schnittstelle. `-alpha.N` und `-beta.N` sind Vorabversionen.
 - Solange die erste Zahl 0 ist, ist das Modkit eine **Alpha**: Die Regeln unten gelten, aber der Umfang dessen, was als stabil gilt, ist noch klein.
 
@@ -41,7 +41,7 @@ Diese Seite legt fest, was sich an der Skript-Schnittstelle zwischen zwei Versio
 die Änderungen. Eine Funktion verliert den Vermerk, sobald ihr Verhalten im Spiel gemessen und in der Referenz beschrieben ist; das ist keine Änderung der
 Schnittstelle.
 
-Stand Version 39: `HurtHitPoints`, `SetProperty`, `SetTemplateRef`, `SetEntityRef`, `CallScript`, `GenerateTradeGoods`, `SetCrosshairVisible`.
+Stand Version 42: `HurtHitPoints`, `SetProperty`, `SetTemplateRef`, `SetEntityRef`, `CallScript`, `GenerateTradeGoods`, `SetCrosshairVisible`, `GetSpeechText`.
 Im Spiel noch nicht geprüft: `SetGameTime`, `OnTransformStart`/`OnTransformEnd`.
 
 ## In einem Mod auf die Version prüfen
@@ -56,4 +56,5 @@ void main() {
 ```
 
 Eine Funktion, die es in der laufenden Version nicht gibt, ist ein **Übersetzungsfehler**: Der Mod wird dann gar nicht geladen und das Protokoll nennt die
-Zeile. Die Prüfung oben hilft deshalb nur bei Verhalten, das sich zwischen Versionen geändert hat, und für eine verständliche Meldung an den Spieler.
+Zeile. Die Prüfung oben hilft deshalb nur bei Verhalten, das sich zwischen Versionen geändert hat. Besser ist ab Version 40 der Eintrag `api=37` in der
+`mod.ini`: Dann lädt der Patch den Mod gar nicht erst und schreibt, dass er zu alt ist ([Mod-Paket](mod-package.md)).
