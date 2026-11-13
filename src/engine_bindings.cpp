@@ -1754,7 +1754,7 @@ SStr ListPropertyTexts(const Entity& e, const SStr& set, int maxn) {
         if (!SafePropValid(acc)) break;
         char nm[160], val[1200];
         SafePropName(acc, nm, sizeof nm);
-        if (!SafePropValue(acc, val, sizeof val)) std::strcpy(val, "<Fehler>");
+        if (!SafePropValue(acc, val, sizeof val)) std::snprintf(val, sizeof val, "<Fehler>");
         if (!all.empty()) all += ";";
         all += PropClean(std::string(nm) + "=" + val, 420);
         if (!SafePropInc(acc)) break;

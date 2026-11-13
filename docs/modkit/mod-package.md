@@ -124,7 +124,17 @@ aitrace=0                   ; 1 = KI-Tracer: Wechsel von KI-Zustand, -Aufgabe, -
 aitracefilter=              ; nur NPCs, deren Name diesen Text enthaelt (leer = alle)
 aitracemax=2000             ; hoechstens so viele KI-Zeilen je Spielstart
 anispeedlog=0               ; 1 = Messung: wer die Abspielgeschwindigkeit von Animationen setzt/liest (SetPlaySpeed/GetPlaySpeed)
+printgame=1                 ; 0 = print() schreibt nur ins eigene Protokoll, nicht zusätzlich ins Protokoll des Spiels
+; nur zur Fehlersuche:
+asynclog=0                  ; 1 = Protokollzeilen über eine Warteschlange schreiben (eigener Thread)
+logwrite=1                  ; 0 = nach dem Start keine Protokollzeilen mehr schreiben
+loadpause=0                 ; so viele Sekunden nach einem Ladevorgang wird OnFrame der Skripte nicht aufgerufen (0 = aus)
+memlog=0                    ; 1 = alle 30 s freien Speicher und Adressraum protokollieren
+[loader]
+crashlog=1                  ; 0 = der Loader schreibt bei einem Absturz keine Zeile nach g3asm_loader.log
 ```
+
+Der Abschnitt hieß bis Version 46 `[patch]`; eine ini mit dem alten Namen wird weiter gelesen, der Installer benennt ihn um.
 
 ## Protokoll
 

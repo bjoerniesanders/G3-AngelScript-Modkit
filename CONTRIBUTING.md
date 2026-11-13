@@ -39,8 +39,9 @@ Bauen, Testen und Einbau stehen in der [README](README.md), die Regeln fuer die 
 ## Hooks und Zugriffe auf das Spiel
 Das Spiel ist fremder, nicht geaenderter Code. Jeder Fehler hier ist ein Absturz beim Spieler.
 
-- **Exporte vor Adressen.** Hooks haengen an exportierten Namen und werden nur ueber `HookExport(...)` (`script_host.h`) eingehaengt. Fehlt der
-  Export, faellt nur diese Funktion aus; das Protokoll sagt es.
+- **Exporte vor Adressen.** Hooks haengen an exportierten Namen; neue Hooks werden ueber `HookExport(...)` (`script_host.h`) eingehaengt. Fehlt der
+  Export, faellt nur diese Funktion aus; das Protokoll sagt es. (Aeltere Stellen in `dialog_bindings.cpp` und `quest_bindings.cpp` rufen MinHook noch
+  direkt auf; bei der naechsten Aenderung dort umstellen.)
 - **Feste Adressen nur mit Bytepruefung.** Vor dem Einhaengen die erwarteten Bytes der Stelle vergleichen; bei Abweichung nicht einhaengen und
   melden. Gehoeren mehrere Stellen zusammen (Beispiel Lernkosten: sieben), gilt alle oder keine. Die geprueften Installationen stehen in
   `docs/compatibility.md`.

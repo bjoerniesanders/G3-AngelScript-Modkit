@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 """Rundlauf-Test fuer g3asm_packmod: echte Gothic-3-Archive (z. B. Community-.mod) mit einem unabhaengigen Python-Leser entpacken, mit g3asm_packmod neu packen und
 Namen, Inhalte, geloeschte Eintraege und Kopf vergleichen.
 Aufruf: python -I tests/packmod_roundtrip.py <g3asm_packmod.exe> <Archiv> [<Archiv> ...]

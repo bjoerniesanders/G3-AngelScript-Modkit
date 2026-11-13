@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 # Testet den G3ASM-Loader in einem Wegwerf-Ordner, ohne das Spiel und ohne den Spielordner zu aendern.
 #   powershell -NoProfile -File tests\run_loader_test.ps1 -SharedBase <SharedBase.dll> -DbghelpOrig <Original-dbghelp.dll> [-BuildDir build32]
 # SharedBase: Original (z. B. G:\Gothic3\SharedBase.dll) oder Nachbau. DbghelpOrig: die Original-dbghelp.dll des Spiels (G:\Gothic3\dbghelp_orig.dll).

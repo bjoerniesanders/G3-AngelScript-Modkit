@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Testprogramm fuer g3asm.dll ohne Spiel: laedt eine SharedBase.dll (Original oder Nachbau), dann g3asm.dll, und fuehrt ein
 // Skript aus (main, ein OnFrame, OnShutdown). Rueckgabe = Zahl der fehlgeschlagenen check()-Aufrufe (-1 Ladefehler, >=100 Startfehler).
 // Aufruf: g3asm_test <SharedBase.dll> <skript.as> [Dialogs.dll zum Vorladen]

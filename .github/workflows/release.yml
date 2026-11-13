@@ -18,11 +18,26 @@ jobs:
         run: cmake -S . -B build -A Win32
 
       - name: Build
-        run: cmake --build build --config Release --parallel --target g3asm g3asm_loader g3asm_packmod g3asm_test g3asm_loader_test
+        run: cmake --build build --config Release --parallel --target g3asm g3asm_loader g3asm_packmod g3asm_test g3asm_loader_test g3asm_sb_stub
 
       - name: FPU fix active (no fninit)
         shell: pwsh
         run: ./tools/check_no_fninit.ps1 -Dll build/g3asm/g3asm.dll
+
+      # Same tests as ci.yml: a tag must not produce a release that the CI would reject.
+      - name: Self test and test mods (stub SharedBase)
+        shell: pwsh
+        run: |
+          ./build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll tests/scripts/selftest.as
+          if ($LASTEXITCODE -ne 0) { throw "self test failed ($LASTEXITCODE)" }
+          ./build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll tests/mods
+          if ($LASTEXITCODE -ne 0) { throw "test mods failed ($LASTEXITCODE)" }
+
+      - name: Loader test (stub SharedBase, system dbghelp)
+        shell: pwsh
+        run: |
+          ./tests/run_loader_test.ps1 -SharedBase build/sbstub/SharedBase.dll -DbghelpOrig "$env:WINDIR\SysWOW64\dbghelp.dll" -BuildDir build
+          if ($LASTEXITCODE -ne 0) { throw "loader test failed ($LASTEXITCODE)" }
 
       - name: PackMod numbering
         run: python -I tests/packmod_generations.py build/g3asm/g3asm_packmod.exe

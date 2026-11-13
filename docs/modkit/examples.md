@@ -103,13 +103,13 @@ void OnKey(int vk, bool down) {
 Numblock 1-6 und Bild hoch/runter, Einfg steuern die Demo-Quest `G3ASM_DemoQuest` (Numblock 1-6: Status zeigen, anlegen und starten, erfolgreich, fehlgeschlagen, entfernen, XP;
 Bild hoch: alle Quests auflisten, Bild runter: Infos ansehen, Einfg: Quest-Dateien neu laden). Zum Ausprobieren der Quest-Funktionen und zum Herausfinden von Statuswerten.
 
-## 7. Eigenschaften ansehen (`property_inspect`)
+## 6. Eigenschaften ansehen (`property_inspect`)
 
 Strg + Ziffernblock `/` schreibt alle Eigenschaften des Items in der rechten Hand (sonst linke Hand, Rücken, sonst das Entity unter dem Fadenkreuz) mit ihren Werten ins Protokoll, getrennt nach den Sets
 `Item`, `Damage` und `Interaction`. Damit lässt sich herausfinden, was ein Item im Spiel wirklich enthält (Wert, Voraussetzungen, `RequiredSkill`, `ActivateSkill`, `ModAttrib…`, Schadensart und -menge). Nur Lesen.
 Die Funktionen dahinter sind `GetProperty` und `ListProperties` ([API](api-reference.md)).
 
-## 6. Lebensraub (`lifesteal_demo`)
+## 7. Lebensraub (`lifesteal_demo`)
 
 „Lebensraub“ ist eine **Eigenschaft der Waffe** wie „geschärft“ oder „gesegnet“: ein eigenes Qualitätsbit (`QUALITY_LIFESTEAL`), das in der Beschreibung der Waffe als Zeile `(20 %) Lebensraub` erscheint
 (Text aus `stringtable.ini`, Schlüssel `HUD_Quality_Lifesteal`) und mit dem Spielstand gespeichert wird. **Ziffernblock \*** setzt oder entfernt die Eigenschaft an der Waffe des Helden (rechte Hand, sonst Rücken rechts
@@ -123,13 +123,13 @@ Zeigt `OnDamage` mit `owner` und `inflictor`, Qualität pro Slot lesen und setze
 
 `beliars_klaue` löst bei einem **starken** Treffer mit dem Orkschlächter (mindestens `MIN_TREFFER` = 55 Schaden) gegen einen **Gegner** (Haltung `AttitudeToPlayer2` feindlich oder Raubtier, bei Tieren auch verärgert) mit `CHANCE_PROZENT` = 30 % Chance einen Blitz aus: `Smn_Lightning` am Opfer erzeugen, den Helden mit `SetEntityRef(..., "gCInteraction_PS", "Owner", hero)` als Besitzer eintragen (nur dann läuft der Schaden durch die echte Kette: Quelle `Smn_Lightning`, Besitzer Held, Art 6) und den Blitz mit `StartEffect("eff_magic_summonlightning_target_01", opfer)` sichtbar machen. Gemessen: Der Blitz macht 17 bis über 500 Schaden (das Skript `ZS_Lightning` rechnet selbst) und kann Umstehende treffen. Zwischen zwei Blitzen liegen mindestens 4 Sekunden.
 
-## Zeichnen prüfen (`draw_test`, Messmod)
+## 9. Zeichnen prüfen (`draw_test`, Messmod)
 
 Ab Version 34, 38 und 39. Zeigt oben links Bildgröße und Bildzähler, darunter Kompass (Pfad und Dateiname), einen sich drehenden Kompass (`OnFrame` dreht
 ihn über die Zeit) und ein Orts-Symbol (`LoadImage`/`DrawImage`), Marken in den vier Ecken, einen Text in der Bildmitte und roten Text über der
 Statusleiste (alles über HUD und Inventar), dazu „Held“ und „Mitte“ an der Position des Helden (`WorldToScreen`). Standardmäßig aus (`+draw_test`).
 
-## 9. Spielskripte nach Namen (`script_probe`, Messmod)
+## 10. Spielskripte nach Namen (`script_probe`, Messmod)
 
 Ab Version 32. Beim ersten Weltstart prüft die Mod mit `ScriptExists`/`GetScriptDll`, welche bekannten Skriptnamen es gibt. Sie meldet einige Skripte
 (`AssessHit`, `MagicTeleport`, `IsDeadlyDamage`, ...) mit `WatchScript` an, reicht sie in `Override_Script` unverändert durch und schreibt die ersten
@@ -137,51 +137,66 @@ Aufrufe je Name mit Self, Other, Zahl und Ergebnis ins Protokoll (`OnScript`). S
 `GetStaminaPoints`, `GetAttitude`, ...) per `CallScript` für den Helden und das anvisierte Entity auf. Standardmäßig aus (`+script_probe`).
 Mit `scriptlog=1` in `g3asm.ini` schreibt das Modkit zusätzlich alle 60 s die häufigsten Skriptnamen und den Zeitaufwand seiner Hooks.
 
-## 10. Begleiter teleportieren mit (`teleport_party`)
+## 11. Begleiter teleportieren mit (`teleport_party`)
 
 Ab Version 33. Fängt das Spielskript `MagicTeleport` ab (`WatchScript`/`Override_Script`) und holt nach dem Teleport des Helden seine Begleiter, Beschwörungen
 und Sklaven mit `TeleportTo` zu ihm und stellt sie 1,5 m neben ihn, mehrere im Kreis (genau auf dem Helden würden sie ihn sofort ansprechen); wartende Begleiter bleiben (`WARTENDE_MIT`). Weil `MagicTeleport` selbst alle Begleiter auf Warten schaltet, gilt der Wartestatus von vor dem Teleport; die Mod hebt das Warten der Mitgenommenen danach wieder auf. Nach 1,5 s holt die Mod alle nach, die noch weiter als 15 m weg sind.
 Strg + Ziffernblock , schreibt die Gruppe ins Protokoll. Standardmäßig aus (`+teleport_party`).
 
-## 11. Zeitrate und Spieluhr (`time_probe`, Messmod)
+## 12. Zeitrate und Spieluhr (`time_probe`, Messmod)
 
 Ab Version 36. Umschalt + Ziffernblock + / - verdoppelt bzw. halbiert die Zeitrate (`SetTimeScale`), Umschalt + Ziffernblock \* schaltet die Spieluhr
 auf das Zehnfache (`SetClockFactor`) und zurück. Weil der Uhrfaktor im Spielstand steht, stellt die Mod ihn in `OnBeforeSave` zurück und setzt ihn in
 `OnAfterSave` wieder. Die Werte stehen oben links (`OnDraw`). Standardmäßig aus (`+time_probe`).
 
-## 12. KI-Skripte und Untertitel (`ki_probe`, Messmod)
+## 13. KI-Skripte und Untertitel (`ki_probe`, Messmod)
 
 Ab Version 41. Meldet die Namen an, die das Plugin G3Fixes umleitet (`ZS_ObserveSuspect`, `_AI_UseInventoryItem`, `OnFollowPlayer`, `OnGuidePlayer`), reicht
 sie in `Override_AI` unverändert durch und schreibt die ersten fünf Aufrufe je Name ins Protokoll (`OnAI`). Jeder gesprochene Satz (`OnAIOutput`) kommt mit
 ID und Text (`GetSpeechText`) ins Protokoll und steht vier Sekunden unten in der Bildmitte: ein einfacher Nachbau des Plugins Subtitles. Standardmäßig aus (`+ki_probe`).
 
-## 13. Monsterschaden (`monster_damage`, Messmod)
+## 14. Monsterschaden (`monster_damage`, Messmod)
 
 Ab Version 42. Ersetzt die Teilung des Monsterschadens an NPCs (durch 10, bei Beschworenen durch 2) durch den Faktor 0,2 wie das Plugin MonsterDamage
 (Standardwert `Game.MonsterDamageMultiplicator=0.2`): Monster richten an NPCs doppelt so viel Schaden an wie im Original. Die ersten zehn Treffer stehen mit
 rohem, originalem und neuem Wert im Protokoll. Standardmäßig aus (`+monster_damage`).
 
-## 14. Lernkosten (`learn_cost`, Messmod)
+## 15. Lernkosten (`learn_cost`, Messmod)
 
 Ab Version 42. Halbiert bei Lehrern die Lernpunkte (aufgerundet) und das Gold für Attribute; hat das Spiel wegen „Alternative Balance“ ab 250 verdoppelt,
 nimmt der Mod das zuerst zurück (wie der Modus `NoThreshold` des Plugins LearningThresholdTweaks). Die ersten zehn Abfragen stehen im Protokoll.
 Standardmäßig aus (`+learn_cost`).
 
-## 15. Schema der Eigenschaften (`schema_dump`, Messmod)
+## 16. Schema der Eigenschaften (`schema_dump`, Messmod)
 
 Ab Version 43. Ruft `DumpPropertySchema` bei den ersten beiden Weltaktivierungen auf (Hauptmenü, dann nach dem Laden) und schreibt
 `<Spiel>\g3asm\property_schema_1.json` und `_2.json`; die Zahl der Klassen steht im Protokoll. Keine Taste, etwa 0,1 s je Dump.
 Standardmäßig aus (`+schema_dump`).
 
-## 16. Angriffsgeschwindigkeit (`attack_speed`, Messmod)
+## 17. Angriffsgeschwindigkeit (`attack_speed`, Messmod)
 
 Ab Version 45. Ändert in `Override_CombatMove` die Geschwindigkeit der Kampfbewegungen des Helden um `Faktor` aus den Einstellungen
 (`mod.ini [settings]`, Standard 2,0, damit es deutlich sichtbar ist; `AlleNPCs=ja` gilt für alle). Die ersten 20 Änderungen stehen im Protokoll.
 Zeigt nebenbei die Einstellungen je Mod (Version 44). Standardmäßig aus (`+attack_speed`).
 
-## 17. Freeze-Liste (`freeze_probe`, Messmod)
+## 18. Freeze-Liste (`freeze_probe`, Messmod)
 
 Ab Version 46. Misst die Funktionen, die vor der Beta noch nicht im Spiel geprüft sind: nach dem Laden automatisch `LoadQuestFile` mit zwei Pfadformen; Strg + Umschalt + Ziffernblock `*` `Kill` am anvisierten Wesen, `-` `GenerateTradeGoods` am anvisierten NPC, `+` der Reihe nach Fadenkreuz aus/an und Uhr 22:00/10:00; dazu `OnTransformStart`/`OnTransformEnd` und `OnNPCKilled`. Standardmäßig aus (`+freeze_probe`).
+
+## Weitere Beispiele
+
+Diese Mods haben hier keinen eigenen Abschnitt; die Beschreibung steht am Anfang der jeweiligen `main.as` und auf der genannten Seite.
+
+| Mod | Zeigt | Seite |
+|---|---|---|
+| `hooks_demo` | Spielfunktionen mit `Override_...` und `Super()` abfangen | [Hooks](hooks.md) |
+| `jens_dialog` | Eigene Gesprächsoptionen mit Questlog-Verbindung, Quest aus einem Mod-Archiv | [Dialoge](dialogs.md), [Mod-Archive](archives.md) |
+| `packmod_demo` | Mod-Archiv schreiben und prüfen, ob das Spiel es liest | [Mod-Archive](archives.md) |
+| `patch_demo` | Datei-Patch auf eine Quest-Datei des Spiels | [Datei-Patches](patches.md) |
+| `text_demo` | Eigene Texte über die Stringtabelle des Mods (nur `stringtable.ini`, kein Skript) | [Mod-Ordner](mod-package.md) |
+| `klon_demo` | Item-Vorlage klonen (`CloneTemplate`) mit eigenem Namen und Text | [API-Referenz](api-reference.md) |
+| `spawn_demo`, `focus_demo` | NPCs erzeugen und entfernen, Fokus und Fadenkreuz lesen | [API-Referenz](api-reference.md) |
+| `blitz_test`, `event_probe`, `reference_dump` | Messmods: Blitz auf ein Ziel, Konsole und Quest-Status, geprüfte Listen fürs Protokoll | [Referenz](reference.md) |
 
 ## Tastenbelegung der Beispiel-Mods
 

@@ -1,4 +1,6 @@
-// Test von G3ASM-Loaders (src/loader): laedt SharedBase.dll mit angepasstem Suchpfad (die dbghelp.dll aus demselben Ordner ist der Loader), prueft
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Test des G3ASM-Loaders (src/loader): laedt SharedBase.dll mit angepasstem Suchpfad (die dbghelp.dll aus demselben Ordner ist der Loader), prueft
 //   1. der Loader ist geladen und hat g3asm.dll gestartet (g3asm_loader.log: "G3ASM gestartet", g3asm.log entsteht),
 //   2. MiniDumpWriteDump wird an dbghelp_orig.dll weitergereicht (Aufruf mit ungueltigen Argumenten liefert FALSE, ohne Absturz).
 // Aufruf: loader_test <Ordner>   (Ordner enthaelt SharedBase.dll, dbghelp.dll = Loader, dbghelp_orig.dll, g3asm.dll, g3asm.ini); tests/run_loader_test.ps1 richtet ihn ein.

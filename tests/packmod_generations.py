@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 """Test der Generationsvergabe von g3asm_packmod: Mod-Archive muessen ohne Luecke nummeriert werden (.mod, .m00, .m01, ...; Alternatives Balancing: .nod, .n00, ...),
 weil die Engine an der ersten fehlenden Nummer aufhoert. Ausserdem: ".deleted"-Dateien, Kommentare aus, leere Ordner, ungueltige Volume-Namen.
 Aufruf: python -I tests/packmod_generations.py <g3asm_packmod.exe>"""

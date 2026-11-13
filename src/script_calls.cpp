@@ -422,11 +422,11 @@ const char* kEventAI = "void OnAI(const bCString &in, int, Entity, Entity, int)"
 // Der Name zeigt in den Zustandsstapel des NPCs (ProcessScript uebergibt &Eintrag.m_strScriptName, gemessen 2026-11-10). Zustaende und KI-Funktionen bauen
 // den Stapel beim Laufen um, danach zeigt der Zeiger auf freigegebenen Speicher: im Spieltest kam OnAI fuer ZS_ObserveSuspect mit zerstoertem Namen an.
 // Skripte bekommen darum eine Kopie des Namens; das Original bekommt den Zeiger des Spiels.
-// Messzeilen: die ersten 8 Aufrufe je Art. Die Tiefe wird ueber ein Objekt zurueckgezaehlt.
+// Messzeilen (nur mit ini scriptlog=1): die ersten 40 Aufrufe je Art. Die Tiefe wird ueber ein Objekt zurueckgezaehlt.
 int g_aiDiag[5] = {};
 bool g_aiDeepLogged = false;
 void AIDiag(int kind, const std::string& s) {
-    if (kind < 0 || kind > 4 || g_aiDiag[kind] >= 8 * 5 || !g_host) return;
+    if (!g_stats || kind < 0 || kind > 4 || g_aiDiag[kind] >= 8 * 5 || !g_host) return;
     ++g_aiDiag[kind];
     g_host->Log("KI-Messung: " + s);
 }
