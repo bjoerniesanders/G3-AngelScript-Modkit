@@ -6,6 +6,8 @@ AngelScript 2.38 und bindet Spielereignisse, Quests, Inventar, Dialoge und Datei
 **Voraussetzungen:** Gothic 3 mit **Community Patch 1.75** und **Parallel-Universe-Patch** (PU). `tools/install_loader.ps1` prueft beides und bricht
 ab, wenn etwas fehlt (`-Force` baut trotzdem ein, ungetestet); der Patch schreibt das Ergebnis als Zeile `Voraussetzungen: ...` ins Protokoll.
 
+Wer am Code mitarbeitet: Hausregeln (Hooks, Gleitkomma, Stil, statische Pruefung mit clang-tidy) stehen in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Aufbau
 | Ordner | Inhalt |
 |---|---|

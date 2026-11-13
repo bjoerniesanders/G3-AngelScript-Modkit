@@ -309,7 +309,7 @@ bool __stdcall HCmStart(void* args, void* spu) {
     float applied = orig;
     bool res = false, called = false, taken = false;
     if (OnGameThread()) {
-        const unsigned pct = orig > 0 && orig < 1000 ? static_cast<unsigned>(orig * 100.0f + 0.5f) : 0;
+        const unsigned pct = orig > 0 && orig < 1000 ? static_cast<unsigned>(orig * 100.0f + 0.5f) : 0;   // NOLINT(bugprone-incorrect-roundings): nur positive Werte
         EvArg a[] = {EvArg::Ent(self), EvArg::Str(&move), EvArg::U(pct)};
         taken = g_host->CallOverride(
             "bool Override_CombatMove(Entity, const bCString &in, uint)", a, 3,

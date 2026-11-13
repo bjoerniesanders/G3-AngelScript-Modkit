@@ -91,7 +91,7 @@ public:
     SStr(const std::string& s) { g_sb.strCtorText(this, s.c_str()); }
     SStr(const SStr& o) { g_sb.strCopy(this, &o); }
     ~SStr() { g_sb.strDtor(this); }
-    SStr& operator=(const SStr& o) {
+    SStr& operator=(const SStr& o) {   // NOLINT(bugprone-unhandled-self-assignment): bCString::operator= der Engine prueft das selbst
         g_sb.strAssign(this, &o);
         return *this;
     }

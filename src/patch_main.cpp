@@ -142,7 +142,7 @@ void** g_slot[kHookCount] = {};
 // Gleitkomma-Zustand der Engine (Diagnose): Genome rechnet mit x87-Steuerwort 007F (24 Bit, bCFPUAdmin). Geschuetzt wird er zentral in
 // ScriptHost::Execute (script_host.cpp); hier nur feste Messpunkte im Protokoll ("FPU-Zustand ..."), um eine Abweichung zu sehen.
 unsigned short FpuCw() {
-    unsigned short cw;
+    unsigned short cw = 0;
     __asm fnstcw cw
     return cw;
 }
@@ -370,7 +370,7 @@ bool FindExeSlots() {
     if (!dd.VirtualAddress) return false;
     int found = 0;
     for (auto* d = reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(base + dd.VirtualAddress); d->Name; ++d) {
-        if (_stricmp(reinterpret_cast<const char*>(base + d->Name), "Engine.dll") || !d->OriginalFirstThunk) continue;
+        if (_stricmp(reinterpret_cast<const char*>(base + d->Name), "Engine.dll") != 0 || !d->OriginalFirstThunk) continue;
         auto* names = reinterpret_cast<IMAGE_THUNK_DATA*>(base + d->OriginalFirstThunk);
         auto* iat = reinterpret_cast<IMAGE_THUNK_DATA*>(base + d->FirstThunk);
         for (size_t i = 0; names[i].u1.AddressOfData; ++i) {

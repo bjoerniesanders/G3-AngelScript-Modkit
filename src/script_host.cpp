@@ -777,13 +777,13 @@ bool ScriptHost::Load(const std::string& path) {
 // mit falscher Genauigkeit weiter: Gebaeude-Texturen blieben nach dem Laden verwaschen. Jeder Skriptaufruf stellt deshalb x87-Steuerwort und MXCSR danach wieder her.
 namespace {
 unsigned short FpuControlWord() {
-    unsigned short cw;
+    unsigned short cw = 0;
     __asm fnstcw cw
     return cw;
 }
 void FpuLoadControlWord(unsigned short cw) { __asm fldcw cw }
 unsigned FpuMxcsr() {
-    unsigned v;
+    unsigned v = 0;
     __asm stmxcsr v
     return v;
 }

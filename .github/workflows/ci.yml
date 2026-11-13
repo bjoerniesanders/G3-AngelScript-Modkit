@@ -34,6 +34,13 @@ jobs:
         shell: pwsh
         run: ./tools/check_no_fninit.ps1 -Dll build/patch/og3_patch.dll
 
+      # Static analysis with the checks from .clang-tidy. Report only for now: the runner's clang-tidy is newer than the one the code base
+      # was cleaned with (LLVM 15) and may know more checks; make this step blocking (-Strict, no continue-on-error) once it has run clean here.
+      - name: clang-tidy (report only)
+        shell: pwsh
+        continue-on-error: true
+        run: ./tools/run_clang_tidy.ps1 -BuildDir build
+
       # The real SharedBase.dll is a game file and not in the repository; tests/sb_stub builds a stand-in with the same exports.
       - name: Self test (stub SharedBase)
         shell: pwsh

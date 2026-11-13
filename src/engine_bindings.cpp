@@ -109,7 +109,7 @@ bool Resolve() {
 bool Valid(const void* p) {
     if (!ReadableMem(p, sizeof(void*))) return false;
     __try {
-        const void* vt = *static_cast<void* const*>(p);
+        const void* vt = *static_cast<void* const*>(p);   // NOLINT(clang-analyzer-core.NullDereference): ReadableMem oben, dazu SEH
         return InModule(g_e.engine, vt) || InModule(g_e.game, vt) || InModule(GetModuleHandleA(nullptr), vt);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
@@ -2176,9 +2176,6 @@ int GetActivePage() { return ResolveScreen() ? SafeActivePage() : -1; }
 
 bool RegisterEngineBindings(asIScriptEngine* e) {
     bool ok = true;
-    auto R = [&](int r) {
-        if (r < 0) ok = false;
-    };
     OG3_REG(e->RegisterObjectType("Entity", sizeof(Entity), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Entity>()));
     OG3_REG(e->RegisterObjectBehaviour("Entity", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(EntConstruct), asCALL_CDECL_OBJLAST));
     OG3_REG(e->RegisterObjectMethod("Entity", "bool IsValid() const", asFUNCTION(EntIsValid), asCALL_CDECL_OBJFIRST));

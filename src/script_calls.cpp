@@ -326,7 +326,7 @@ void LogStats() {
 }
 
 struct HookTimer {
-    LARGE_INTEGER t0;
+    LARGE_INTEGER t0{};
     HookTimer() {
         if (g_stats) QueryPerformanceCounter(&t0);
     }
