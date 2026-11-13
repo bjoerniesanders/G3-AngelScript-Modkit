@@ -7,7 +7,9 @@
 # (build32\loader\dbghelp.dll) wird zu dbghelp.dll, og3_patch.dll und eine og3_patch.ini kommen dazu, ausserdem ein Mini-Mod und der Ordner og3\mods.
 # Sicherung nach <Spiel>\og3_backup\loader_<Zeit>\. Ist dbghelp.dll schon ein Proxy (z. B. der des Hauptrepos) und gibt es kein dbghelp_orig.dll, bricht das Skript ab.
 # Dateien werden geloescht und neu angelegt (Hardlinks zu anderen Spielkopien werden getrennt, nicht mitveraendert).
-param([Parameter(Mandatory)][string]$Game, [switch]$Uninstall, [string]$BuildDir = "")
+# Voraussetzung (nur beim Einbau geprueft): Community Patch 1.75 (PE-Zeitstempel der Gothic3.exe 4F959F4F) und Parallel-Universe-Patch (paru_s1.dll,
+# scripts\Script_paru.dll). Fehlt etwas, bricht das Skript ab; -Force baut trotzdem ein (ungetestet).
+param([Parameter(Mandatory)][string]$Game, [switch]$Uninstall, [string]$BuildDir = "", [switch]$Force)
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot   # og3-patch
 if (-not $BuildDir) { $BuildDir = Join-Path (Split-Path -Parent $root) "build32" }
@@ -41,6 +43,21 @@ if ($Uninstall) {
     "og3_patch.dll entfernt (og3_patch.ini, og3\ und dbghelp_orig.dll bleiben liegen)"
     return
 }
+
+function Get-PeTimeStamp([string]$file) {
+    $b = [IO.File]::ReadAllBytes($file)
+    return [BitConverter]::ToUInt32($b, [BitConverter]::ToInt32($b, 0x3C) + 8)
+}
+$missing = @()
+if ((Get-PeTimeStamp (Join-Path $Game "Gothic3.exe")) -ne 0x4F959F4F) { $missing += "Community Patch 1.75 (Gothic3.exe hat einen anderen Stand)" }
+if (-not ((Test-Path (Join-Path $Game "paru_s1.dll")) -and (Test-Path (Join-Path $Game "scripts\Script_paru.dll")))) {
+    $missing += "Parallel-Universe-Patch (paru_s1.dll oder scripts\Script_paru.dll fehlt)"
+}
+if ($missing) {
+    $text = "Voraussetzung fehlt: " + ($missing -join "; ")
+    if (-not $Force) { throw "$text. OG3-Patch braucht Community Patch 1.75 und Parallel-Universe-Patch. Mit -Force trotzdem einbauen (ungetestet)." }
+    "WARNUNG: $text - Einbau wegen -Force trotzdem (ungetestet)"
+} else { "Voraussetzungen: Community Patch 1.75 und Parallel-Universe-Patch gefunden" }
 
 $loader = Join-Path $BuildDir "loader\dbghelp.dll"
 $patchDll = Join-Path $BuildDir "patch\og3_patch.dll"

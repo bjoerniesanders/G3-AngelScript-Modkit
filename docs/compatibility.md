@@ -1,18 +1,30 @@
 # Kompatibilität
 
-Der OG3-Patch ist ein **Alpha**-Stand. Getestet ist bisher nur eine Installation. Diese Seite sammelt, was auf welcher Installation geprüft wurde. Wer den Patch
+Der OG3-Patch ist ein **Alpha**-Stand. Getestet ist er bisher auf wenigen Installationen. Diese Seite sammelt, was auf welcher Installation geprüft wurde. Wer den Patch
 auf einer anderen Installation ausprobiert, kann das Ergebnis gern melden (Protokolle siehe unten).
+
+## Voraussetzungen
+
+Der OG3-Patch setzt **Community Patch 1.75** und den **Parallel-Universe-Patch** (PU) voraus. Ohne einen der beiden ist er nicht getestet und wird nicht
+unterstützt.
+
+- `tools/install_loader.ps1` prüft beim Einbau beides und bricht ab, wenn etwas fehlt. Mit `-Force` baut er trotzdem ein (ungetestet).
+- Der Patch schreibt beim Start die Zeile `Voraussetzungen: Community Patch 1.75 ja/NEIN, Parallel-Universe-Patch ja/NEIN` ins Protokoll, bei einem `NEIN`
+  zusätzlich eine `WARNUNG`. Er läuft trotzdem weiter; Hooks an festen Adressen prüfen ihre Bytes selbst.
+- Erkennung: Community Patch 1.75 am PE-Zeitstempel `4F959F4F` der `Gothic3.exe` (die `Game.dll` taugt dafür nicht, Mods patchen sie binär), PU an
+  `paru_s1.dll` und `scripts\Script_paru.dll` im Spielordner.
 
 ## Testmatrix
 
 | Installation | Community Patch | PU-Patch | DXVK | Ergebnis | Stand |
 |---|---|---|---|---|---|
-| Entwicklerinstallation (Kopie, Windows 11) | 1.75 | ja | ja | alle Prüfungen bestanden | API 30, 2026-11 |
-| Steam (stark gemoddet, Kopie) | Steam-Fassung mit eigenem Patchstand | ja | ja (anderer DXVK-Stand) | Start, Spielstand laden, Weltwechsel, Beenden ohne Fehler (nur Mini-Mod); alle 8 Spiel-Hooks und 2 Statuseffekt-Hooks aktiv, x87-Steuerwort durchgehend 007F; Tooltip-Hook ausgelassen, weil `Game.dll+0xA48B0` dort abweicht (erwartet). 2026-11-08: Blackscreen im Intro durch gemeinsamen `Shader.Cache` (getrennt: behoben); ein Spielstand mit `perk_lifesteal` stürzte nach Neustart und Laden beim Öffnen des Charakterbogens ab, auch ohne Mods (Ursache offen) | 2026-11 |
-| GOG | offen | offen | offen | nicht getestet | |
-| CD/DVD-Version | offen | offen | offen | nicht getestet | |
+| Entwicklerinstallation (Kopie, Windows 11; `FileSystem.dll`/`Dialogs.dll` sind dort eigene Testfassungen) | 1.75 | ja | ja | alle Prüfungen bestanden | API 30, 2026-11 |
+| Steam (stark gemoddet, Kopie) | 1.75 (Spiel-DLLs von Mods binär verändert) | ja | ja (anderer DXVK-Stand) | Start, Spielstand laden, Weltwechsel, Beenden ohne Fehler (nur Mini-Mod); alle 8 Spiel-Hooks und 2 Statuseffekt-Hooks aktiv, x87-Steuerwort durchgehend 007F; Tooltip-Hook ausgelassen, weil `Game.dll+0xA48B0` dort abweicht (erwartet). 2026-11-08: Blackscreen im Intro durch gemeinsamen `Shader.Cache` (getrennt: behoben); ein Spielstand mit `perk_lifesteal` stürzte nach Neustart und Laden beim Öffnen des Charakterbogens ab, auch ohne Mods (Ursache offen) | 2026-11 |
+| Steam (sauber, Kopie; nur Community Patch und PU) | 1.75 | ja | nein | Spiel-DLLs byte-gleich mit der Entwicklerinstallation (außer `FileSystem.dll`/`Dialogs.dll`). Ohne Patch (Loader eingebaut, `enable=0`) und mit Patch (nur Mini-Mod): Start, Spielstand laden, Charakterbogen, Speichern in neuen Slot, erneut laden, Beenden ohne Fehler; Voraussetzungen erkannt, alle Hooks aktiv (auch Tooltip und die festen Stellen Monsterschaden/Lernkosten), x87-Steuerwort durchgehend 007F. Mod-Test mit `perk_lifesteal` und `beliars_klaue` nach dem Prüfablauf unten: Lebensraub heilt, Kachel nach jedem Laden und Speichern vorhanden, Blitze mit Besitzer und Optik; Abschalten mit `ENTFERNEN = true`, danach Mods aus und zuletzt Patch ausgebaut: Spielstand laden, Charakterbogen, Waffe ab- und anlegen jeweils ohne Absturz | API 46, 2026-11-13 |
+| GOG | 1.75 nötig | nötig | offen | nicht getestet | |
+| CD/DVD-Version | 1.75 nötig | nötig | offen | nicht getestet | |
 
-Weitere Zeilen für Kombinationen: ohne Community Patch, mit/ohne PU-Patch, mit/ohne DXVK.
+Installationen ohne Community Patch 1.75 oder ohne PU-Patch werden nicht geprüft (siehe Voraussetzungen). Offen ist noch: mit/ohne DXVK.
 
 ## Bekannte Unterschiede zwischen Installationen
 
@@ -38,6 +50,7 @@ danach löschen.
 1. **Einbauen** (Spiel beendet): aus dem Release-Zip, im entpackten Ordner:
    `powershell -NoProfile -ExecutionPolicy Bypass -File tools\install_loader.ps1 -Game "<Kopie>" -BuildDir bin`
 2. **Starten**, Spielstand laden, ein paar Minuten spielen, beenden. Dann `<Kopie>\og3_patch.log` ansehen:
+   - die Zeile `Voraussetzungen: Community Patch 1.75 ja, Parallel-Universe-Patch ja`;
    - sieben Zeilen `Modul ...: <Bytes> Bytes, PE-Zeitstempel ..., CRC32 ..., Spielordner ja/nein` (Gothic3.exe, Game, Engine, Script, Script_Game, SharedBase, d3d9);
    - alle Hooks als `eingehaengt`, `Qualitaets-Tooltip (Lebensraub): eingehaengt`;
    - das x87-Steuerwort steht bei jeder Zeile `FPU-Zustand ...` auf `007F`;
@@ -48,13 +61,13 @@ danach löschen.
 4. **Speichern und Laden** mit eingeschalteten Mods, **in einen neuen Slot**.
 5. **Ausbauen:** `... install_loader.ps1 -Game "<Kopie>" -Uninstall`, danach das Spiel **ohne Patch** starten.
 
-**Achtung bei Schritt 5:** `perk_lifesteal` legt einen Gegenstandsstapel im Inventar des Helden an. Er steht im Spielstand. Lädt man einen Spielstand mit diesem
-Stapel **ohne** die Mod und öffnet den Charakterbogen, stürzt das Spiel ab (gemessen, siehe [Grenzen und Stand](modkit/limitations.md)). Zum Ausbau-Test deshalb
-einen Spielstand laden, der **vor** dem Einschalten der Mods entstand, oder `ENTFERNEN = true` in `perk_lifesteal` setzen, einmal laden, speichern und erst dann
-die Mod abschalten.
+**Achtung bei Schritt 5:** `perk_lifesteal` legt einen Gegenstandsstapel im Inventar des Helden an. Lädt man einen Spielstand mit diesem Stapel **ohne** die Mod
+und öffnet den Charakterbogen, stürzt das Spiel ab (gemessen, siehe [Grenzen und Stand](modkit/limitations.md)). Seit Version 31 nimmt die Mod den Stapel vor
+jedem Speichern heraus und legt ihn danach und nach jedem Laden neu an; Spielstände dieser Fassung enthalten ihn also nicht. Ältere Spielstände können ihn
+enthalten: dann `ENTFERNEN = true` in `perk_lifesteal` setzen, einmal laden, speichern und erst dann die Mod abschalten (so auch im Test vom 2026-11-13).
 
 ## Was bei einem Bericht helfen würde
-- Installation (Steam/GOG/CD), Version des Community Patch, PU-Patch ja/nein, DXVK ja/nein.
+- Installation (Steam/GOG/CD), DXVK ja/nein und die Zeile `Voraussetzungen: ...` aus dem Protokoll.
 - `og3_patch.log` und `og3_loader.log` aus dem Spielordner. Der Loader schreibt in der ersten Zeile den Pfad zur Einstellungsdatei; vor dem Weitergeben
   Benutzernamen im Pfad ggf. unkenntlich machen.
 - Was zuletzt im Spiel passiert ist, wenn es abstürzt.

@@ -27,7 +27,7 @@ Aktuelle Skript-Schnittstelle: **Version 46** (`GetApiVersion()`).
 
 ## Schnellstart
 
-1. Patch einbauen (Spiel beenden): `powershell -NoProfile -File tools\install_patch.ps1` (siehe [Mod-Ordner](mod-package.md)).
+1. Patch einbauen (Spiel beenden; Voraussetzung Community Patch 1.75 und Parallel-Universe-Patch): `powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner>` (siehe [Mod-Ordner](mod-package.md)).
 2. Ordner `G:\Gothic3\og3\mods\hallo\` anlegen, darin `main.as`:
    ```angelscript
    void main() {

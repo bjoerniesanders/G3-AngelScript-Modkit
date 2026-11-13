@@ -29,6 +29,9 @@ foreach ($f in "README.md", "LICENSE", "LICENSE-EXCEPTIONS.md") { if (Test-Path 
 $install = @"
 OG3-Patch $Version - AngelScript modkit for Gothic 3 (original game, 32-bit)
 
+Requirements: Gothic 3 with Community Patch 1.75 and the Parallel Universe Patch (PU) installed.
+The installer checks both and stops if one is missing (-Force installs anyway, untested).
+
 Install (close Gothic 3 first; the folder must contain Gothic3.exe):
   powershell -NoProfile -ExecutionPolicy Bypass -File tools\install_loader.ps1 -Game "C:\Path\to\Gothic 3" -BuildDir bin
 

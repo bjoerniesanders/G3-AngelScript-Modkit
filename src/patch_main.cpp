@@ -214,14 +214,31 @@ void LogModuleVersion(const char* name) {
                   static_cast<unsigned long>(nt->FileHeader.TimeDateStamp), crcText, inGameDir ? "ja" : "nein");
     Log(b);
 }
+// Voraussetzungen: Community Patch 1.75 und Parallel-Universe-Patch (PU). Nur Pruefung und Protokoll, der Patch laeuft in jedem Fall weiter.
+// CP 1.75: PE-Zeitstempel der Gothic3.exe 4F959F4F (gleich in Entwicklerinstallation, Steam sauber und Steam gemoddet, gemessen 2026-11-13; die
+// Game.dll taugt nicht, gemoddete Installationen patchen sie binaer). PU: paru_s1.dll und scripts\Script_paru.dll im Spielordner.
+void LogPrerequisites() {
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(GetModuleHandleA(nullptr));
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(reinterpret_cast<const char*>(dos) + dos->e_lfanew);
+    const bool cp = nt->FileHeader.TimeDateStamp == 0x4F959F4Fu;
+    const bool pu = GetFileAttributesA((g_gameDir + "paru_s1.dll").c_str()) != INVALID_FILE_ATTRIBUTES &&
+                    GetFileAttributesA((g_gameDir + "scripts\\Script_paru.dll").c_str()) != INVALID_FILE_ATTRIBUTES;
+    Log(std::string("Voraussetzungen: Community Patch 1.75 ") + (cp ? "ja" : "NEIN") + ", Parallel-Universe-Patch " + (pu ? "ja" : "NEIN"));
+    if (!cp || !pu)
+        Log("WARNUNG: OG3-Patch setzt Community Patch 1.75 und Parallel-Universe-Patch voraus; ohne sie ist er nicht getestet (Hooks pruefen ihre Bytes selbst)");
+}
 void LogModuleVersions() {
     // Script.dll und Script_Game.dll laden erst nach OnPostInitializeModules (gemessen 2026-11-07); sie werden bei der ersten Weltaktivierung nachgetragen.
     static const char* kMods[] = {"Gothic3.exe", "Game.dll", "Engine.dll", "SharedBase.dll", "d3d9.dll"};
     for (const char* n : kMods) LogModuleVersion(n);
+    LogPrerequisites();
 }
 void LogScriptModuleVersions() {
+    // Bei der ersten Weltaktivierung (Hauptmenue) sind beide oft noch nicht geladen (gemessen 2026-11-13, Steam sauber): dann bei der naechsten Aktivierung
+    // erneut versuchen, statt zweimal "nicht geladen" festzuschreiben.
     static bool done = false;
     if (done) return;
+    if (!GetModuleHandleA("Script.dll") || !GetModuleHandleA("Script_Game.dll")) return;
     done = true;
     LogModuleVersion("Script.dll");
     LogModuleVersion("Script_Game.dll");

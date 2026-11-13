@@ -69,7 +69,14 @@ bCString Zustand(Entity hero, const bCString &in talent) {
 void OnQuestsLoaded() { Versuch(); }
 int ladeZaehler = 0;
 int gemessen = 0;
-void OnWorldActivate() { Versuch(); ladeZaehler++; }
+// Nach jedem Laden neu pruefen: Der Stapel steht (wegen OnBeforeSave) nicht im Spielstand und muss wieder angelegt werden, sonst fehlen Kachel und Talent
+// bis zum naechsten Speichern (gemessen 2026-11-13). Die Nachaktivierung des alten Helden gilt fuer den neu geladenen nicht.
+void OnWorldActivate() {
+    Versuch();
+    ladeZaehler++;
+    stapelGeprueft = false;
+    manuell = false;
+}
 
 // Die frueheren Qualitaetszeile "(20 %) Lebensraub" (Bit QUALITY_LIFESTEAL aus lifesteal_demo) steckt im Spielstand an der Waffe: hier einmal pro Sekunde entfernen,
 // damit nur noch das Bonustalent an der Waffe steht.

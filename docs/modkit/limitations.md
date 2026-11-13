@@ -23,7 +23,9 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 - Eigene Talente mit Kachel im Charakterbogen (`perk_lifesteal`); Abschalten mit `ENTFERNEN = true`, dann Spielstand ohne Mod ohne Absturz
 - Spielstand ohne Mod (2026-11-10): mit `perk_lifesteal` gespeichert (Talent und Stapel in `OnBeforeSave` entnommen), Mod abgeschaltet, Neustart, geladen,
   Charakterbogen geöffnet, Waffe ab- und wieder ausgerüstet: kein Absturz, keine Fehlerzeilen. Der Verweis `ActivateSkill2` an der Waffe, der beim Speichern
-  noch auf das Talent zeigt, stört ohne die Mod nicht
+  noch auf das Talent zeigt, stört ohne die Mod nicht. Wiederholt 2026-11-13 auf einer sauberen Steam-Kopie (Community Patch 1.75 + PU), dort zusätzlich ganz ohne Patch.
+  Dabei gefunden und behoben: Nach dem **Laden** legte die Mod den Stapel nicht neu an (Kachel und Talent fehlten bis zum nächsten Speichern); jetzt bei
+  jeder Weltaktivierung
 - Verletzen und Töten über die Blitz-Beschwörung mit Besitzer (`beliars_klaue`), Effekte starten (`StartEffect`)
 - Vorlagen klonen (`CloneTemplate`) mit fester ID; Klon-Items bleiben nach Speichern, Laden und Neustart erhalten
 - NPCs erzeugen und entfernen (`SpawnNPC`, `DestroyNPC`), auch aus früheren Sitzungen; Welt-NPCs, Held und Welt-Objekte werden abgelehnt
@@ -38,7 +40,7 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 - Datei-Patches auf Quest-Dateien (`patch_demo`); Mod-Archive (`PackMod`) werden geladen und überschreiben vorhandene Dateien
 - Zeichnen über HUD und Inventar: Text (`DrawText`) und Bilder aus den GUI-Daten (`DrawImage`), `WorldToScreen`
 
-**Installationen:** Entwicklerinstallation und eine stark gemoddete Steam-Kopie, siehe `docs/compatibility.md` im Repository.
+**Installationen:** Voraussetzung sind Community Patch 1.75 und Parallel-Universe-Patch. Geprüft: Entwicklerinstallation, eine stark gemoddete und eine saubere Steam-Kopie, siehe `docs/compatibility.md` im Repository.
 
 ## Nicht oder nur teilweise geprüft
 

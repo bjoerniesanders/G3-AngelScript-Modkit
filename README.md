@@ -3,6 +3,9 @@
 AngelScript-Modding fuer das **Original-Gothic-3**: `og3_patch.dll` wird von einer schlanken Ersatz-`dbghelp.dll` (dem Loader, `src/loader`) geladen, startet
 AngelScript 2.38 und bindet Spielereignisse, Quests, Inventar, Dialoge und Datei-Patches an Mod-Skripte.
 
+**Voraussetzungen:** Gothic 3 mit **Community Patch 1.75** und **Parallel-Universe-Patch** (PU). `tools/install_loader.ps1` prueft beides und bricht
+ab, wenn etwas fehlt (`-Force` baut trotzdem ein, ungetestet); der Patch schreibt das Ergebnis als Zeile `Voraussetzungen: ...` ins Protokoll.
+
 ## Aufbau
 | Ordner | Inhalt |
 |---|---|
