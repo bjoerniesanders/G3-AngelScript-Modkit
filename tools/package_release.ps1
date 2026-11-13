@@ -6,18 +6,18 @@ $root = Split-Path -Parent $PSScriptRoot
 if (-not [IO.Path]::IsPathRooted($BuildDir)) { $BuildDir = Join-Path $root $BuildDir }
 if (-not [IO.Path]::IsPathRooted($OutDir)) { $OutDir = Join-Path $root $OutDir }
 
-$need = @("loader\dbghelp.dll", "patch\g3asm.dll", "patch\g3asm_packmod.exe")
+$need = @("loader\dbghelp.dll", "g3asm\g3asm.dll", "g3asm\g3asm_packmod.exe")
 foreach ($f in $need) { if (-not (Test-Path (Join-Path $BuildDir $f))) { throw "$f is missing in $BuildDir (build first)" } }
 
 $name = "g3asm-$Version"
 $stage = Join-Path $OutDir $name
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-New-Item -ItemType Directory -Force (Join-Path $stage "bin\loader"), (Join-Path $stage "bin\patch"), (Join-Path $stage "tools"), (Join-Path $stage "docs") | Out-Null
+New-Item -ItemType Directory -Force (Join-Path $stage "bin\loader"), (Join-Path $stage "bin\g3asm"), (Join-Path $stage "tools"), (Join-Path $stage "docs") | Out-Null
 
 Copy-Item (Join-Path $BuildDir "loader\dbghelp.dll") (Join-Path $stage "bin\loader\")
 foreach ($f in "g3asm.dll", "g3asm.map", "g3asm_packmod.exe") {
-    $p = Join-Path $BuildDir "patch\$f"
-    if (Test-Path $p) { Copy-Item $p (Join-Path $stage "bin\patch\") }
+    $p = Join-Path $BuildDir "g3asm\$f"
+    if (Test-Path $p) { Copy-Item $p (Join-Path $stage "bin\g3asm\") }
 }
 Copy-Item (Join-Path $root "tools\install_loader.ps1"), (Join-Path $root "tools\g3pak_read.py") (Join-Path $stage "tools\")
 Copy-Item (Join-Path $root "examples") $stage -Recurse

@@ -11,7 +11,7 @@
 # scripts\Script_paru.dll). Fehlt etwas, bricht das Skript ab; -Force baut trotzdem ein (ungetestet).
 param([Parameter(Mandatory)][string]$Game, [switch]$Uninstall, [string]$BuildDir = "", [switch]$Force)
 $ErrorActionPreference = "Stop"
-$root = Split-Path -Parent $PSScriptRoot   # g3-angelscript-modkit
+$root = Split-Path -Parent $PSScriptRoot   # G3-AngelScript-Modkit
 if (-not $BuildDir) { $BuildDir = Join-Path (Split-Path -Parent $root) "build32" }
 $dbg = Join-Path $Game "dbghelp.dll"
 $dbgOrig = Join-Path $Game "dbghelp_orig.dll"
@@ -61,7 +61,7 @@ if ($missing) {
 } else { "Voraussetzungen: Community Patch 1.75 und Parallel-Universe-Patch gefunden" }
 
 $loader = Join-Path $BuildDir "loader\dbghelp.dll"
-$patchDll = Join-Path $BuildDir "patch\g3asm.dll"
+$patchDll = Join-Path $BuildDir "g3asm\g3asm.dll"
 foreach ($f in $loader, $patchDll) { if (-not (Test-Path $f)) { throw "$f fehlt - zuerst bauen (cmake --build <Ordner> --config Release --target g3asm_loader g3asm)" } }
 if (-not (Test-Path $dbg)) { throw "$dbg fehlt - ist das ein Gothic-3-Ordner?" }
 $haveOrig = Test-Path $dbgOrig
@@ -83,6 +83,17 @@ if ((Test-Path $oldIni) -and -not (Test-Path (Join-Path $Game "g3asm.ini"))) {
 }
 foreach ($f in "og3_patch.dll", "og3_patch.map") { $p = Join-Path $Game $f; if (Test-Path $p) { Remove-Item $p -Force; "Umzug: $f entfernt" } }
 
+# Der ini-Abschnitt hiess bis API 46 [patch]; die DLL liest ihn noch, wenn [g3asm] fehlt. Hier wird er umbenannt (Inhalt bleibt).
+$iniNow = Join-Path $Game "g3asm.ini"
+if (Test-Path $iniNow) {
+    $enc = [Text.Encoding]::GetEncoding(1252)
+    $t = [IO.File]::ReadAllText($iniNow, $enc)
+    if ($t -match '(?im)^\[patch\]' -and $t -notmatch '(?im)^\[g3asm\]') {
+        [IO.File]::WriteAllText($iniNow, ($t -replace '(?im)^\[patch\]', '[g3asm]'), $enc)
+        "Umzug: Abschnitt [patch] in g3asm.ini heisst jetzt [g3asm]"
+    }
+}
+
 $bk = Join-Path $backupRoot ("loader_" + (Get-Date -Format "yyyyMMdd_HHmmss"))
 New-Item -ItemType Directory -Force $bk | Out-Null
 if (Is-Loader $dbg) { "dbghelp.dll ist schon der G3ASM-Loader: wird nicht noch einmal gesichert (Original: dbghelp_orig.dll und fruehere Sicherungen)" }
@@ -94,10 +105,10 @@ if (-not $haveOrig) { Copy-Item $dbg $dbgOrig; "Original-dbghelp.dll als dbghelp
 else { "dbghelp_orig.dll ist schon vorhanden und bleibt" }
 Replace-File $loader $dbg
 Replace-File $patchDll (Join-Path $Game "g3asm.dll")
-$map = Join-Path $BuildDir "patch\g3asm.map"
+$map = Join-Path $BuildDir "g3asm\g3asm.map"
 if (Test-Path $map) { Replace-File $map (Join-Path $Game "g3asm.map") }
 if (-not (Test-Path $ini)) {
-    Set-Content -Path $ini -Value "[patch]`r`nenable=1`r`nscript=g3asm\scripts\main.as`r`nhotreload=1`r`n[loader]`r`ncrashlog=1`r`n" -Encoding ASCII
+    Set-Content -Path $ini -Value "[g3asm]`r`nenable=1`r`nscript=g3asm\scripts\main.as`r`nhotreload=1`r`n[loader]`r`ncrashlog=1`r`n" -Encoding ASCII
     "g3asm.ini angelegt"
 } else { "Vorhandene g3asm.ini bleibt" }
 $scripts = Join-Path $Game "g3asm\scripts"

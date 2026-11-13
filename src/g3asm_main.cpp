@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// g3asm.dll - offener Patch fuer Gothic 3 mit AngelScript-Modding (Meilenstein 1).
-// Wird vom dbghelp-Proxy geladen (og3_hooks.ini [patch] enable=1) und arbeitet mit der geladenen SharedBase.dll (Original oder Nachbau).
+// g3asm.dll - G3 AngelScript Modkit: AngelScript-Modding fuer Gothic 3.
+// Wird vom Loader (src/loader, Ersatz-dbghelp.dll; g3asm.ini [g3asm] enable=1) geladen und arbeitet mit der geladenen SharedBase.dll (Original oder Nachbau).
 //
 // Einhaengen ohne Code-Eingriff (vertraeglich mit dem Parallel-Universe-Patch): die Importtabelle von Gothic3.exe wird fuer vier
 // Lebenszyklus-Funktionen von eCApplication (Engine.dll) umgelenkt. Die EXE leitet ihre Anwendungsklasse von eCApplication ab und
 // ruft diese virtuellen Funktionen ueber Import-Thunks auf:
 //   OnPostInitializeModules -> Skript laden, main()        OnProcess -> OnFrame(dt), Neuladen bei Dateiaenderung
 //   OnWorldActivate / OnWorldDeactivate -> gleichnamige Skript-Ereignisse
-// Beim Laden des Proxys sind die Importe der EXE eventuell noch nicht gebunden: ein Hilfsthread wartet darauf (hoechstens 60 s).
+// Beim Laden durch den Loader sind die Importe der EXE eventuell noch nicht gebunden: ein Hilfsthread wartet darauf (hoechstens 60 s).
 //
-// ini [patch]: enable=0|1, script=g3asm\scripts\main.as (relativ zum Spielordner), hotreload=1
+// ini [g3asm]: enable=0|1, script=g3asm\scripts\main.as (relativ zum Spielordner), hotreload=1
 // Protokoll: <Spielordner>\g3asm.log
 #include <windows.h>
 #include <xmmintrin.h>
@@ -38,11 +38,11 @@ bool g_logLockInit = false;
 std::atomic<bool> g_initDone{false};
 bool g_mainRan = false;
 
-// Protokoll. Standard: sofort schreiben. Optional asynchron (ini [patch] asynclog=1): Der aufrufende Thread legt die Zeile nur in eine Warteschlange, ein
+// Protokoll. Standard: sofort schreiben. Optional asynchron (ini [g3asm] asynclog=1): Der aufrufende Thread legt die Zeile nur in eine Warteschlange, ein
 // Hintergrund-Thread schreibt g3asm.log und reicht die Zeilen an den Loader (g3asm_loader.log) weiter. Entstanden beim Suchen der verwaschenen Texturen;
 // das Schreiben war nicht die Ursache (die war fninit in der AngelScript-Aufrufbruecke, siehe CMakeLists.txt CLEAR_FPU_STACK).
 bool g_asyncLog = false;
-bool g_logWrite = true;   // ini [patch] logwrite=0: nach dem Start (main gelaufen) keine Protokollzeilen mehr (nur fuer Tests)
+bool g_logWrite = true;   // ini [g3asm] logwrite=0: nach dem Start (main gelaufen) keine Protokollzeilen mehr (nur fuer Tests)
 // Eine Meldung: Dateizeile mit Zeitstempel und Zeile fuer den Loader (ohne Zeitstempel, ganze Meldung wie frueher)
 struct LogItem {
     std::string fileLine, hostLine;
@@ -285,7 +285,7 @@ void InstallQuietMenu() {
     Log("Menuetaste stumm (F10/Alt ohne Windows-Piepton)");
 }
 
-// Speichermessung (Diagnose, ini [patch] memlog=1, Standard aus): alle 30 s freier Speicher und Adressraum wie von GlobalMemoryStatusEx (das auch die Engine liest)
+// Speichermessung (Diagnose, ini [g3asm] memlog=1, Standard aus): alle 30 s freier Speicher und Adressraum wie von GlobalMemoryStatusEx (das auch die Engine liest)
 // ins Protokoll, Zeilen "Speicher: ..." (nur Lesen, aendert nichts).
 bool g_memLog = false;
 void MemoryProbe() {
@@ -311,7 +311,7 @@ void MemoryProbe() {
                   m.ullTotalVirtual >> 20, m.dwMemoryLoad, freeV < 400 ? "  <-- Adressraum knapp" : "");
     Log(b);
 }
-// Ladepause (ini [patch] loadpause=<Sekunden>, 0 = aus): Waehrend eine Welt geladen wird (OnWorldDeactivate bis OnWorldActivate) und bis loadpause Sekunden
+// Ladepause (ini [g3asm] loadpause=<Sekunden>, 0 = aus): Waehrend eine Welt geladen wird (OnWorldDeactivate bis OnWorldActivate) und bis loadpause Sekunden
 // nach dem letzten OnWorldActivate wird OnFrame der Skripte nicht aufgerufen. Test fuer "verwaschene Gebaeude-Texturen nach dem Laden": Der Lader holt die
 // Gebaeude in dieser Zeit nach; jeder Skriptaufruf in C++ hat sie gestoert (gemessen 2026-11-06).
 unsigned g_loadPauseMs = 0;
@@ -551,22 +551,25 @@ extern "C" __declspec(dllexport) int g3asm_start(HMODULE sharedBase, const char*
     if (!InitCommon(sharedBase, gameDir, hostLog)) return 0;
     char script[MAX_PATH] = "g3asm\\scripts\\main.as", modsRel[MAX_PATH] = "g3asm\\mods";
     if (ini && *ini) {
-        GetPrivateProfileStringA("patch", "script", script, script, MAX_PATH, ini);
-        g_hotReload = GetPrivateProfileIntA("patch", "hotreload", 1, ini) != 0;
-        g_gameHooks = GetPrivateProfileIntA("patch", "hooks", 1, ini) != 0;
-        SetGameHookOptions(GetPrivateProfileIntA("patch", "navevents", 0, ini) != 0);
-        g_filePatches = GetPrivateProfileIntA("patch", "filepatches", 1, ini) != 0;
-        SetPrintToGameLog(GetPrivateProfileIntA("patch", "printgame", 1, ini) != 0);
-        g_asyncLog = GetPrivateProfileIntA("patch", "asynclog", 0, ini) != 0;
-        g_logWrite = GetPrivateProfileIntA("patch", "logwrite", 1, ini) != 0;
-        g_loadPauseMs = unsigned(GetPrivateProfileIntA("patch", "loadpause", 0, ini)) * 1000u;
-        g_memLog = GetPrivateProfileIntA("patch", "memlog", 0, ini) != 0;
-        SetScriptCallOptions(GetPrivateProfileIntA("patch", "scriptlog", 0, ini) != 0);
+        // Abschnitt [g3asm]; fehlt er, gilt der fruehere Name [g3asm] (aeltere ini, og3_hooks.ini des Hauptrepos)
+        char probe[8];
+        const char* sec = GetPrivateProfileSectionA("g3asm", probe, sizeof probe, ini) > 0 ? "g3asm" : "patch";
+        GetPrivateProfileStringA(sec, "script", script, script, MAX_PATH, ini);
+        g_hotReload = GetPrivateProfileIntA(sec, "hotreload", 1, ini) != 0;
+        g_gameHooks = GetPrivateProfileIntA(sec, "hooks", 1, ini) != 0;
+        SetGameHookOptions(GetPrivateProfileIntA(sec, "navevents", 0, ini) != 0);
+        g_filePatches = GetPrivateProfileIntA(sec, "filepatches", 1, ini) != 0;
+        SetPrintToGameLog(GetPrivateProfileIntA(sec, "printgame", 1, ini) != 0);
+        g_asyncLog = GetPrivateProfileIntA(sec, "asynclog", 0, ini) != 0;
+        g_logWrite = GetPrivateProfileIntA(sec, "logwrite", 1, ini) != 0;
+        g_loadPauseMs = unsigned(GetPrivateProfileIntA(sec, "loadpause", 0, ini)) * 1000u;
+        g_memLog = GetPrivateProfileIntA(sec, "memlog", 0, ini) != 0;
+        SetScriptCallOptions(GetPrivateProfileIntA(sec, "scriptlog", 0, ini) != 0);
         char aiFilter[128] = "";
-        GetPrivateProfileStringA("patch", "aitracefilter", "", aiFilter, sizeof aiFilter, ini);
-        SetAiTraceOptions(GetPrivateProfileIntA("patch", "aitrace", 0, ini) != 0, aiFilter, GetPrivateProfileIntA("patch", "aitracemax", 2000, ini));
-        SetAniSpeedLog(GetPrivateProfileIntA("patch", "anispeedlog", 0, ini) != 0);
-        GetPrivateProfileStringA("patch", "mods", modsRel, modsRel, MAX_PATH, ini);
+        GetPrivateProfileStringA(sec, "aitracefilter", "", aiFilter, sizeof aiFilter, ini);
+        SetAiTraceOptions(GetPrivateProfileIntA(sec, "aitrace", 0, ini) != 0, aiFilter, GetPrivateProfileIntA(sec, "aitracemax", 2000, ini));
+        SetAniSpeedLog(GetPrivateProfileIntA(sec, "anispeedlog", 0, ini) != 0);
+        GetPrivateProfileStringA(sec, "mods", modsRel, modsRel, MAX_PATH, ini);
     }
     g_modsDir = (modsRel[1] == ':' || modsRel[0] == '\\') ? std::string(modsRel) : g_gameDir + modsRel;
     while (!g_modsDir.empty() && (g_modsDir.back() == '\\' || g_modsDir.back() == '/')) g_modsDir.pop_back();

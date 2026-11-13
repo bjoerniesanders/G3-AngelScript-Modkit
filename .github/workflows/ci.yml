@@ -25,14 +25,14 @@ jobs:
       - name: Check build output
         shell: pwsh
         run: |
-          foreach ($f in 'build/patch/g3asm.dll', 'build/loader/dbghelp.dll', 'build/patch/g3asm_packmod.exe', 'build/patch/g3asm_test.exe', 'build/patch/g3asm_loader_test.exe', 'build/sbstub/SharedBase.dll') {
+          foreach ($f in 'build/g3asm/g3asm.dll', 'build/loader/dbghelp.dll', 'build/g3asm/g3asm_packmod.exe', 'build/g3asm/g3asm_test.exe', 'build/g3asm/g3asm_loader_test.exe', 'build/sbstub/SharedBase.dll') {
             if (-not (Test-Path $f)) { throw "$f is missing" }
             "{0,-32} {1,9} bytes" -f $f, (Get-Item $f).Length
           }
 
       - name: FPU fix active (no fninit)
         shell: pwsh
-        run: ./tools/check_no_fninit.ps1 -Dll build/patch/g3asm.dll
+        run: ./tools/check_no_fninit.ps1 -Dll build/g3asm/g3asm.dll
 
       # Static analysis with the checks from .clang-tidy. Report only for now: the runner's clang-tidy is newer than the one the code base
       # was cleaned with (LLVM 15) and may know more checks; make this step blocking (-Strict, no continue-on-error) once it has run clean here.
@@ -45,13 +45,13 @@ jobs:
       - name: Self test (stub SharedBase)
         shell: pwsh
         run: |
-          ./build/patch/g3asm_test.exe build/sbstub/SharedBase.dll tests/scripts/selftest.as
+          ./build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll tests/scripts/selftest.as
           if ($LASTEXITCODE -ne 0) { throw "self test failed ($LASTEXITCODE)" }
 
       - name: Test mods (stub SharedBase)
         shell: pwsh
         run: |
-          ./build/patch/g3asm_test.exe build/sbstub/SharedBase.dll tests/mods
+          ./build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll tests/mods
           if ($LASTEXITCODE -ne 0) { throw "test mods failed ($LASTEXITCODE)" }
 
       # Compile check of all example mods. The example set deliberately breaks the override-chain check (several mods override the
@@ -59,7 +59,7 @@ jobs:
       - name: Example mods compile (stub SharedBase)
         shell: pwsh
         run: |
-          $out = ./build/patch/g3asm_test.exe build/sbstub/SharedBase.dll examples/mods 2>&1 | Out-String
+          $out = ./build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll examples/mods 2>&1 | Out-String
           $rc = $LASTEXITCODE
           $out
           # exit code = number of failed checks (1 = the expected override-chain failure); >= 100 means the test runner itself failed
@@ -80,7 +80,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "loader test failed ($LASTEXITCODE)" }
 
       - name: PackMod numbering
-        run: python -I tests/packmod_generations.py build/patch/g3asm_packmod.exe
+        run: python -I tests/packmod_generations.py build/g3asm/g3asm_packmod.exe
 
       - name: Build a sample release package
         shell: pwsh

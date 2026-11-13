@@ -7,7 +7,7 @@
 //   - laedt g3asm.dll (neben dem Loader) und ruft g3asm_start() auf,
 //   - schreibt optional ein einfaches Absturzprotokoll (erste Chance, Modul+Offset).
 // Einstellungen in g3asm.ini neben der DLL (Fallback: og3_hooks.ini des Hauptrepos):
-//   [patch]   enable=1 (Standard 1)   script=...  hotreload=...  mods=...  (Rest siehe docs/g3asm.md)
+//   [g3asm]   enable=1 (Standard 1)   script=...  hotreload=...  mods=...  (Rest siehe docs/modkit/mod-package.md)
 //   [loader]  crashlog=1 (Standard 1)
 // Protokoll: g3asm_loader.log neben der DLL.
 #include <windows.h>
@@ -114,7 +114,9 @@ BOOL APIENTRY DllMain(HMODULE self, DWORD reason, LPVOID) {
 
     Log("G3ASM-Loader gestartet (Einstellungen: %s)", GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ? "keine ini, Standardwerte" : ini);
     if (GetPrivateProfileIntA("loader", "crashlog", 1, ini) != 0) AddVectoredExceptionHandler(1, CrashLogger);
-    if (GetPrivateProfileIntA("patch", "enable", 1, ini) == 0) {
+    char probe[8];   // Abschnitt [g3asm]; fehlt er, gilt der fruehere Name [g3asm]
+    const char* sec = GetPrivateProfileSectionA("g3asm", probe, sizeof probe, ini) > 0 ? "g3asm" : "patch";
+    if (GetPrivateProfileIntA(sec, "enable", 1, ini) == 0) {
         Log("G3ASM per ini abgeschaltet");
         return TRUE;
     }

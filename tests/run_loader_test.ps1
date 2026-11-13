@@ -6,8 +6,8 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 if (-not $BuildDir) { $BuildDir = Join-Path (Split-Path -Parent $root) "build32" }
 $loader = Join-Path $BuildDir "loader\dbghelp.dll"
-$patch = Join-Path $BuildDir "patch\g3asm.dll"
-$test = Join-Path $BuildDir "patch\g3asm_loader_test.exe"
+$patch = Join-Path $BuildDir "g3asm\g3asm.dll"
+$test = Join-Path $BuildDir "g3asm\g3asm_loader_test.exe"
 foreach ($f in $SharedBase, $DbghelpOrig, $loader, $patch, $test) { if (-not (Test-Path $f)) { throw "$f fehlt" } }
 $dir = Join-Path $env:TEMP ("g3asm_loader_test_" + [guid]::NewGuid().ToString("N").Substring(0, 8))
 New-Item -ItemType Directory $dir | Out-Null
@@ -16,7 +16,7 @@ try {
     Copy-Item $DbghelpOrig (Join-Path $dir "dbghelp_orig.dll")
     Copy-Item $loader (Join-Path $dir "dbghelp.dll")
     Copy-Item $patch (Join-Path $dir "g3asm.dll")
-    Set-Content -Path (Join-Path $dir "g3asm.ini") -Value "[patch]`r`nenable=1`r`nhotreload=0`r`n[loader]`r`ncrashlog=1`r`n" -Encoding ASCII
+    Set-Content -Path (Join-Path $dir "g3asm.ini") -Value "[g3asm]`r`nenable=1`r`nhotreload=0`r`n[loader]`r`ncrashlog=1`r`n" -Encoding ASCII
     & $test $dir
     $rc = $LASTEXITCODE
     "--- g3asm_loader.log"; Get-Content (Join-Path $dir "g3asm_loader.log") -ErrorAction SilentlyContinue

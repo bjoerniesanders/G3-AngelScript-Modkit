@@ -22,10 +22,10 @@ jobs:
 
       - name: FPU fix active (no fninit)
         shell: pwsh
-        run: ./tools/check_no_fninit.ps1 -Dll build/patch/g3asm.dll
+        run: ./tools/check_no_fninit.ps1 -Dll build/g3asm/g3asm.dll
 
       - name: PackMod numbering
-        run: python -I tests/packmod_generations.py build/patch/g3asm_packmod.exe
+        run: python -I tests/packmod_generations.py build/g3asm/g3asm_packmod.exe
 
       - name: Determine version
         id: ver

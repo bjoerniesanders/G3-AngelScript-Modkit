@@ -13,7 +13,7 @@ Das Skript
 - legt die `dbghelp.dll` des Spiels als `dbghelp_orig.dll` beiseite und sichert sie nach `<Spiel>\g3asm_backup\loader_<Zeit>\`,
 - kopiert den Loader (als `dbghelp.dll`) und `g3asm.dll` in den Spielordner,
 - legt `g3asm.ini`, `g3asm\scripts\` (mit einem Mini-Mod) und `g3asm\mods\` an,
-- zieht eine ältere Installation mit den früheren Namen (`og3_patch.dll`, `og3_patch.ini`, Ordner `og3\`) auf die neuen Namen um.
+- zieht eine ältere Installation mit den früheren Namen (`og3_patch.dll`, `og3_patch.ini`, Ordner `og3\`, ini-Abschnitt `[patch]`) auf die neuen Namen um.
 
 Rückbau: dasselbe mit `-Uninstall` statt `-BuildDir bin` stellt die originale `dbghelp.dll` wieder her und entfernt `g3asm.dll`. `g3asm.ini` und der Ordner
 `g3asm\` bleiben liegen.
@@ -26,7 +26,7 @@ Rückbau: dasselbe mit `-Uninstall` statt `-BuildDir bin` stellt die originale `
 <Gothic 3>\
   g3asm.dll
   g3asm.log                 Protokoll (print() und Fehlermeldungen)
-  g3asm.ini                 Einstellungen, Abschnitte [patch] und [loader]
+  g3asm.ini                 Einstellungen, Abschnitte [g3asm] und [loader]
   g3asm_loader.log          Protokoll des Loaders (Absturzkandidaten)
   dbghelp.dll               der Loader; dbghelp_orig.dll ist die des Spiels
   g3asm\
@@ -111,7 +111,7 @@ Das Skript liest sie mit `GetModSetting("Faktor")`, `GetModSettingFloat(...)` us
 ## Einstellungen: `g3asm.ini`
 
 ```
-[patch]
+[g3asm]
 enable=1                    ; 1 = Modkit laden
 script=g3asm\scripts\main.as  ; Einzelskript, relativ zum Spielordner oder absolut
 hotreload=1                 ; Skripte bei Dateiänderung neu laden (Prüfung einmal je Sekunde)

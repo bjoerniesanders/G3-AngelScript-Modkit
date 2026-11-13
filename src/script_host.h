@@ -4,8 +4,8 @@
 // AngelScript-Host von G3ASM: Engine, Bindings der Genome-Grundtypen (ueber die geladene SharedBase), Laden der Mod-Skripte,
 // Ereignisse und Overrides fuer Skripte, Neuladen bei Dateiaenderung.
 //
-// Die Skript-Schnittstelle (Typen, Funktionen, Ereignisse, Override-Hooks, Version G3ASM_SCRIPT_API_VERSION) ist in docs/g3asm.md
-// und docs/modkit/api-reference.md beschrieben; hier stehen nur die C++-Schnittstellen.
+// Die Skript-Schnittstelle (Typen, Funktionen, Ereignisse, Override-Hooks, Version G3ASM_SCRIPT_API_VERSION) ist in docs/modkit/
+// (api-reference.md, events.md, hooks.md) beschrieben; hier stehen nur die C++-Schnittstellen.
 #include <functional>
 #include <unordered_map>
 #include <string>
@@ -32,7 +32,7 @@ struct EvArg {
     static EvArg U(unsigned v) { return {UInt, nullptr, v}; }
 };
 
-void SetPrintToGameLog(bool on);   // ini [patch] printgame
+void SetPrintToGameLog(bool on);   // ini [g3asm] printgame
 void SetLoadDefaultOffMods(bool on);   // auch Mods mit mod.ini enabled=0 laden (Testprogramm)
 
 class ScriptHost {
@@ -170,7 +170,7 @@ bool AdjustHeroHitPoints(const void* ent, int delta);
 int InstallGameHooks(ScriptHost& host);
 // Spielskripte nach Namen (script_calls.cpp): Hooks auf gCScriptAdmin::RunScript/RunScriptFromScript, Bindings CallScript/WatchScript/...
 int InstallScriptCallHooks(ScriptHost& host);   // nach InstallGameHooks (Game.dll geladen, MinHook bereit)
-void SetScriptCallOptions(bool stats);   // ini [patch] scriptlog
+void SetScriptCallOptions(bool stats);   // ini [g3asm] scriptlog
 void ScriptCallsFrame();                 // einmal je Bild im Spiel-Thread
 void ScriptCallsReport();
 // Zeichen-API (draw_api.cpp): Hook auf GFC CFFGFCWnd::OnPaint -> Ereignis OnDraw(); DrawFrameTick einmal je Spielbild
@@ -184,9 +184,9 @@ void MoreEventsFrame();
 // Einstellungen je Mod (mod_settings.cpp, ab Version 44): Bindings; ModSettingsForget beim Neuladen eines Mods (Zwischenspeicher verwerfen)
 bool RegisterModSettingsBindings(asIScriptEngine* e);
 void ModSettingsForget(const std::string& mod);
-// KI-Tracer (ai_trace.cpp): nur Protokoll, ini [patch] aitrace/aitracefilter/aitracemax; InstallAiTrace haengt nur ein, wenn eingeschaltet
+// KI-Tracer (ai_trace.cpp): nur Protokoll, ini [g3asm] aitrace/aitracefilter/aitracemax; InstallAiTrace haengt nur ein, wenn eingeschaltet
 void SetAiTraceOptions(bool enabled, const char* filter, int maxLines);
-void SetAniSpeedLog(bool enabled);   // ini [patch] anispeedlog: Messung SetPlaySpeed/GetPlaySpeed (Roadmap 6.3)
+void SetAniSpeedLog(bool enabled);   // ini [g3asm] anispeedlog: Messung SetPlaySpeed/GetPlaySpeed (Roadmap 6.3)
 int InstallAiTrace(ScriptHost& host);
 // Eingriffe mitten in Spielskripten (combat_patches.cpp, Originalbytes geprueft): Override_MonsterDamage; bei jeder Weltaktivierung aufrufen (einmalig wirksam)
 int InstallScriptGamePatches(ScriptHost& host);   // einmal je Bild (Spiel-Takt): OnTouch-Handler, Verwandlungs-Hooks, Messung

@@ -11,17 +11,17 @@ Wer am Code mitarbeitet: Hausregeln (Hooks, Gleitkomma, Stil, statische Pruefung
 ## Aufbau
 | Ordner | Inhalt |
 |---|---|
-| `src/` | DLL-Quellen (`patch_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`), `src/loader/` (Loader = `dbghelp.dll`) |
+| `src/` | DLL-Quellen (`g3asm_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`), `src/loader/` (Loader = `dbghelp.dll`) |
 | `tests/` | `test_runner.cpp` (g3asm_test), `scripts/selftest.as`, `mods/` (Ordner-Test), `sb_stub/` (Ersatz-SharedBase.dll fuer Tests ohne Spieldateien) |
 | `examples/` | Beispiel-Mods (`mods/`) und Mini-Mod (`scripts/main.as`) |
-| `docs/` | `modkit/` (Modder-Doku), `compatibility.md` (gepruefte Installationen), `g3asm.md` (aeltere Entwicklungsnotizen) |
+| `docs/` | `modkit/` (Modder-Doku), `compatibility.md` (gepruefte Installationen) |
 | `tools/` | `g3pak_read.py` (Archive lesen, auch komprimierte Eintraege), `reference_from_log.py` (Referenz aus dem Dump), `install_loader.ps1` (Ein-/Ausbau), `package_release.ps1` (Release-Zip), `check_no_fninit.ps1`, `run_clang_tidy.ps1`, `packmod_main.cpp` (`g3asm_packmod`), `graphify_modding_sync.ps1` |
 | (beim Bauen geladen) | AngelScript (zlib) und MinHook: `G3ASM_ANGELSCRIPT_DIR` / `G3ASM_MINHOOK_DIR` oder automatischer Download |
 
 ## Bauen (32 Bit)
     cmake -S . -B build32 -A Win32
     cmake --build build32 --config Release --target g3asm g3asm_test g3asm_packmod g3asm_loader g3asm_loader_test g3asm_sb_stub
-Ausgabe: `build32/patch/` (g3asm.dll, Tests, g3asm_packmod) und `build32/loader/dbghelp.dll` (Loader).
+Ausgabe: `build32/g3asm/` (g3asm.dll, Tests, g3asm_packmod) und `build32/loader/dbghelp.dll` (Loader).
 
 ## Test
     g3asm_test.exe <SharedBase.dll> tests\scripts\selftest.as
@@ -47,9 +47,9 @@ und rechnet nicht bitgenau wie das Original; Messungen am Verhalten des Original
 Der Installer legt die vorhandene `dbghelp.dll` des Spiels als `dbghelp_orig.dll` beiseite (der Loader leitet `MiniDumpWriteDump` dorthin weiter, die Absturzberichte
 des Spiels funktionieren weiter), stellt den Loader als `dbghelp.dll` hin und kopiert `g3asm.dll`, eine `g3asm.ini` und einen Mini-Mod. Sicherung unter
 `<Spiel>\g3asm_backup\loader_<Zeit>\`. Protokolle: `g3asm_loader.log` (Loader, Absturzkandidaten) und `g3asm.log` (Modkit). Einstellungen in `g3asm.ini`
-(`[patch] enable/script/hotreload/mods`, `[loader] crashlog`).
+(`[g3asm] enable/script/hotreload/mods`, `[loader] crashlog`).
 
-**Frueherer Name:** Bis API 46 hiess das Projekt OG3-Patch (`og3_patch.dll`, `og3_patch.ini`, Ordner `og3\`). Der Installer zieht eine solche Installation beim
+**Frueherer Name:** Bis API 46 hiess das Projekt OG3-Patch (`og3_patch.dll`, `og3_patch.ini`, Ordner `og3\`, ini-Abschnitt `[patch]`). Der Installer zieht eine solche Installation beim
 Einbau um (Ordner und ini werden umbenannt, die alte DLL entfernt) und findet beim Ausbau auch die alten Sicherungen.
 
 ## Lizenz

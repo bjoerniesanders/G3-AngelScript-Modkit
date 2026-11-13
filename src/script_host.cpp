@@ -311,7 +311,7 @@ SQuat M4Quaternion(const SMat4& m) {
 }
 
 // ---------------------------------------------------------------- globale Funktionen
-bool g_printToGameLog = true;   // ini [patch] printgame=0: print() schreibt nur ins eigene Protokoll, nicht zusaetzlich ins Spielprotokoll (geInfo)
+bool g_printToGameLog = true;   // ini [g3asm] printgame=0: print() schreibt nur ins eigene Protokoll, nicht zusaetzlich ins Spielprotokoll (geInfo)
 void Print(const SStr& s) {
     if (ScriptHost::s_current) ScriptHost::s_current->Log(std::string("[") + ScriptHost::s_current->CurrentMod() + "] " + s.c_str());
     if (g_printToGameLog && g_sb.geInfo) g_sb.geInfo("g3asm-Skript: %s", s.c_str());

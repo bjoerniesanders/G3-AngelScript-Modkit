@@ -2,7 +2,7 @@
 // Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // KI-Tracer (Roadmap 6.2, nur Protokoll, keine Skript-Schnittstelle): schreibt Wechsel von KI-Zustand, -Aufgabe, -Routine, KI-Modus und Aktion
 // der NPCs ins Protokoll, um zu sehen, wann und warum die KI etwas abbricht (z. B. Animationen). Standard aus; g3asm.ini:
-//   [patch] aitrace=1            einschalten (Hooks werden nur dann eingehaengt)
+//   [g3asm] aitrace=1            einschalten (Hooks werden nur dann eingehaengt)
 //           aitracefilter=Diego  nur NPCs, deren Name diesen Text enthaelt (Gross-/Kleinschreibung egal; leer = alle)
 //           aitracemax=2000      hoechstens so viele Zeilen je Spielstart, danach eine Schlusszeile
 // Eingehaengt (Game.dll-Exporte, thiscall, ein Referenzargument):
@@ -10,7 +10,7 @@
 //   SetAIMode(const bTPropertyContainer<gEAIMode>&), SetAction(const bTPropertyContainer<gEAction>&); gCNavigation_PS::SetRoutine(const bCString&)
 // bCScriptString erbt von bCString; bTPropertyContainer<Enum> = {vtable, Wert} (8 Byte, Schema-Dump). Gemeldet wird nur ein geaenderter Wert
 // je NPC und Art (Wiederholungen desselben Werts zaehlen nur mit). Was die Aufrufe im Spiel ausloest, ist noch nicht gemessen.
-// Ausserdem (eigener Schalter, unten): [patch] anispeedlog=1 misst eCWrapper_emfx2Actor::SetPlaySpeed/GetPlaySpeed (Roadmap 6.3).
+// Ausserdem (eigener Schalter, unten): [g3asm] anispeedlog=1 misst eCWrapper_emfx2Actor::SetPlaySpeed/GetPlaySpeed (Roadmap 6.3).
 #include <windows.h>
 #include <intrin.h>
 
@@ -123,7 +123,7 @@ void __fastcall HAction(void* ps, void*, const void* c) {
     o_action(ps, c);
 }
 
-// ---- Messung Abspielgeschwindigkeit (Roadmap 6.3, ini [patch] anispeedlog=1): Engine.dll eCWrapper_emfx2Actor::SetPlaySpeed(eEMotionType, float)
+// ---- Messung Abspielgeschwindigkeit (Roadmap 6.3, ini [g3asm] anispeedlog=1): Engine.dll eCWrapper_emfx2Actor::SetPlaySpeed(eEMotionType, float)
 // und GetPlaySpeed(eEMotionType) (beide von Game.dll importiert). Ziel: herausfinden, wer die Angriffsgeschwindigkeit setzt, bevor es einen Override gibt.
 // Erste Messung (2026-11-11): Einzelwerte fuellten 300 Zeilen in 2 s (fliessende Werte von Game.dll+0xDC5AA). Jetzt: eine neue Aufrufstelle wird sofort
 // gemeldet (hoechstens 100), sonst alle 10 s je Aufrufstelle und Art eine Zusammenfassung (Anzahl, kleinster/groesster Wert, Zahl der Werte > 1,05),

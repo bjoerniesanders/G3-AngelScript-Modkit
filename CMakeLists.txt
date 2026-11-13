@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 # G3ASM: AngelScript-Modding fuer Gothic 3 (g3asm.dll + g3asm_test).
 # Eigenstaendig baubar (32-bit, Gothic 3 ist x86):
 #   cmake -S . -B build32 -A Win32 && cmake --build build32 --config Release
-# Oder als Unterprojekt per add_subdirectory(g3-angelscript-modkit); dann gelten die Variablen des Hauptprojekts.
+# Oder als Unterprojekt per add_subdirectory(G3-AngelScript-Modkit); dann gelten die Variablen des Hauptprojekts.
 if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(G3ASM_SUBPROJECT ON)
 else()
@@ -13,7 +13,7 @@ else()
 endif()
 
 if(NOT WIN32)
-    message(STATUS "g3-angelscript-modkit: nur Windows")
+    message(STATUS "G3-AngelScript-Modkit: nur Windows")
     return()
 endif()
 
@@ -59,7 +59,7 @@ set_target_properties(g3asm_angelscript PROPERTIES MSVC_RUNTIME_LIBRARY MultiThr
 
 enable_language(C)
 file(GLOB G3ASM_MINHOOK_SRCS ${G3ASM_MINHOOK_DIR}/src/*.c ${G3ASM_MINHOOK_DIR}/src/hde/*.c)
-set(G3ASM_SRCS src/patch_main.cpp src/script_host.cpp src/sb_api.cpp src/engine_bindings.cpp src/game_hooks.cpp
+set(G3ASM_SRCS src/g3asm_main.cpp src/script_host.cpp src/sb_api.cpp src/engine_bindings.cpp src/game_hooks.cpp
               src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp src/combat_patches.cpp src/schema_dump.cpp src/ai_trace.cpp src/mod_settings.cpp)
 list(TRANSFORM G3ASM_SRCS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
 add_library(g3asm SHARED ${G3ASM_SRCS} ${G3ASM_MINHOOK_SRCS})
@@ -73,7 +73,7 @@ add_executable(g3asm_test tests/test_runner.cpp)
 add_executable(g3asm_packmod tools/packmod_main.cpp src/pack_mod.cpp)
 
 foreach(t g3asm g3asm_test g3asm_packmod)
-    set_target_properties(${t} PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/patch)
+    set_target_properties(${t} PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/g3asm)
 endforeach()
 
 # Schlanker Loader: Ersatz-dbghelp.dll, die g3asm.dll laedt (eigenstaendig, ohne den Proxy des Hauptrepos). Ausgabe: build32/loader/dbghelp.dll
@@ -88,4 +88,4 @@ set_target_properties(g3asm_sb_stub PROPERTIES OUTPUT_NAME SharedBase MSVC_RUNTI
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/sbstub RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/sbstub
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/sbstub)
 add_executable(g3asm_loader_test tests/loader_test.cpp)
-set_target_properties(g3asm_loader_test PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/patch)
+set_target_properties(g3asm_loader_test PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/g3asm)

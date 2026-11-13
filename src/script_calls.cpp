@@ -16,7 +16,7 @@
 //   bool Override_Script(const bCString &in name, Entity self, Entity other, int arg)   - Super() = Original; SetOverrideArg(3, x) aendert arg
 //   void OnScript(const bCString &in name, Entity self, Entity other, int arg, int result)  - danach, nur wenn das Original lief
 //   SetScriptResult(int)                     - Ergebnis fuers Spiel, wenn Override_Script das Original NICHT aufruft (sonst 1 bei true, 0 bei false)
-// Messung (ini [patch] scriptlog=1): alle 60 s die haeufigsten Skriptnamen je Weg, Aufrufe aus anderen Threads und die Zeit in unseren Hooks.
+// Messung (ini [g3asm] scriptlog=1): alle 60 s die haeufigsten Skriptnamen je Weg, Aufrufe aus anderen Threads und die Zeit in unseren Hooks.
 //
 // KI-Skripte (API 41): Neben m_Scripts hat gCScriptAdmin vier weitere Tabellen (gemessen am Assembler der Game.dll 2026-11-10): Zustaende (+0x1B0, "ZS_..."),
 // KI-Funktionen (+0x1C0, "_AI_..."), Callbacks (+0x1D0) und Routinen (+0x1E0). Je Tabelle gibt es genau einen Export, der nachschlaegt und aufruft:

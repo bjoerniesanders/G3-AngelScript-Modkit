@@ -53,7 +53,7 @@ Protokollzeilen: `Datei-Patch angewendet: <Datei> (Basis: Archiv Quests.pak, 2 P
   aus einer kompilierten Datei (`Infos.cpt`); ob dort `.info`-Patches ankommen, ist ungeprüft.
 - Binärdateien (Templates, Meshes) lassen sich nicht per Diff ändern.
 - Die Datei wird beim **Start des Spiels** gepatcht; Änderungen an Patches brauchen einen Neustart.
-- `ini [patch] filepatches=0` schaltet das Feature ab.
+- `ini [g3asm] filepatches=0` schaltet das Feature ab.
 
 ## Beispiel
 
