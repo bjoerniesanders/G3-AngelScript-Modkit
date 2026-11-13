@@ -852,12 +852,6 @@ void* SafeCrosshair(void* fs) {
         return g_crossFn(fs);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-bool SafePick(void* fs, SVec3* out) {
-    __try {
-        std::memcpy(out, g_pickFn(fs), sizeof(SVec3));
-        return true;
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
-}
 typedef void(__thiscall* DrawCrossFn)(void*, const bool&);   // gCFocus_PS::SetDrawCrossHair(const bool&)
 DrawCrossFn g_drawCrossFn = nullptr;
 bool SafeDrawCross(void* fs, bool on) {
@@ -882,19 +876,27 @@ Entity GetCrosshairEntity() {
     if (p && Valid(p)) r.p = p;
     return r;
 }
-// Fadenkreuz des Spielers ein-/ausschalten (gCFocus_PS::SetDrawCrossHair). Vermutlich aktualisiert das Spiel den Zielpunkt (GetPickPosition) nur bei sichtbarem Fadenkreuz.
-bool SetCrosshairVisible(bool on) {
-    if (!ResolveCross() || !g_drawCrossFn) return false;
-    void* fs = SafeFocusSet();
-    return fs && Valid(fs) && SafeDrawCross(fs, on);
+// Fadenkreuz des Spielers ein-/ausschalten (API 46): HUD gCGUIManager::ShowCrossHair(bool) (SDK ge_guimanager.h), dazu wie bisher
+// gCFocus_PS::SetDrawCrossHair. Rueckgabe: true, wenn ShowCrossHair aufgerufen wurde.
+typedef void(__thiscall* ShowCrossFn)(void*, bool);
+ShowCrossFn g_showCross = nullptr;
+bool SafeShowCross(bool on) {
+    __try {
+        void* session = g_e.sessionInstance();
+        void* gm = session ? g_f.guiManager(session) : nullptr;
+        if (!gm) return false;
+        g_showCross(gm, on);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// Weltpunkt, auf den der Spieler zielt (Nullvektor, wenn nicht verfuegbar)
-SVec3 GetPickPosition() {
-    SVec3 v{0, 0, 0};
-    if (!ResolveCross()) return v;
-    void* fs = SafeFocusSet();
-    if (fs && Valid(fs)) SafePick(fs, &v);
-    return v;
+bool SetCrosshairVisible(bool on) {
+    if (!ResolveFocus()) return false;
+    if (!g_showCross) g_showCross = reinterpret_cast<ShowCrossFn>(GetProcAddress(g_e.game, "?ShowCrossHair@gCGUIManager@@QAEX_N@Z"));
+    if (ResolveCross() && g_drawCrossFn) {
+        void* fs = SafeFocusSet();
+        if (fs && Valid(fs)) SafeDrawCross(fs, on);
+    }
+    return g_showCross && SafeShowCross(on);
 }
 // Ungueltiges Entity, wenn nichts anvisiert wird oder kein Spiel laeuft
 Entity GetFocusedEntity() {
@@ -1620,6 +1622,74 @@ bool EntTeleportTo(const Entity& e, const Entity& target) {
     if (!MakeScriptEntity(a, e.p) || !MakeScriptEntity(b, target.p)) return false;
     return SafeTeleport(a, b);
 }
+// NPC toeten (API 46, Ersatz fuer DoDamage): Rezept aus dem Plugin Chszonszcze (statische Analyse 2026-11-08):
+//   PSDamageReceiver.DamageAmount = 0, PSNpc::SetLastAttacker/SetCurrentAttacker(Taeter), Spielskript SetHitPoints(Opfer, None, 0),
+//   PSRoutine::FullStop, PSRoutine::SetTask("ZS_RagDollDead").
+// Script.dll-Entity (SDK gs_entity.h): +0 eCEntity*, danach je 4 Byte die Property-Set-Huellen in Deklarationsreihenfolge: Routine +0x04, NPC +0x34,
+// DamageReceiver +0x4C. Eigenschaften (GS_PROPERTY) arbeiten mit this = Adresse der Huelle. SetTask nimmt den bCString als Wert (die Funktion zerstoert ihn).
+struct KillApi {
+    bool tried = false;
+    void*(__thiscall* dmgAssign)(void*, const long*) = nullptr;
+    void(__thiscall* setLast)(void*, const void*) = nullptr;
+    void(__thiscall* setCur)(void*, const void*) = nullptr;
+    void(__thiscall* fullStop)(void*) = nullptr;
+    void(__thiscall* setTask)(void*, void*) = nullptr;   // eigentlich (bCString als Wert): 4 Byte roher bCString, den die Funktion freigibt
+};
+KillApi& Kills() {
+    static KillApi a;
+    if (!a.tried) {
+        HMODULE script = GetModuleHandleA("Script.dll");
+        if (!script) return a;   // Script.dll laedt spaet: spaeter erneut versuchen
+        a.tried = true;
+        a.dmgAssign = reinterpret_cast<void*(__thiscall*)(void*, const long*)>(GetProcAddress(script, "??4PropertyDamageAmount@PSDamageReceiver@@QAEAAV01@ABJ@Z"));
+        a.setLast = reinterpret_cast<void(__thiscall*)(void*, const void*)>(GetProcAddress(script, "?SetLastAttacker@PSNpc@@QAEXABVEntity@@@Z"));
+        a.setCur = reinterpret_cast<void(__thiscall*)(void*, const void*)>(GetProcAddress(script, "?SetCurrentAttacker@PSNpc@@QAEXABVEntity@@@Z"));
+        a.fullStop = reinterpret_cast<void(__thiscall*)(void*)>(GetProcAddress(script, "?FullStop@PSRoutine@@QAEXXZ"));
+        a.setTask = reinterpret_cast<void(__thiscall*)(void*, void*)>(GetProcAddress(script, "?SetTask@PSRoutine@@QAEXVbCString@@@Z"));
+    }
+    return a;
+}
+// Schritte 1 und 2 (vor dem Skriptaufruf); k = Script-Entity des Taeters oder nullptr
+bool SafeKillPrepare(KillApi& a, unsigned char* v, const void* k) {
+    __try {
+        const long zero = 0;
+        a.dmgAssign(v + 0x4C, &zero);
+        if (k) {
+            a.setLast(v + 0x34, k);
+            a.setCur(v + 0x34, k);
+        }
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool SafeKillFinish(KillApi& a, unsigned char* v, void* rawTask) {
+    __try {
+        a.fullStop(v + 0x04);
+        a.setTask(v + 0x04, rawTask);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool EntKill(const Entity& victim, const Entity& killer) {
+    KillApi& a = Kills();
+    if (!EntIsValid(victim) || !a.dmgAssign || !a.setLast || !a.setCur || !a.fullStop || !a.setTask) return false;
+    alignas(8) unsigned char v[kScriptEntityBytes], k[kScriptEntityBytes];
+    if (!MakeScriptEntity(v, victim.p)) return false;
+    const bool hasKiller = EntIsValid(killer) && MakeScriptEntity(k, killer.p);
+    if (!SafeKillPrepare(a, v, hasKiller ? k : nullptr)) return false;
+    CallGameScript("SetHitPoints", victim.p, nullptr, 0);
+    void* rawTask = nullptr;   // eigene Kopie fuer die Funktion, die ihren Wert-Parameter zerstoert
+    SStr task("ZS_RagDollDead");
+    g_sb.strCopy(&rawTask, &task);
+    const bool ok = SafeKillFinish(a, v, rawTask);
+    if (ScriptHost::s_current) {
+        static int logged = 0;
+        if (logged < 20) {
+            ++logged;
+            ScriptHost::s_current->Log(std::string("Kill: ") + (ok ? "ausgefuehrt" : "Ausnahme abgefangen") + ", Taeter " + (hasKiller ? "gesetzt" : "keiner"));
+        }
+    }
+    return ok;
+}
+bool EntKillNoKiller(const Entity& victim) { return EntKill(victim, Entity{nullptr}); }
 // Effekte (API 30): Script.dll EffectSystem::ExistsEffect(Name) und StartEffect(Name, Entity) starten einen benannten Effekt (z. B. "eff_magic_summonlightning_target_01", der Blitz
 // des Zaubers "Blitz beschwoeren") am Entity. Der Effekt-Handle (Effect, 4 Byte, Rueckgabe per Zeiger) wird nicht aufbewahrt; die Effektverwaltung beendet ihn selbst.
 typedef bool(__stdcall* EffectExistsFn)(const void*);
@@ -1857,17 +1927,8 @@ int EntDeleteItemStack(Entity& e, const SStr& name) {
     return inv && SafeDeleteStacks(inv, &name, &r) ? r : -1;
 }
 
-// VERALTET (markiert bei API 39, bleibt aufrufbar): Script.dll Entity::DoDamage(other, amount, gEDamageType). Gemessen 2026-11-06: verdreht - this (hier "attacker") ist das
-// OPFER, das Argument der Angreifer, und die Menge kommt aus dessen Schadensdaten; amount und type wirken nicht. Verletzen und toeten: Blitz-Beschwoerung
-// (beliars_klaue), nur Lebenspunkte senken: HurtHitPoints. Beim ersten Aufruf je Mod eine Warnung im Protokoll.
-// Entity in Script.dll = Zeiger auf eCEntity, wie unsere Struktur Entity.
-typedef void(__thiscall* DoDamageFn)(const Entity*, const Entity*, unsigned, int);
-bool SafeDoDamage(DoDamageFn fn, const Entity& attacker, const Entity& victim, int amount, int type) {
-    __try {
-        fn(&attacker, &victim, unsigned(amount), type);
-        return true;
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
-}
+// Entity::DoDamage entfernt mit API 46 (veraltet seit 39, verdreht: this war das Opfer). Ersatz: Entity::Kill, HurtHitPoints.
+// Warnung fuer veraltete Funktionen: einmal je Mod und Funktion
 void WarnDeprecatedOnce(const char* what, const char* hint) {
     static std::set<std::string> warned;
     ScriptHost* h = ScriptHost::s_current;
@@ -1875,15 +1936,6 @@ void WarnDeprecatedOnce(const char* what, const char* hint) {
     const std::string key = std::string(h->CurrentMod()) + "|" + what;
     if (!warned.insert(key).second) return;
     h->Log(std::string("[") + h->CurrentMod() + "] VERALTET: " + what + " - " + hint);
-}
-bool EntDoDamage(const Entity& attacker, const Entity& victim, int amount, int type) {
-    WarnDeprecatedOnce("Entity.DoDamage", "this ist das Opfer, Menge/Art wirken nicht; siehe api-reference.md (Blitz-Beschwoerung, HurtHitPoints)");
-    static DoDamageFn fn = nullptr;
-    if (!fn) {   // Script.dll laedt erst nach main(): erst festhalten, wenn gefunden
-        if (HMODULE script = GetModuleHandleA("Script.dll")) fn = reinterpret_cast<DoDamageFn>(GetProcAddress(script, "?DoDamage@Entity@@QAEXABV1@KW4gEDamageType@@@Z"));
-    }
-    if (!fn || !EntIsValid(attacker) || !EntIsValid(victim) || amount <= 0) return false;
-    return SafeDoDamage(fn, attacker, victim, amount, type);
 }
 
 // Lebenspunkte eines NPC direkt aendern (API 30): gCDamageReceiver_PS::GetHitPoints/SetHitPoints. Das ist die Stelle, an der das Spiel Schaden anwendet; unser Schaden-Hook
@@ -2165,7 +2217,6 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterObjectMethod("Entity", "bool IsSkillActive(const bCString &in) const", asFUNCTION(EntIsSkillActive), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "int GetSkillActivationCount(const bCString &in) const", asFUNCTION(EntSkillActivationCount), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "int DeleteItemStack(const bCString &in)", asFUNCTION(EntDeleteItemStack), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool DoDamage(const Entity &in attacker, int amount, int type)", asFUNCTION(EntDoDamage), asCALL_CDECL_OBJFIRST));   // veraltet (markiert bei API 39)
     OG3_REG(e->RegisterObjectMethod("Entity", "int HurtHitPoints(int amount, int minHp = 0)", asFUNCTION(EntHurtHP), asCALL_CDECL_OBJFIRST));   // experimentell
     OG3_REG(e->RegisterGlobalFunction("int CloneTemplate(const bCString &in base, const bCString &in newName)", asFUNCTION(CloneTemplate),
                                       asCALL_CDECL));
@@ -2177,8 +2228,7 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("bool HasPickPoint()", asFUNCTION(HasPickPoint), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("Entity GetFocusedEntity()", asFUNCTION(GetFocusedEntity), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("Entity GetCrosshairEntity()", asFUNCTION(GetCrosshairEntity), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetCrosshairVisible(bool)", asFUNCTION(SetCrosshairVisible), asCALL_CDECL));   // experimentell
-    OG3_REG(e->RegisterGlobalFunction("bCVector GetPickPosition()", asFUNCTION(GetPickPosition), asCALL_CDECL));   // funktioniert nicht (immer Nullvektor)
+    OG3_REG(e->RegisterGlobalFunction("bool SetCrosshairVisible(bool)", asFUNCTION(SetCrosshairVisible), asCALL_CDECL));   // API 46: gCGUIManager::ShowCrossHair
     OG3_REG(e->RegisterGlobalFunction("bool DestroyNPC(const Entity &in)", asFUNCTION(DestroyNPC), asCALL_CDECL));
     OG3_REG(e->RegisterObjectMethod("Entity", "bCString GetCategory() const", asFUNCTION(EntCategory), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetCurrentAttacker() const", asFUNCTION(EntCurrentAttacker), asCALL_CDECL_OBJFIRST));
@@ -2225,6 +2275,8 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterObjectMethod("Entity", "bool IsPartyWaiting() const", asFUNCTION(EntIsPartyWaiting), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "bool SetPartyWaiting(bool)", asFUNCTION(EntSetPartyWaiting), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "bool TeleportTo(const Entity &in target)", asFUNCTION(EntTeleportTo), asCALL_CDECL_OBJFIRST));
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool Kill(const Entity &in killer)", asFUNCTION(EntKill), asCALL_CDECL_OBJFIRST));   // API 46
+    OG3_REG(e->RegisterObjectMethod("Entity", "bool Kill()", asFUNCTION(EntKillNoKiller), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "int GetInventoryStackCount() const", asFUNCTION(EntStackCount), asCALL_CDECL_OBJFIRST));
     OG3_REG(e->RegisterObjectMethod("Entity", "bool GenerateTradeGoods()", asFUNCTION(EntGenerateTradeGoods), asCALL_CDECL_OBJFIRST));   // experimentell
     OG3_REG(e->RegisterGlobalFunction("bool EffectExists(const bCString &in name)", asFUNCTION(EffectExistsScript), asCALL_CDECL));

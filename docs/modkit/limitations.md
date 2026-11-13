@@ -1,6 +1,6 @@
 # Grenzen und Stand
 
-Stand: 2026-11-11, Skript-Schnittstelle Version 45 (Alpha). Was sich zwischen Versionen ändern darf: [Versionsregeln](api-policy.md).
+Stand: 2026-11-11, Skript-Schnittstelle Version 46 (Alpha). Was sich zwischen Versionen ändern darf: [Versionsregeln](api-policy.md).
 Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke **Experimentell**, **Im Spiel nicht geprüft**, **Funktioniert nicht** oder **Veraltet**.
 
 ## Im Spiel geprüft
@@ -42,8 +42,6 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 
 ## Nicht oder nur teilweise geprüft
 
-- **Verwandlung** (`OnTransformStart`/`OnTransformEnd`): eingehängt, im Spiel noch nie ausgelöst.
-- **`SetGameTime`:** ohne Spiel getestet, im Spiel nicht bestätigt.
 - **Schema-Dump** (`DumpPropertySchema`, Version 43): im Spiel bestätigt (2026-11-11, 273 Klassen, Hauptmenü und nach dem Laden gleich); drei Eigenschaften ohne Namen. Die Getter `bCPOTypeListItem::GetBaseClassName` und `bCPropertyObjectTypeBase::GetPropertyType(int)` blieben im Test hängen (vermutlich ein Assert-Dialog der Original-DLL); die Liste wird deshalb direkt aus dem Speicher gelesen (SDK-Aufbau).
 - **KI-Tracer** (`aitrace=1` in `og3_patch.ini`, nur Protokoll): sechs Hooks auf `gCScriptRoutine_PS` (Zustand, Aufgabe, Routine, KI-Modus, Aktion) und `gCNavigation_PS::SetRoutine`. Im Spiel gemessen (2026-11-11, 3,5 min, 40 NPCs, 574 Zeilen, kein Ruckeln): Es kommen nur **Aufgabe**, **KI-Modus** und **Aktion**; Zustand, Routine und Navigation-Routine wurden nie gesetzt. Die Aufgabe trägt die Zustandsnamen (`ZS_Ambient`, `ZS_HangAround`, `ZS_Guard`, `ZS_WatchFight`, `ZS_Sleep`, beim Helden `PS_Normal`, `ZS_Talk`, `PS_Interact`); Zustandswechsel sieht man also über `SetCurrentTask`.
 - **Angriffsgeschwindigkeit:** noch kein Override. Messpunkt gebaut (`anispeedlog=1`): `eCWrapper_emfx2Actor::SetPlaySpeed`/`GetPlaySpeed` der Engine.dll, die Game.dll importiert. Erste Messung (2026-11-11): fast alle Aufrufe von `Game.dll+0xDC5AA` mit fließenden Werten 0,34 bis 0,98 für die Bewegungsarten 0 bis 3 (vermutlich Überblendung der Laufbewegung), einmal `Game.dll+0xDA21A` mit 1,778. Die Messung lief nur 2 s (Zeilenzahl erschöpft) und erfasste keinen Kampf. Zweite Messung mit Kampf (2026-11-11) und Assembler: `SetPlaySpeed` steuert nur die **Laufbewegung** (`+0xDC5AA`, Schleife über vier Bewegungsschichten, Wert aus dem Betrag der Bewegungsgeschwindigkeit, daher Werte bis über 10000) und das **Drehen auf der Stelle** (`+0xDA031`/`+0xDA21A`, Wert = Winkel × Länge / 90). Die Kampfschleife `gCScriptProcessingUnit::sAICombatMoveItlLoop` liest die Geschwindigkeit nur, um eine Pause (0) zu erkennen. Angriffe starten über `eCVisualAnimation_PS::PlayMotion(Art, eSMotionDesc*)`; der Aufbau von `eSMotionDesc` ist im SDK leer; gemessen: +8 Geschwindigkeit, +0x10 Gewicht. Angriffe kommen aus `gCScriptProcessingUnit::sAICombatMoveStart`, das die Geschwindigkeit aus seinen Argumenten (+0x10) übernimmt (ein NPC mit 1,3). Daraus `Override_CombatMove` (Version 45, experimentell), im Spiel bestätigt (2026-11-11: Faktor 2 sichtbar schneller, Schaden normal; `Recover` meldet einmal die Waffe als `self`).
@@ -56,7 +54,9 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 - **`GenerateTradeGoods`:** liefert `true`, ob dabei andere Items entstehen, ist nicht geprüft.
 - **`owner` im Gruppenkampf** ist eine Näherung (der aktuelle Gegner des Opfers, nicht zwingend der Schläger).
 - **Attribut `"XP"`** las im Test 0. Quest-XP zahlt das Spiel selbst aus.
-- **Funktioniert nicht:** `DumpQuest`/`LoadQuestFile` (immer `false`), `ExecuteInfo` (kein `OnInfoFinished`), `GetPickPosition` (immer Nullvektor).
+- **Entfernt mit Version 46:** `DoDamage` (verdreht; Ersatz `Kill`), `ExecuteInfo` (kein `OnInfoFinished`), `GetPickPosition` (immer Nullvektor), `DumpQuest` (schrieb mit keinem Pfad eine Datei).
+- **Quest-Dateien:** `LoadQuestFile` liest mit dem virtuellen Pfad `Data/Quests/<Welt>/...` (`GetQuestFilePath`), im Spiel bestätigt; Schreiben geht nicht.
+- **Händlerware neu erzeugen** (`GenerateTradeGoods`, experimentell): liefert `true`, die Ware bleibt aber gleich (zweimal gemessen).
 
 ## Bekannte Risiken
 
@@ -72,7 +72,7 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 | Funktion | Zustand |
 |---|---|
 | **Animationen** | Abspielen, Namen der Engine abfangen, eigene Animationen aus Blender: geplant, noch nichts gebaut |
-| **Schaden mit fester Menge, der tötet** | `HurtHitPoints` tötet nicht, `DoDamage` ist verdreht und veraltet; tödlicher Schaden nur über die Blitz-Beschwörung |
+| **Schaden mit fester Menge, der tötet** | `HurtHitPoints` tötet nicht; töten ohne Schaden mit `Entity::Kill` (ab Version 46, mit Erfahrung und Beute), tödlicher Schaden nur über die Blitz-Beschwörung |
 | **Verweis-Eigenschaften schreiben** | `SetProperty` schreibt Textwerte, Verweise auf andere Vorlagen nicht; dafür gibt es `SetTemplateRef`/`SetEntityRef` (experimentell) |
 | **Bedingungen von Infos** | Items, Reputation, Fähigkeiten als Bedingung einer eigenen Info: die Listen (`CondItems`, ...) sind nicht schreibbar. Bedingungen prüfst du im Skript (`Override_InfoAvailable`) |
 | **Questlog selbst schreiben** | Einträge entstehen über Dialogzeilen (`SetInfoQuest`); direkt ins Log schreiben geht nicht |

@@ -86,7 +86,7 @@ void TestMatrix4() {
     check(!GetTemplateEntity("Perk_OrcSlayer").IsValid() && !SetProperty(z, "Item", "GoldValue", "1"), "Vorlage/Schreiben ohne Spiel: ungueltig/false");
     check(!z.LearnSkill("Perk_1H_1") && !z.ActivateSkill("Perk_1H_1") && !z.DeactivateSkill("Perk_1H_1") && !z.HasLearnedSkill("Perk_1H_1") && !z.IsSkillActive("Perk_1H_1") && z.GetSkillActivationCount("Perk_1H_1") == -1, "Talente ohne Spiel: false/-1");
     check(z.DeleteItemStack("It_Perk_1H_1") == -1, "DeleteItemStack ohne Spiel: -1");
-    check(!z.DoDamage(z, 10, 6) && z.HurtHitPoints(10) == -1 && !SetEntityRef(z, "gCInteraction_PS", "Owner", z), "DoDamage/HurtHitPoints/SetEntityRef ohne Spiel: false/-1");
+    check(!z.Kill(z) && !z.Kill() && z.HurtHitPoints(10) == -1 && !SetEntityRef(z, "gCInteraction_PS", "Owner", z), "Kill/HurtHitPoints/SetEntityRef ohne Spiel: false/-1");
     check(!EffectExists("eff_magic_summonlightning_target_01") && !StartEffect("eff_magic_summonlightning_target_01", z), "Effekte ohne Spiel: false");
     check(CountTemplateNames("It_") <= 0, "Vorlagen zaehlen ohne Spiel: -1");
     check(QUALITY_LIFESTEAL == 512 && QUALITY_SHARP == 32 && QUALITY_BLESSED == 64 && SLOT_RIGHT_HAND == 1 && SLOT_BACK_RIGHT == 6, "Konstanten der Qualitaet und Slots");
@@ -95,7 +95,7 @@ void TestMatrix4() {
     check(z.GetTemplateName() == "" && !z.GetParent().IsValid() && z.GetBoundsMax().GetMagnitude() < 0.001f, "ohne Spiel keine Vorlage/Huelle/Eltern");
     check(!PickCenter().IsValid() && !HasPickPoint() && GetPickPoint().GetMagnitude() < 0.001f, "ohne Spiel kein Bildschirm-Picking");
     check(!GetFocusedEntity().IsValid(), "ohne Spiel kein Fokus-Entity");
-    check(!GetCrosshairEntity().IsValid() && GetPickPosition().GetMagnitude() < 0.001f, "ohne Spiel kein Fadenkreuz-Entity/Zielpunkt");
+    check(!GetCrosshairEntity().IsValid(), "ohne Spiel kein Fadenkreuz-Entity/Zielpunkt");
 }
 
 void TestRotation() {
@@ -138,13 +138,13 @@ void TestEntity() {
     { Entity z; check(!DestroyNPC(z) && !IsDynamicSpawn(z) && !z.LookAt(z) && !z.SetRotation(bCQuaternion()), "ohne Spiel kein DestroyNPC/LookAt/SetRotation"); }
     check(!QuestExists("X") && !CreateQuest("X") && !RunQuest("X") && !SucceedQuest("X") && !FailQuest("X") && !CloseQuest("X") && !RemoveQuest("X"), "ohne Spiel keine Quests");
     check(GetQuestStatus("X") == -1 && GetQuestXP("X") == -1 && !SetQuestStatus("X", QUEST_RUNNING) && !SetQuestXP("X", 5) && !ReloadQuestFiles(), "ohne Spiel keine Queststatus");
-    check(!SetQuestTopic("X", "t") && !SetQuestDescription("X", "t") && !DumpQuest("X", "p") && !LoadQuestFile("X", "p") && GetQuestCount() == -1 && GetQuestNameAt(0).IsEmpty(), "ohne Spiel keine Quest-Texte");
+    check(!SetQuestTopic("X", "t") && !SetQuestDescription("X", "t") && !LoadQuestFile("X", "p") && GetQuestCount() == -1 && GetQuestNameAt(0).IsEmpty(), "ohne Spiel keine Quest-Texte");
     check(GetQuestDir().IsEmpty() && GetQuestFilePath("X").IsEmpty() && !GetGameDir().IsEmpty(), "Quest-Pfade ohne Spiel");
     check(GetInfoCount() == -1 && GetInfoName(0).IsEmpty() && GetInfoOwner(0).IsEmpty() && !DescribeInfo("X").IsEmpty(), "ohne Spiel keine Infos");
     check(!InfoExists("X") && !CreateInfo("X", "Y") && !RemoveInfo("X") && !SetInfoQuest("X", "q") && !SetInfoType("X", 3) && !SetInfoCondition("X", INFO_COND_GENERAL) &&
           !AddInfoLine("X", "Say", "npc", "", "", "", "t") && !RebuildInfos() && INFO_COND_RUNNING == 7 && INFO_TYPE_INFO == 3, "ohne Spiel keine Dialog-Erstellung");
     check(!SetQuestReward("X", "DEX", 1) && GetQuestReward("X").IsEmpty(), "ohne Spiel keine Quest-Belohnung");
-    check(!SetGameEvent("X") && !ClearGameEvent("X") && !IsGameEventSet("X") && !SetInfoGiven("X", true) && !IsInfoGiven("X") && !ExecuteInfo("X"), "ohne Spiel keine Schalter");
+    check(!SetGameEvent("X") && !ClearGameEvent("X") && !IsGameEventSet("X") && !SetInfoGiven("X", true) && !IsInfoGiven("X"), "ohne Spiel keine Schalter");
     check(QUEST_OPEN == 0 && QUEST_RUNNING == 1 && QUEST_SUCCESS == 2 && QUEST_FAILED == 3 && QUEST_WON == 7, "Quest-Konstanten");
 }
 

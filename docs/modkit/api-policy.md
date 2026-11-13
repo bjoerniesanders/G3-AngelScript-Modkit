@@ -33,7 +33,7 @@ Diese Seite legt fest, was sich an der Skript-Schnittstelle zwischen zwei Versio
 
 | Funktion | veraltet seit | Ersatz |
 |---|---|---|
-| `Entity::DoDamage` | Version 39 | noch keiner mit fester Menge; Verletzen und Töten über die Blitz-Beschwörung (`beliars_klaue`), nur Lebenspunkte senken mit `HurtHitPoints` |
+| `Entity::DoDamage` | Version 39, **entfernt mit 46** | `Entity::Kill` (Töten), `HurtHitPoints` (nur Lebenspunkte senken) |
 
 ## Experimentelle Funktionen
 
@@ -41,8 +41,10 @@ Diese Seite legt fest, was sich an der Skript-Schnittstelle zwischen zwei Versio
 die Änderungen. Eine Funktion verliert den Vermerk, sobald ihr Verhalten im Spiel gemessen und in der Referenz beschrieben ist; das ist keine Änderung der
 Schnittstelle.
 
-Stand Version 42: `HurtHitPoints`, `SetProperty`, `SetTemplateRef`, `SetEntityRef`, `CallScript`, `GenerateTradeGoods`, `SetCrosshairVisible`, `GetSpeechText`.
-Im Spiel noch nicht geprüft: `SetGameTime`, `OnTransformStart`/`OnTransformEnd`.
+Stand Version 46 (Freeze-Liste vor der Beta): experimentell `HurtHitPoints`, `SetProperty`, `GenerateTradeGoods`, `Override_CombatMove`.
+Im Spiel bestätigt mit 46 (2026-11-11): `Entity::Kill`, `SetCrosshairVisible`, `SetGameTime`, `LoadQuestFile`, `OnTransformStart`/`OnTransformEnd`.
+Ohne Vermerk seit 46: `SetTemplateRef`, `SetEntityRef`, `CallScript`, `GetSpeechText` (Verhalten gemessen und beschrieben).
+Entfernt mit 46 (nie funktionsfähig, Alpha): `GetPickPosition` (Ersatz `PickCenter`/`GetPickPoint`), `ExecuteInfo`, `DumpQuest`.
 
 ## In einem Mod auf die Version prüfen
 

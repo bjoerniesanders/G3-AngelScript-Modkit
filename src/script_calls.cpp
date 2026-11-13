@@ -500,6 +500,11 @@ bool __fastcall HRunRoutine(void* admin, void*, const void* name, void* spu) {
 
 }   // namespace
 
+// Spielskript nach Namen fuer andere Bindings (z. B. Entity::Kill): wie CallScript, self/other als eCEntity* (nullptr = None)
+int CallGameScript(const char* name, void* self, void* other, int arg) {
+    return CallScriptScript(SStr(name), Entity{self}, Entity{other}, arg);
+}
+
 // Script.dll-Entity fuer andere Bindings (z. B. StartEffect): buf muss mindestens kScriptEntityBytes gross sein
 bool MakeScriptEntity(void* buf, void* ent) {
     static_assert(sizeof(ScriptEntityBuf) >= kScriptEntityBytes, "Puffergroesse");

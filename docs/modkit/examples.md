@@ -179,6 +179,10 @@ Ab Version 45. Ändert in `Override_CombatMove` die Geschwindigkeit der Kampfbew
 (`mod.ini [settings]`, Standard 2,0, damit es deutlich sichtbar ist; `AlleNPCs=ja` gilt für alle). Die ersten 20 Änderungen stehen im Protokoll.
 Zeigt nebenbei die Einstellungen je Mod (Version 44). Standardmäßig aus (`+attack_speed`).
 
+## 17. Freeze-Liste (`freeze_probe`, Messmod)
+
+Ab Version 46. Misst die Funktionen, die vor der Beta noch nicht im Spiel geprüft sind: nach dem Laden automatisch `LoadQuestFile` mit zwei Pfadformen; Strg + Umschalt + Ziffernblock `*` `Kill` am anvisierten Wesen, `-` `GenerateTradeGoods` am anvisierten NPC, `+` der Reihe nach Fadenkreuz aus/an und Uhr 22:00/10:00; dazu `OnTransformStart`/`OnTransformEnd` und `OnNPCKilled`. Standardmäßig aus (`+freeze_probe`).
+
 ## Tastenbelegung der Beispiel-Mods
 
 Die Mods werden einzeln zum Testen zugeschaltet; einige teilen sich Tasten (`spawn_demo` mit `lifesteal_demo` bei `*` und mit `reference_dump` bei `/`), dann nicht beide gleichzeitig zuschalten. **Nicht benutzt werden Tasten, die das Spiel selbst belegt:** Numblock 7, 8, 9 (Debug-Zähler), F1 bis F4, F6 bis F9 (Zeitlupe, Spieler zurücksetzen, Schnellladen) und F12,

@@ -442,19 +442,6 @@ bool SafeSetByte(DialogApi::AccessFn f, void* info, bool v) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-bool SafeExec(void* info, void* mgr, bool* out) {
-    __try {
-        *out = g_d.execInfo(info, mgr);
-        return true;
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
-}
-// Info-Skript ohne Gespraechsfenster ausfuehren (fuer Infos, die nur unsichtbare Befehle wie AddQuestLog enthalten)
-bool ExecuteInfo(const SStr& name) {
-    void* mgr = Manager();
-    void* info = Resolve() ? FindInfoByName(name.c_str()) : nullptr;
-    bool r = false;
-    return mgr && info && g_d.execInfo && SafeExec(info, mgr, &r) && r;
-}
 bool SetInfoGiven(const SStr& name, bool given) {   // "Info wurde schon gegeben": blendet sie aus und laesst ihre Zeilen im Questlog stehen
     void* info = Resolve() ? FindInfoByName(name.c_str()) : nullptr;
     return info && g_d.accessGiven && SafeSetByte(g_d.accessGiven, info, given);
@@ -582,7 +569,6 @@ bool RegisterDialogBindings(asIScriptEngine* e) {
     OG3_REG(e->RegisterGlobalFunction("bCString GetInfoName(int)", asFUNCTION(GetInfoName), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bCString GetInfoOwner(int)", asFUNCTION(GetInfoOwner), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bCString DescribeInfo(const bCString &in)", asFUNCTION(DescribeInfo), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool ExecuteInfo(const bCString &in)", asFUNCTION(ExecuteInfo), asCALL_CDECL));   // funktioniert nicht (kein OnInfoFinished)
     OG3_REG(e->RegisterGlobalFunction("bool SetInfoGiven(const bCString &in, bool)", asFUNCTION(SetInfoGiven), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool IsInfoGiven(const bCString &in)", asFUNCTION(IsInfoGiven), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool InfoExists(const bCString &in)", asFUNCTION(InfoExists), asCALL_CDECL));

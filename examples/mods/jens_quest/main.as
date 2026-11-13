@@ -46,8 +46,6 @@ void OnFrame(float dt) {
         print("Topic gesetzt: " + SetQuestTopic(QUEST, "Wolfsfell fuer Jens"));
         print("Beschreibung gesetzt: " + SetQuestDescription(QUEST, "Jens braucht ein Wolfsfell. Bring es ihm."));
         print("Quest-Dateipfad laut Spiel: " + GetQuestFilePath(QUEST) + ", Quest-Verzeichnis: " + GetQuestDir());
-        print("Quest-Datei geschrieben (Spielordner): " + DumpQuest(QUEST, GetGameDir() + "og3_jens_quest_dump.ini"));
-        print("Quest-Datei geschrieben (Questpfad): " + DumpQuest(QUEST, GetQuestFilePath(QUEST) + ".og3dump"));
         QuestDebug();
         if (RunQuest(QUEST)) Zeige("Jens: Hey du! Bring mir ein Wolfsfell, ich bezahle gut.", 255, 220, 140);
         Zeige("Neue Quest: Wolfsfell fuer Jens (Abgabe: Rollen-Taste bei Jens)", 140, 220, 255);

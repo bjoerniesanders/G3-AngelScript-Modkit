@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#define OG3_SCRIPT_API_VERSION 45
+#define OG3_SCRIPT_API_VERSION 46
 
 class asIScriptEngine;
 class asIScriptContext;
@@ -193,6 +193,7 @@ int InstallScriptGamePatches(ScriptHost& host);   // einmal je Bild (Spiel-Takt)
 // Script.dll-Entity-Objekt (0xA8 Byte, gemessen) per Konstruktor der Script.dll bauen; Puffer mit kScriptEntityBytes, Ausrichtung 8
 constexpr unsigned kScriptEntityBytes = 0x100;
 bool MakeScriptEntity(void* buf, void* ent);                // Messung jetzt schreiben (beim Entladen einer Welt)
+int CallGameScript(const char* name, void* self, void* other, int arg);   // Spielskript nach Namen (script_calls.cpp), 0 wenn nicht moeglich
 
 // Spielfenster (groesstes sichtbares Hauptfenster des Prozesses), nullptr falls noch keins
 HWND__* GameWindow();

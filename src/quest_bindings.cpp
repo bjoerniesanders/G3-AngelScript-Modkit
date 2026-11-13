@@ -47,7 +47,7 @@ struct QuestApi {
     LocCtorFn locCtor = nullptr;
     LocDtorFn locDtor = nullptr;
     SetLocFn setTopic = nullptr, setDesc = nullptr;
-    FileFn writeFile = nullptr, readFile = nullptr;
+    FileFn readFile = nullptr;   // Schreiben (gCQuest_PS::Write) entfernt mit API 46: schrieb nie eine Datei
     GetRefFn getName = nullptr;
     GetRefFn getAttrib = nullptr, getAttribAmount = nullptr;
     SetLocFn setAttrib = nullptr;   // SetAttribSuccess(const bCString&)
@@ -80,7 +80,6 @@ bool Resolve() {
     }
     g_q.setTopic = reinterpret_cast<SetLocFn>(G("?SetLogTopic@gCQuest_PS@@QAEXABVeCLocString@@@Z"));
     g_q.setDesc = reinterpret_cast<SetLocFn>(G("?SetQuestDesc@gCQuest_PS@@QAEXABVeCLocString@@@Z"));
-    g_q.writeFile = reinterpret_cast<FileFn>(G("?Write@gCQuest_PS@@QBE_NABVbCString@@@Z"));
     g_q.readFile = reinterpret_cast<FileFn>(G("?Read@gCQuest_PS@@QAE_NABVbCString@@@Z"));
     g_q.getName = reinterpret_cast<GetRefFn>(G("?GetName@gCQuest_PS@@QBEABVbCString@@XZ"));
     g_q.getAttrib = reinterpret_cast<GetRefFn>(G("?GetAttribSuccess@gCQuest_PS@@QBEABVbCString@@XZ"));
@@ -235,11 +234,6 @@ bool SetQuestText(SetLocFn fn, const SStr& name, const char* prefix, const SStr&
 }
 bool SetQuestTopic(const SStr& name, const SStr& text) { return SetQuestText(g_q.setTopic, name, "OG3_QTOPIC_", text); }
 bool SetQuestDescription(const SStr& name, const SStr& text) { return SetQuestText(g_q.setDesc, name, "OG3_QDESC_", text); }
-bool DumpQuest(const SStr& name, const SStr& path) {   // gCQuest_PS::Write(path): Quest als ini-Datei schreiben
-    void* q = FindQuest(name);
-    bool r = false;
-    return q && g_q.writeFile && SafeFile(g_q.writeFile, q, &path, &r) && r;
-}
 bool LoadQuestFile(const SStr& name, const SStr& path) {   // gCQuest_PS::Read(path): Eigenschaften der Quest aus ini-Datei lesen
     void* q = FindQuest(name);
     bool r = false;
@@ -605,7 +599,6 @@ bool RegisterQuestBindings(asIScriptEngine* e) {
         e->RegisterGlobalFunction("bool SetQuestTopic(const bCString &in, const bCString &in)", asFUNCTION(SetQuestTopic), asCALL_CDECL));
     OG3_REG(e->RegisterGlobalFunction("bool SetQuestDescription(const bCString &in, const bCString &in)", asFUNCTION(SetQuestDescription),
                                       asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool DumpQuest(const bCString &in, const bCString &in)", asFUNCTION(DumpQuest), asCALL_CDECL));   // funktioniert nicht
     OG3_REG(
         e->RegisterGlobalFunction("bool LoadQuestFile(const bCString &in, const bCString &in)", asFUNCTION(LoadQuestFile), asCALL_CDECL));   // funktioniert nicht
     OG3_REG(e->RegisterGlobalFunction("int GetQuestCount()", asFUNCTION(GetQuestCount), asCALL_CDECL));
