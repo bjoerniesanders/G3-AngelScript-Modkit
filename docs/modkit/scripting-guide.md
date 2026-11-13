@@ -1,7 +1,7 @@
 # Scripting-Guide
 
 Die Skripte sind AngelScript 2.38. Die Grundlagen der Sprache stehen in der offiziellen Dokumentation (https://www.angelcode.com/angelscript/).
-Diese Seite beschreibt, was im OG3-Patch anders oder besonders ist.
+Diese Seite beschreibt, was in G3ASM anders oder besonders ist.
 
 ## Eine Datei, ein Mod
 

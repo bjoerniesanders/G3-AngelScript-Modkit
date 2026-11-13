@@ -18,14 +18,14 @@ jobs:
         run: cmake -S . -B build -A Win32
 
       - name: Build
-        run: cmake --build build --config Release --parallel --target og3_patch og3_loader og3_packmod og3_patch_test og3_loader_test
+        run: cmake --build build --config Release --parallel --target g3asm g3asm_loader g3asm_packmod g3asm_test g3asm_loader_test
 
       - name: FPU fix active (no fninit)
         shell: pwsh
-        run: ./tools/check_no_fninit.ps1 -Dll build/patch/og3_patch.dll
+        run: ./tools/check_no_fninit.ps1 -Dll build/patch/g3asm.dll
 
       - name: PackMod numbering
-        run: python -I tests/packmod_generations.py build/patch/og3_packmod.exe
+        run: python -I tests/packmod_generations.py build/patch/g3asm_packmod.exe
 
       - name: Determine version
         id: ver
@@ -40,7 +40,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: og3-patch-${{ steps.ver.outputs.version }}
+          name: g3asm-${{ steps.ver.outputs.version }}
           path: dist/*.zip
 
       - name: Create GitHub release
@@ -53,4 +53,4 @@ jobs:
           $extra = @()
           # Tags with a hyphen (v0.30.0-alpha.1, v1.0.0-rc.2) are pre-releases.
           if ($tag.Contains('-')) { $extra += '--prerelease' }
-          gh release create $tag (Get-ChildItem dist/*.zip).FullName --title "OG3-Patch $tag" --generate-notes @extra
+          gh release create $tag (Get-ChildItem dist/*.zip).FullName --title "G3 AngelScript Modkit $tag" --generate-notes @extra

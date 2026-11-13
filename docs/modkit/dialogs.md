@@ -1,13 +1,13 @@
 # Dialoge (Infos)
 
-Gespräche in Gothic 3 sind **Infos** (`gCInfo_PS`), verwaltet vom `gCInfoManager_PS`. Der Patch kann sie lesen und eigene anlegen.
+Gespräche in Gothic 3 sind **Infos** (`gCInfo_PS`), verwaltet vom `gCInfoManager_PS`. Das Modkit kann sie lesen und eigene anlegen.
 Im Spiel gibt es 4593 Infos. Jede gehört einem NPC und läuft als kleines Skript aus Befehlszeilen.
 
 ## Aufbau einer Info
 
 | Teil | Bedeutung |
 |---|---|
-| Name | eindeutige Kennung (`SKALVERAM31`, bei eigenen z. B. `OG3_Jens_Job`) |
+| Name | eindeutige Kennung (`SKALVERAM31`, bei eigenen z. B. `G3ASM_Jens_Job`) |
 | Owner | der NPC, bei dem die Option erscheint (`Jens`) |
 | Parent | Eltern-Info: macht daraus eine Folgefrage im Gesprächsbaum |
 | Quest | verknüpft die Info mit einer Quest: ihre Gesprächszeilen kommen automatisch ins Questlog dieser Quest |
@@ -88,5 +88,5 @@ Der vollständige Mod steht in `examples/mods/jens_dialog/main.as`.
 
 ## Eigene Texte
 
-Texte in `AddInfoLine` und Quests sind Text-IDs der Stringtabelle des Spiels. Der Patch fängt die Textsuche ab: ein Text, den du übergibst, wird unter einer eigenen ID
-(`OG3_INFO_<Info>_<n>`, `OG3_QTOPIC_<Quest>`) registriert und überall angezeigt, wo das Spiel diese ID auflöst. Umlaute funktionieren (Windows-1252).
+Texte in `AddInfoLine` und Quests sind Text-IDs der Stringtabelle des Spiels. Das Modkit fängt die Textsuche ab: ein Text, den du übergibst, wird unter einer eigenen ID
+(`G3ASM_INFO_<Info>_<n>`, `G3ASM_QTOPIC_<Quest>`) registriert und überall angezeigt, wo das Spiel diese ID auflöst. Umlaute funktionieren (Windows-1252).

@@ -36,15 +36,15 @@ void OnDraw() {
     DrawImage(bildFrueh, 410, 60, 64, 64);
     bilder++;
     int w = GetScreenWidth(), h = GetScreenHeight();
-    DrawText(schrift, 30, 26, "OG3 OnDraw " + w + "x" + h + "  Bild " + bilder, 0xFFFFFF80);
+    DrawText(schrift, 30, 26, "G3ASM OnDraw " + w + "x" + h + "  Bild " + bilder, 0xFFFFFF80);
     bool a = DrawImage(bildPfad, 30, 60, 64, 64);
     bool b = DrawImage(bildKurz, 110, 60, 64, 64);
     bool c = DrawImage(bildPfad, 190, 60, 64, 64, winkel);
     bool d = DrawImage(bildGross, 270, 60, 128, 128);
     // ueber dem HUD: Statusleiste unten
     DrawImage(bildPfad, 10, h - 70, 64, 64);
-    DrawText(schrift, 80, h - 50, "OG3 ueber dem HUD", 0xFFFF6060);
-    bCString rechts = "OG3 ueber dem HUD";
+    DrawText(schrift, 80, h - 50, "G3ASM ueber dem HUD", 0xFFFF6060);
+    bCString rechts = "G3ASM ueber dem HUD";
     DrawText(schrift, w - TextWidth(schrift, rechts) - 20, h - 50, rechts, 0xFFFF6060);
     // Ecken und Mitte: liegen sie genau dort?
     DrawText(schrift, 2, 2, "[oben links]", 0xFF40FFFF);
@@ -53,7 +53,7 @@ void OnDraw() {
     DrawText(schrift, 2, h - 22, "[unten links]", 0xFF40FFFF);
     bCString ur = "[unten rechts]";
     DrawText(schrift, w - TextWidth(schrift, ur) - 2, h - 22, ur, 0xFF40FFFF);
-    bCString mitte = "OG3 Mitte - auch im Inventar sichtbar?";
+    bCString mitte = "G3ASM Mitte - auch im Inventar sichtbar?";
     DrawText(schrift, (w - TextWidth(schrift, mitte)) / 2, h / 2, mitte, 0xFF40FF40);
     Entity held = GetHero();
     if (!held.IsValid()) return;

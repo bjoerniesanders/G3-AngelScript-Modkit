@@ -1,7 +1,10 @@
-# OG3-Patch: offener Patch mit AngelScript-Modding (Meilenstein 1, 2026-11-01)
+# G3ASM: Technik und Stand (Meilenstein 1, 2026-11-01)
+
+> **Aeltere Entwicklungsnotizen** aus der Zeit, als das Projekt noch OG3-Patch hiess und vom Proxy des OpenGothic3-Hauptrepos geladen wurde.
+> Einbau, Dateinamen und Schnittstelle haben sich seitdem geaendert. Aktuell sind die README, `docs/modkit/` und `docs/compatibility.md`.
 
 ## Aufbau
-- `og3_patch.dll` (Ziel `og3_patch`, build32\patch): AngelScript 2.38.0 (thirdparty/angelscript, zlib-Lizenz) statisch eingebaut.
+- `g3asm.dll` (Ziel `g3asm`, build32\patch): AngelScript 2.38.0 (thirdparty/angelscript, zlib-Lizenz) statisch eingebaut.
 - Geladen vom dbghelp-Proxy (`og3_hooks.ini` `[patch] enable=1`), arbeitet mit der geladenen SharedBase.dll. Die Bindings rufen deren
   Exporte auf (Original oder Nachbau, gleiche Exportnamen) -> Originalverhalten, auch fuer Objekte, die das Spiel selbst anlegt.
 - Einhaengen nur ueber die Importtabelle von Gothic3.exe (kein Code-Eingriff, vertraeglich mit dem PU-Patch):
@@ -13,11 +16,11 @@
 ## ini
 ```
 [patch]
-enable=0                    ; 1 = og3_patch.dll laden (liegt neben dbghelp.dll)
-script=og3\scripts\main.as  ; relativ zum Spielordner oder absolut
+enable=0                    ; 1 = g3asm.dll laden (liegt neben dbghelp.dll)
+script=g3asm\scripts\main.as  ; relativ zum Spielordner oder absolut
 hotreload=1                 ; Skript bei Dateiaenderung im laufenden Spiel neu laden (Pruefung 1x je Sekunde)
 ```
-Protokoll: `<Gothic3>\og3_patch.log`; print() schreibt zusaetzlich ins Gothic-3-Protokoll (GE_MESSAGEF_INFO).
+Protokoll: `<Gothic3>\g3asm.log`; print() schreibt zusaetzlich ins Gothic-3-Protokoll (GE_MESSAGEF_INFO).
 
 ## Skript-Schnittstelle (Version 2, `GetApiVersion()`)
 - `bCString`: Literale, `+ += == < `, `+ int/uint/float/double/bool`, GetLength, IsEmpty, Compare, CompareNoCase, Find(s, start=0),
@@ -43,18 +46,18 @@ Protokoll: `<Gothic3>\og3_patch.log`; print() schreibt zusaetzlich ins Gothic-3-
   mit Funktion/Zeile, ein Aufruf laenger als 5 s wird abgebrochen (Endlosschleife). Das Spiel laeuft in allen Faellen weiter.
 
 ## Tests (ohne Spiel)
-`build32\patch\og3_patch_test.exe <SharedBase.dll> tests\scripts\selftest.as [Dialogs.dll]` -> 42 Pruefungen, mit Original-SharedBase
+`build32\patch\g3asm_test.exe <SharedBase.dll> tests\scripts\selftest.as [Dialogs.dll]` -> 42 Pruefungen, mit Original-SharedBase
 (tmp\engtest) und Nachbau (build32\dll_mimalloc) jeweils 0 Fehlschlaege. Fehlerfaelle (Syntax, Division durch 0, Endlosschleife) geprueft.
 
 ## Mini-Mod (examples/scripts/main.as)
 Fenstertitel mit FPS/Spielzeit/Heldenposition, Ton bei Engine-Start und Weltwechsel, F11 Info, F10 Position merken, Shift+F10 zurueck.
 Im Spiel bestaetigt (Version 1: Titel, Ereignisse, Taste, Neuladen); Version 2 (Entity/Teleport) noch nicht im Spiel getestet.
-Einbau/Update: `powershell -NoProfile -File og3-patch/tools/install_patch.ps1 [-Script]`.
+Einbau/Update: `powershell -NoProfile -File g3-angelscript-modkit/tools/install_patch.ps1 [-Script]`.
 
 - Menuetaste stumm (2026-11-01): Fensterprozedur des Spiels wird beim ersten OnProcess ersetzt; SC_KEYMENU, WM_SYSCHAR, WM_MENUCHAR werden geschluckt -> kein Windows-Piepton bei F10/Alt. Protokollzeile "Menuetaste stumm".
 
 ## Offen / naechste Schritte
-- Spieltest (Proxy + og3_patch.dll nach G:\Gothic3, nur mit OK des Nutzers).
+- Spieltest (Proxy + g3asm.dll nach G:\Gothic3, nur mit OK des Nutzers).
 - Engine-Bindings: Entity nach Namen (eCSceneAdmin), Position/Rotation, Held, Property-Sets; Tastatur-Ereignis (eCApplication::OnKeyboard).
 - x64-Exportnamen fuer Classic.
 
@@ -74,13 +77,13 @@ Einbau/Update: `powershell -NoProfile -File og3-patch/tools/install_patch.ps1 [-
 
 ## Mods (Schritt 1 zum G1R-Modkit-Umfang, 2026-11-02)
 - Ziel: Funktionsumfang wie https://alkimiainteractive.github.io/G1R-Modkit/scripting/ (Script Hooking, Script Patches, Quests, Konversationen).
-- `<Spiel>\og3\mods\<Name>\main.as` je Mod, eigenes AngelScript-Modul je Mod (Globals getrennt, `#include` relativ zur Datei). ini `[patch] mods=og3\mods`.
+- `<Spiel>\g3asm\mods\<Name>\main.as` je Mod, eigenes AngelScript-Modul je Mod (Globals getrennt, `#include` relativ zur Datei). ini `[patch] mods=g3asm\mods`.
   Das Einzelskript (`script=`) laeuft weiter als Mod "main" und zwar zuerst.
 - `mods\load_order.txt` (optional): ein Modname je Zeile in Ladereihenfolge, `#` Kommentar, `-Name` schaltet einen Mod ab; Rest alphabetisch.
 - Alle Ereignisse (main, OnFrame, OnKey, OnWorldActivate/Deactivate, OnShutdown) gehen der Reihe nach an alle Mods; `print` traegt den Modnamen `[Name]`.
 - Fehler sind pro Mod isoliert (Uebersetzungsfehler, Ausnahme, Zeitueberschreitung): die anderen Mods laufen weiter.
 - Hot-Reload je Mod (Aenderung an main.as), neue Ordner werden im laufenden Spiel erkannt (main() laeuft dann), entfernte/abgeschaltete werden entladen (OnShutdown).
-- Test: `og3_patch_test.exe <SharedBase.dll> tests\mods` (Ordner statt Skript): Reihenfolge, Fehlerisolation, Abschaltung geprueft. Selbsttest 49/49 unveraendert.
+- Test: `g3asm_test.exe <SharedBase.dll> tests\mods` (Ordner statt Skript): Reihenfolge, Fehlerisolation, Abschaltung geprueft. Selbsttest 49/49 unveraendert.
 - Geplant: (2) Hooks auf Game.dll-Methoden (OnNPCKilled, OnReceiveItem, ...), (3) Quest-API, (4) Unified-Diff-Patches `ScriptPatches\*.patch` auf ini-Daten, (5) Info/Dialog-API.
 
 ## Spielereignisse (Schritt 2, API 5, 2026-11-02)
@@ -95,7 +98,7 @@ Einbau/Update: `powershell -NoProfile -File og3-patch/tools/install_patch.ps1 [-
 - Das Protokoll meldet jedes Ereignis beim ersten Auftreten ("Spielereignis erstmals ausgeloest: ...") -> zeigt, welche Hooks das Spiel wirklich ruft.
   UNGEPRUEFT im Spiel: ob das Spiel diese Funktionen bei jedem Kill/Itemfund aufruft (sie koennten nur fuer aktive Quests laufen).
 - Feuert ein Ereignis, waehrend ein Skript laeuft, wird der Kontext verschachtelt (PushState).
-- Test: `OG3_TEST_GAMEDLL=G:\Gothic3\Game.dll og3_patch_test.exe ...` laedt die echte Game.dll und prueft das Einhaengen: 6 von 6 Hooks aktiv.
+- Test: `G3ASM_TEST_GAMEDLL=G:\Gothic3\Game.dll g3asm_test.exe ...` laedt die echte Game.dll und prueft das Einhaengen: 6 von 6 Hooks aktiv.
   Selbsttest 53/53 (Original und Nachbau), Zustellung mit Argumenten (Entity, Text, Zahl) ohne Spiel geprueft.
 - Beispiel-Mod: examples/mods/ereignisse/main.as (Bildschirmtext bei Kill, Protokoll fuer alle Ereignisse).
 - Noch offen in Schritt 2: `override`-artige Hooks mit Aufruf/Ersatz des Originals (Super), Abbrechen von Aktionen, weitere Hooks (Inventar, Dialog, Schaden).
@@ -122,7 +125,7 @@ Einbau/Update: `powershell -NoProfile -File og3-patch/tools/install_patch.ps1 [-
 ## Inventar + Jens-Quest (API 7, 2026-11-02)
 - `Entity.GetItemCount(itemName)` (Summe ueber alle Staepel, -1 = nicht lesbar), `Entity.RemoveItems(itemName, n)` (Rueckgabe = entfernte Stuecke): Script.dll
   `PSInventory(eCEntity*)` -> gCInventory_PS::FindStackIndex(bCString)/GetStack/DeleteItems. itemName = Template-Name ("It_Wolf_Fur", wie in OnReceiveItem).
-- Beispiel-Mod examples/mods/jens_quest: Naehert sich der Held Jens (<= 4 m), startet die Quest "OG3_Jens_Wolfsfell" (Bitte als Bildschirmtext);
+- Beispiel-Mod examples/mods/jens_quest: Naehert sich der Held Jens (<= 4 m), startet die Quest "G3ASM_Jens_Wolfsfell" (Bitte als Bildschirmtext);
   Abgabe mit der Rollen-Taste bei Jens (entfernt ein It_Wolf_Fur) oder per OnReceiveItem (Held -> Jens); Belohnung 100 Quest-XP; Tod von Jens = Quest gescheitert.
 - Ohne Dialogsystem (Info-API noch offen) ersetzt Naehe + Taste das Gespraech. UNGEPRUEFT im Spiel: Itemname des Stapels, ob SucceedQuest die XP vergibt.
 
@@ -131,7 +134,7 @@ Einbau/Update: `powershell -NoProfile -File og3-patch/tools/install_patch.ps1 [-
   besteht aus Dialogen (Infos), daher leer ohne Dialog-API. Das Spiel vergibt beim Abschluss selbst 500 XP (Meldung "Quest abgeschlossen") unabhaengig von SetQuestXP(100).
 - Questliste funktioniert: gCQuestManager_PS+0x14 = {Daten, Anzahl, Kapazitaet}, Elemente = gCQuest_PS* (571 Quests). GetQuestCount/GetQuestNameAt.
 - Texte: `RegisterText(id, text)` + eCLocString-Hooks (Engine.dll GetString(), GetString(bCString), operator bCUnicodeString): registrierte IDs liefern unseren Text
-  (Windows-1252 -> Unicode), sonst Original. SetQuestTopic/SetQuestDescription legen dafuer IDs OG3_QTOPIC_<Quest>/OG3_QDESC_<Quest> an.
+  (Windows-1252 -> Unicode), sonst Original. SetQuestTopic/SetQuestDescription legen dafuer IDs G3ASM_QTOPIC_<Quest>/G3ASM_QDESC_<Quest> an.
 - DumpQuest(name, pfad) mit relativem Pfad schlug fehl (false); neu: GetQuestDir(), GetQuestFilePath(name), GetGameDir() zum Ausprobieren absoluter/Spielpfade.
 
 ## Modkit-Dokumentation
@@ -144,7 +147,7 @@ Einsteigerseiten (Deutsch, nach dem Vorbild des G1R-Modkits): docs/modkit/index.
   Type (3 Info, 2 News), Skriptzeilen: `Say | player/npc | | ID1 (z. B. SD_Thoughtful) | | Text`, `SetGameEvent`/`ClearGameEvent` (ID1), `SetTradeEnabled`/`SetTeachEnabled`
   (npc, ID1 true), `CloseQuest` (ID1 = Quest), `SetRoutine` (Entity, ID1), `SetSlaveryEnabled`, `Give` (npc, player, ID1 Item, ID2 Menge), `End`, `GiveXP` (ID1).
   `DescribeCommands()` listet das gesamte Vokabular mit Beispiel (Bild runter im quest_demo).
-- Schreiben: CreateInfo(name, owner), SetInfoQuest/Parent/Type/Condition, AddInfoLine(info, cmd, e1, e2, id1, id2, text) (Text wird als OG3_INFO_<info>_<n> registriert),
+- Schreiben: CreateInfo(name, owner), SetInfoQuest/Parent/Type/Condition, AddInfoLine(info, cmd, e1, e2, id1, id2, text) (Text wird als G3ASM_INFO_<info>_<n> registriert),
   RebuildInfos() (gCInfoManager_PS::BuildMapInfosByOwners), RemoveInfo, InfoExists. Ereignis OnInfoFinished(info, owner, quest) per Hook auf OnInfoScriptFinished.
 - Mod jens_dialog: "Hast du Arbeit fuer mich?" startet die Quest, "Ich habe das Wolfsfell." (Cond Running + Quest) gibt sie ab. UNGEPRUEFT im Spiel.
 
@@ -160,7 +163,7 @@ Einsteigerseiten (Deutsch, nach dem Vorbild des G1R-Modkits): docs/modkit/index.
 - Disassembly: gCQuest_PS::WriteRuntimeData schreibt Status, Aktivierungszeit, Lieferzaehler und das Log (LogText); die Ladefunktion des Quest-Managers sucht die Quest nach Namen
   und liest die Laufzeitdaten hinein. Eigene Quests muessen also VOR dem Einlesen existieren.
 - Neu: Hooks auf LoadQuestsFromInis/LoadInfosFromInis -> Ereignisse `OnQuestsLoaded()`/`OnInfosLoaded()`; Protokollhooks fuer ResetQuests, Quest-ReadRuntimeData/WriteRuntimeData, Info-ReadSaveGame
-  (zeigt die Reihenfolge beim Laden/Speichern). jens_dialog legt Quest und Infos dort an; Notfall-Wiederherstellung ueber Schalter bleibt; Jens-Tod => FailQuest + Schalter OG3_JensWolf_Failed.
+  (zeigt die Reihenfolge beim Laden/Speichern). jens_dialog legt Quest und Infos dort an; Notfall-Wiederherstellung ueber Schalter bleibt; Jens-Tod => FailQuest + Schalter G3ASM_JensWolf_Failed.
 
 ## Override-Hooks (Schritt 2b, API 17, 2026-11-02)
 - Spielfunktionen abfangen, aendern oder abbrechen: ein Mod definiert `bool Override_<Name>(<Argumente>)`. Der Hook ruft diese Funktion statt des Originals; `Super()` ruft das Original
@@ -172,8 +175,8 @@ Einsteigerseiten (Deutsch, nach dem Vorbild des G1R-Modkits): docs/modkit/index.
 - Tests: selftest 67/67, tests\mods 6/6 (Kette zeta -> alpha -> Original). Beispiel: examples/mods/hooks_demo (Jens' Mod-Arbeit nur 8-20 Uhr; Itemuebergaben mitschreiben).
 
 ## Datei-Patches (Schritt 4, 2026-11-02)
-- src/file_patches.cpp: `<Mod>\ScriptPatches\*.patch` (Unified Diff) werden beim Start (og3_patch_start, vor dem ersten Lesen durch das Spiel) auf Datendateien angewendet.
+- src/file_patches.cpp: `<Mod>\ScriptPatches\*.patch` (Unified Diff) werden beim Start (g3asm_start, vor dem ersten Lesen durch das Spiel) auf Datendateien angewendet.
   Basis = eigene physische Datei oder G3V0-Archiv (Data\<Archiv>.pak, unkomprimierte Eintraege; Quests/Infos sind unkomprimiert, stringtable.ini nicht), Ergebnis als physische Overlay-Datei
-  Data\<Archiv>\<Pfad> (Dateisystem-Modul bevorzugt physische Dateien); Liste og3\patched_files.txt, beim naechsten Start entfernt und neu berechnet. Mods nur mit ScriptPatches (ohne main.as) werden erkannt.
-- Getestet ohne Spiel (OG3_TEST_PATCHES="<Spielordner>|<Modordner>"): Stapeln ueber Mods, kaputter Patch uebersprungen, neue Datei, idempotent, CRLF erhalten, Overlay verschwindet mit dem Mod.
+  Data\<Archiv>\<Pfad> (Dateisystem-Modul bevorzugt physische Dateien); Liste g3asm\patched_files.txt, beim naechsten Start entfernt und neu berechnet. Mods nur mit ScriptPatches (ohne main.as) werden erkannt.
+- Getestet ohne Spiel (G3ASM_TEST_PATCHES="<Spielordner>|<Modordner>"): Stapeln ueber Mods, kaputter Patch uebersprungen, neue Datei, idempotent, CRLF erhalten, Overlay verschwindet mit dem Mod.
 - Mod patch_demo (Abbas_Artefakt ExperiencePoints 300 -> 600). OFFEN: Bestaetigung im Spiel; ob Infos-Patches wirken (Infos werden beim Laden aus Infos.cpt gelesen).

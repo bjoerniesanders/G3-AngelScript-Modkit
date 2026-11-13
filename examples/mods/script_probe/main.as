@@ -2,13 +2,13 @@
 //   erste Welt: welche bekannten Skriptnamen es gibt und in welcher Script_*.dll sie stehen
 //   immer:      die beobachteten Skripte (BEOBACHTEN) mit Self, Other, Zahl und Ergebnis ins Protokoll, je Name hoechstens MAX_ZEILEN Zeilen
 //   Strg + Ziffernblock +: lesende Spielskripte per CallScript fuer den Helden und das anvisierte Entity aufrufen
-// Override_Script reicht nur durch (Super()); es misst, ob die Kette und das Ergebnis stimmen. Protokoll: og3_patch.log.
+// Override_Script reicht nur durch (Super()); es misst, ob die Kette und das Ergebnis stimmen. Protokoll: g3asm.log.
 const int TASTE = 0x6B;        // Ziffernblock +, zusammen mit Strg
 const int MAX_ZEILEN = 15;
 
 array<bCString> BEOBACHTEN = {"MagicTeleport", "OnHit", "GetStaminaPoints", "GetAttitude", "IsDeadlyDamage", "CanBurn", "Respawn", "AssessTarget"};
 array<bCString> PRUEFEN = {"MagicTeleport", "AssessHit", "IsDeadlyDamage", "CanBurn", "CanFreeze", "Respawn", "AssessTarget", "PS_DuskToDawn",
-                           "SetHitPoints", "IsHumanoid", "IsInFistMode", "GetStaminaPoints", "GetLevelMax", "GetAttitude", "GibtEsNicht_OG3"};
+                           "SetHitPoints", "IsHumanoid", "IsInFistMode", "GetStaminaPoints", "GetLevelMax", "GetAttitude", "GibtEsNicht_G3ASM"};
 array<int> zeilen;
 int overrides = 0;
 
@@ -73,6 +73,6 @@ void OnKey(int vk, bool down) {
         print("  IsHumanoid(Ziel) = " + CallScript("IsHumanoid", ziel, none));
         print("  GetAttitude(Ziel, Held) = " + CallScript("GetAttitude", ziel, held));
     }
-    print("  GibtEsNicht_OG3 = " + CallScript("GibtEsNicht_OG3", held, none));
-    PrintScreen("CallScript-Test: siehe og3_patch.log", 3, 180, 255, 180);
+    print("  GibtEsNicht_G3ASM = " + CallScript("GibtEsNicht_G3ASM", held, none));
+    PrintScreen("CallScript-Test: siehe g3asm.log", 3, 180, 255, 180);
 }

@@ -1,5 +1,5 @@
 // Mess-Mod fuer Override_CombatMove (ab API 45): veraendert die Abspielgeschwindigkeit der Kampfbewegungen (sAICombatMoveStart).
-// Einstellungen in mod.ini [settings] bzw. og3\settings\attack_speed.ini: Faktor (Standard 2.0, deutlich sichtbar), AlleNPCs (Standard nein).
+// Einstellungen in mod.ini [settings] bzw. g3asm\settings\attack_speed.ini: Faktor (Standard 2.0, deutlich sichtbar), AlleNPCs (Standard nein).
 // Die ersten 20 Aenderungen stehen im Protokoll.
 int gemeldet = 0;
 

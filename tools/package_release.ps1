@@ -1,21 +1,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 param([Parameter(Mandatory)][string]$BuildDir, [Parameter(Mandatory)][string]$Version, [string]$OutDir = "dist")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 if (-not [IO.Path]::IsPathRooted($BuildDir)) { $BuildDir = Join-Path $root $BuildDir }
 if (-not [IO.Path]::IsPathRooted($OutDir)) { $OutDir = Join-Path $root $OutDir }
 
-$need = @("loader\dbghelp.dll", "patch\og3_patch.dll", "patch\og3_packmod.exe")
+$need = @("loader\dbghelp.dll", "patch\g3asm.dll", "patch\g3asm_packmod.exe")
 foreach ($f in $need) { if (-not (Test-Path (Join-Path $BuildDir $f))) { throw "$f is missing in $BuildDir (build first)" } }
 
-$name = "og3-patch-$Version"
+$name = "g3asm-$Version"
 $stage = Join-Path $OutDir $name
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force (Join-Path $stage "bin\loader"), (Join-Path $stage "bin\patch"), (Join-Path $stage "tools"), (Join-Path $stage "docs") | Out-Null
 
 Copy-Item (Join-Path $BuildDir "loader\dbghelp.dll") (Join-Path $stage "bin\loader\")
-foreach ($f in "og3_patch.dll", "og3_patch.map", "og3_packmod.exe") {
+foreach ($f in "g3asm.dll", "g3asm.map", "g3asm_packmod.exe") {
     $p = Join-Path $BuildDir "patch\$f"
     if (Test-Path $p) { Copy-Item $p (Join-Path $stage "bin\patch\") }
 }
@@ -27,7 +27,7 @@ foreach ($p in "roadmap.md", "plugin-analyse.md") { Remove-Item (Join-Path $stag
 foreach ($f in "README.md", "LICENSE", "LICENSE-EXCEPTIONS.md") { if (Test-Path (Join-Path $root $f)) { Copy-Item (Join-Path $root $f) $stage } }
 
 $install = @"
-OG3-Patch $Version - AngelScript modkit for Gothic 3 (original game, 32-bit)
+G3 AngelScript Modkit (G3ASM) $Version for Gothic 3 (original game, 32-bit)
 
 Requirements: Gothic 3 with Community Patch 1.75 and the Parallel Universe Patch (PU) installed.
 The installer checks both and stops if one is missing (-Force installs anyway, untested).
@@ -38,7 +38,7 @@ Install (close Gothic 3 first; the folder must contain Gothic3.exe):
 Uninstall:
   powershell -NoProfile -ExecutionPolicy Bypass -File tools\install_loader.ps1 -Game "C:\Path\to\Gothic 3" -Uninstall
 
-Example mods: copy examples\mods\<name> to <Gothic 3>\og3\mods\ and enable it with a line "+<name>" in og3\mods\load_order.txt.
+Example mods: copy examples\mods\<name> to <Gothic 3>\g3asm\mods\ and enable it with a line "+<name>" in g3asm\mods\load_order.txt.
 Documentation: docs\modkit\index.md
 "@
 [IO.File]::WriteAllText((Join-Path $stage "INSTALL.txt"), $install.Replace("`n", "`r`n"), (New-Object Text.UTF8Encoding($false)))

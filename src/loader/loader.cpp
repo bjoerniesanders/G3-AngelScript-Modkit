@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// OG3-Loader: schlanke Ersatz-"dbghelp.dll" fuer den OG3-Patch (Gothic 3, 32 Bit). Eigenstaendig, ohne das OpenGothic3-Hauptrepo.
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// G3ASM-Loader: schlanke Ersatz-"dbghelp.dll" fuer G3ASM (Gothic 3, 32 Bit). Eigenstaendig, ohne das OpenGothic3-Hauptrepo.
 //
 // SharedBase.dll importiert dbghelp.dll (nur MiniDumpWriteDump) und laedt sie aus dem Spielordner. Dieser Loader steht an dieser Stelle:
 //   - leitet MiniDumpWriteDump an die umbenannte Original-DLL (dbghelp_orig.dll) weiter, damit das Spiel wie gewohnt Absturzberichte schreiben kann,
-//   - laedt og3_patch.dll (neben dem Loader) und ruft og3_patch_start() auf,
+//   - laedt g3asm.dll (neben dem Loader) und ruft g3asm_start() auf,
 //   - schreibt optional ein einfaches Absturzprotokoll (erste Chance, Modul+Offset).
-// Einstellungen in og3_patch.ini neben der DLL (Fallback: og3_hooks.ini des Hauptrepos):
-//   [patch]   enable=1 (Standard 1)   script=...  hotreload=...  mods=...  (Rest siehe docs/og3_patch.md)
+// Einstellungen in g3asm.ini neben der DLL (Fallback: og3_hooks.ini des Hauptrepos):
+//   [patch]   enable=1 (Standard 1)   script=...  hotreload=...  mods=...  (Rest siehe docs/g3asm.md)
 //   [loader]  crashlog=1 (Standard 1)
-// Protokoll: og3_loader.log neben der DLL.
+// Protokoll: g3asm_loader.log neben der DLL.
 #include <windows.h>
 
 #include <cstdarg>
@@ -29,7 +29,7 @@ void Log(const char* fmt, ...) {
     if (n < 0) n = static_cast<int>(strlen(line));
     line[n++] = '\r';
     line[n++] = '\n';
-    _snprintf_s(path, sizeof path, _TRUNCATE, "%sog3_loader.log", g_dir);
+    _snprintf_s(path, sizeof path, _TRUNCATE, "%sg3asm_loader.log", g_dir);
     // erster Eintrag eines Starts legt die Datei neu an, danach wird angehaengt
     HANDLE f = CreateFileA(path, g_logStarted ? FILE_APPEND_DATA : GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
                            g_logStarted ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -109,22 +109,22 @@ BOOL APIENTRY DllMain(HMODULE self, DWORD reason, LPVOID) {
     if (slash) slash[1] = 0;
 
     char ini[MAX_PATH + 32];
-    _snprintf_s(ini, sizeof ini, _TRUNCATE, "%sog3_patch.ini", g_dir);
+    _snprintf_s(ini, sizeof ini, _TRUNCATE, "%sg3asm.ini", g_dir);
     if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES) _snprintf_s(ini, sizeof ini, _TRUNCATE, "%sog3_hooks.ini", g_dir);   // Hauptrepo-Datei
 
-    Log("OG3-Loader gestartet (Einstellungen: %s)", GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ? "keine ini, Standardwerte" : ini);
+    Log("G3ASM-Loader gestartet (Einstellungen: %s)", GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ? "keine ini, Standardwerte" : ini);
     if (GetPrivateProfileIntA("loader", "crashlog", 1, ini) != 0) AddVectoredExceptionHandler(1, CrashLogger);
     if (GetPrivateProfileIntA("patch", "enable", 1, ini) == 0) {
-        Log("OG3-Patch per ini abgeschaltet");
+        Log("G3ASM per ini abgeschaltet");
         return TRUE;
     }
     char dll[MAX_PATH + 32];
-    _snprintf_s(dll, sizeof dll, _TRUNCATE, "%sog3_patch.dll", g_dir);
+    _snprintf_s(dll, sizeof dll, _TRUNCATE, "%sg3asm.dll", g_dir);
     HMODULE pp = LoadLibraryA(dll);
     using StartFn = int (*)(HMODULE, const char*, const char*, void (*)(const char*));
-    StartFn start = pp ? reinterpret_cast<StartFn>(GetProcAddress(pp, "og3_patch_start")) : nullptr;
-    if (!start) Log("og3_patch.dll nicht ladbar oder og3_patch_start fehlt (Fehler %lu)", GetLastError());
-    else if (!start(GetModuleHandleA("SharedBase.dll"), ini, g_dir, PatchLog)) Log("OG3-Patch: Start fehlgeschlagen");
-    else Log("OG3-Patch gestartet");
+    StartFn start = pp ? reinterpret_cast<StartFn>(GetProcAddress(pp, "g3asm_start")) : nullptr;
+    if (!start) Log("g3asm.dll nicht ladbar oder g3asm_start fehlt (Fehler %lu)", GetLastError());
+    else if (!start(GetModuleHandleA("SharedBase.dll"), ini, g_dir, PatchLog)) Log("G3ASM: Start fehlgeschlagen");
+    else Log("G3ASM gestartet");
     return TRUE;
 }

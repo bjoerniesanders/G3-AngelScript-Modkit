@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 #include "script_host.h"
 
 #include <angelscript.h>
@@ -23,7 +23,7 @@
 #include "scriptbuilder/scriptbuilder.h"
 #include "scriptmath/scriptmath.h"
 
-namespace og3p {
+namespace g3asm {
 
 bool RegisterEngineBindings(asIScriptEngine* e);   // engine_bindings.cpp
 ScriptHost* ScriptHost::s_current = nullptr;
@@ -314,7 +314,7 @@ SQuat M4Quaternion(const SMat4& m) {
 bool g_printToGameLog = true;   // ini [patch] printgame=0: print() schreibt nur ins eigene Protokoll, nicht zusaetzlich ins Spielprotokoll (geInfo)
 void Print(const SStr& s) {
     if (ScriptHost::s_current) ScriptHost::s_current->Log(std::string("[") + ScriptHost::s_current->CurrentMod() + "] " + s.c_str());
-    if (g_printToGameLog && g_sb.geInfo) g_sb.geInfo("og3-Skript: %s", s.c_str());
+    if (g_printToGameLog && g_sb.geInfo) g_sb.geInfo("g3asm-Skript: %s", s.c_str());
 }
 SStr ToStringInt(int v) {
     char b[32];
@@ -355,7 +355,7 @@ unsigned GetTimeStamp() {
     static Fn f = g_sb.module ? reinterpret_cast<Fn>(GetProcAddress(g_sb.module, "?GetTimeStamp@bCTimer@@SGKXZ")) : nullptr;
     return f ? unsigned(f()) : GetTickCount();
 }
-int GetApiVersion() { return OG3_SCRIPT_API_VERSION; }
+int GetApiVersion() { return G3ASM_SCRIPT_API_VERSION; }
 bool IsModActive(const SStr& name);   // Mod-Abhaengigkeiten, weiter unten bei DiscoverMods
 SStr CallModScript(const SStr& mod, const SStr& func, const SStr& arg) {
     SStr out;
@@ -427,187 +427,187 @@ void LineCallback(asIScriptContext* ctx, Timeout* t) {
 bool RegisterAll(asIScriptEngine* e) {
     bool ok = true;
     // bCString
-    OG3_REG(e->RegisterObjectType("bCString", sizeof(SStr), asOBJ_VALUE | asGetTypeTraits<SStr>()));
-    OG3_REG(e->RegisterStringFactory("bCString", &g_strFactory));
-    OG3_REG(e->RegisterObjectBehaviour("bCString", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(StrConstruct), asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectBehaviour("bCString", asBEHAVE_CONSTRUCT, "void f(const bCString &in)", asFUNCTION(StrCopyConstruct),
+    G3ASM_REG(e->RegisterObjectType("bCString", sizeof(SStr), asOBJ_VALUE | asGetTypeTraits<SStr>()));
+    G3ASM_REG(e->RegisterStringFactory("bCString", &g_strFactory));
+    G3ASM_REG(e->RegisterObjectBehaviour("bCString", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(StrConstruct), asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectBehaviour("bCString", asBEHAVE_CONSTRUCT, "void f(const bCString &in)", asFUNCTION(StrCopyConstruct),
                                        asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectBehaviour("bCString", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(StrDestruct), asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString &opAssign(const bCString &in)", asMETHODPR(SStr, operator=, (const SStr&), SStr&),
+    G3ASM_REG(e->RegisterObjectBehaviour("bCString", asBEHAVE_DESTRUCT, "void f()", asFUNCTION(StrDestruct), asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString &opAssign(const bCString &in)", asMETHODPR(SStr, operator=, (const SStr&), SStr&),
                                     asCALL_THISCALL));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString &opAddAssign(const bCString &in)",
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString &opAddAssign(const bCString &in)",
                                     asMETHODPR(SStr, operator+=, (const SStr&), SStr&), asCALL_THISCALL));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(const bCString &in) const", asFUNCTION(StrAdd), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(int) const", asFUNCTION(StrAddInt), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(uint) const", asFUNCTION(StrAddUInt), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(float) const", asFUNCTION(StrAddFloat), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(double) const", asFUNCTION(StrAddDouble), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(bool) const", asFUNCTION(StrAddBool), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString opAdd_r(int) const", asFUNCTION(StrAddRInt), asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString opAdd_r(float) const", asFUNCTION(StrAddRFloat), asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bool opEquals(const bCString &in) const", asFUNCTION(StrEquals), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "int opCmp(const bCString &in) const", asFUNCTION(StrCompare), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "int GetLength() const", asFUNCTION(StrLength), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bool IsEmpty() const", asFUNCTION(StrIsEmpty), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "int Compare(const bCString &in) const", asFUNCTION(StrCompare), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "int CompareNoCase(const bCString &in) const", asFUNCTION(StrCompareNoCase),
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(const bCString &in) const", asFUNCTION(StrAdd), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(int) const", asFUNCTION(StrAddInt), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(uint) const", asFUNCTION(StrAddUInt), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(float) const", asFUNCTION(StrAddFloat), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(double) const", asFUNCTION(StrAddDouble), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString opAdd(bool) const", asFUNCTION(StrAddBool), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString opAdd_r(int) const", asFUNCTION(StrAddRInt), asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString opAdd_r(float) const", asFUNCTION(StrAddRFloat), asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bool opEquals(const bCString &in) const", asFUNCTION(StrEquals), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "int opCmp(const bCString &in) const", asFUNCTION(StrCompare), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "int GetLength() const", asFUNCTION(StrLength), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bool IsEmpty() const", asFUNCTION(StrIsEmpty), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "int Compare(const bCString &in) const", asFUNCTION(StrCompare), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "int CompareNoCase(const bCString &in) const", asFUNCTION(StrCompareNoCase),
                                     asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "int Find(const bCString &in, int start = 0) const", asFUNCTION(StrFind),
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "int Find(const bCString &in, int start = 0) const", asFUNCTION(StrFind),
                                     asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bool Contains(const bCString &in) const", asFUNCTION(StrContains), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString Left(int) const", asFUNCTION(StrLeft), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString Right(int) const", asFUNCTION(StrRight), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString Mid(int, int) const", asFUNCTION(StrMid), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "void ToUpper()", asFUNCTION(StrToUpper), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "void ToLower()", asFUNCTION(StrToLower), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString GetUpper() const", asFUNCTION(StrUpper), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCString", "bCString GetLower() const", asFUNCTION(StrLower), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bool Contains(const bCString &in) const", asFUNCTION(StrContains), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString Left(int) const", asFUNCTION(StrLeft), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString Right(int) const", asFUNCTION(StrRight), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString Mid(int, int) const", asFUNCTION(StrMid), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "void ToUpper()", asFUNCTION(StrToUpper), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "void ToLower()", asFUNCTION(StrToLower), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString GetUpper() const", asFUNCTION(StrUpper), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "bCString GetLower() const", asFUNCTION(StrLower), asCALL_CDECL_OBJFIRST));
 
     // bCVector
-    OG3_REG(
+    G3ASM_REG(
         e->RegisterObjectType("bCVector", sizeof(SVec3), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_ALLFLOATS | asGetTypeTraits<SVec3>()));
-    OG3_REG(e->RegisterObjectProperty("bCVector", "float x", asOFFSET(SVec3, x)));
-    OG3_REG(e->RegisterObjectProperty("bCVector", "float y", asOFFSET(SVec3, y)));
-    OG3_REG(e->RegisterObjectProperty("bCVector", "float z", asOFFSET(SVec3, z)));
-    OG3_REG(e->RegisterObjectBehaviour("bCVector", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(V3Construct), asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectBehaviour("bCVector", asBEHAVE_CONSTRUCT, "void f(float, float, float)", asFUNCTION(V3ConstructXYZ),
+    G3ASM_REG(e->RegisterObjectProperty("bCVector", "float x", asOFFSET(SVec3, x)));
+    G3ASM_REG(e->RegisterObjectProperty("bCVector", "float y", asOFFSET(SVec3, y)));
+    G3ASM_REG(e->RegisterObjectProperty("bCVector", "float z", asOFFSET(SVec3, z)));
+    G3ASM_REG(e->RegisterObjectBehaviour("bCVector", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(V3Construct), asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectBehaviour("bCVector", asBEHAVE_CONSTRUCT, "void f(float, float, float)", asFUNCTION(V3ConstructXYZ),
                                        asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "float GetMagnitude() const", asFUNCTION(V3Mag), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "float GetSquareMagnitude() const", asFUNCTION(V3SqMag), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "void Normalize()", asFUNCTION(V3Normalize), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "bCVector GetNormalized() const", asFUNCTION(V3GetNormalized), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "float GetDotProduct(const bCVector &in) const", asFUNCTION(V3Dot), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "bCVector GetCrossProduct(const bCVector &in) const", asFUNCTION(V3Cross),
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "float GetMagnitude() const", asFUNCTION(V3Mag), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "float GetSquareMagnitude() const", asFUNCTION(V3SqMag), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "void Normalize()", asFUNCTION(V3Normalize), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "bCVector GetNormalized() const", asFUNCTION(V3GetNormalized), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "float GetDotProduct(const bCVector &in) const", asFUNCTION(V3Dot), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "bCVector GetCrossProduct(const bCVector &in) const", asFUNCTION(V3Cross),
                                     asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "bCVector opAdd(const bCVector &in) const", asFUNCTION(V3Add), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "bCVector opSub(const bCVector &in) const", asFUNCTION(V3Sub), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "bCVector opMul(float) const", asFUNCTION(V3Mul), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "bCVector opMul_r(float) const", asFUNCTION(V3Mul), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "bCVector opDiv(float) const", asFUNCTION(V3Div), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "bCVector opNeg() const", asFUNCTION(V3Neg), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "bool opEquals(const bCVector &in) const", asFUNCTION(V3Equals), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector", "bCString ToString() const", asFUNCTION(V3ToString), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "bCVector opAdd(const bCVector &in) const", asFUNCTION(V3Add), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "bCVector opSub(const bCVector &in) const", asFUNCTION(V3Sub), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "bCVector opMul(float) const", asFUNCTION(V3Mul), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "bCVector opMul_r(float) const", asFUNCTION(V3Mul), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "bCVector opDiv(float) const", asFUNCTION(V3Div), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "bCVector opNeg() const", asFUNCTION(V3Neg), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "bool opEquals(const bCVector &in) const", asFUNCTION(V3Equals), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector", "bCString ToString() const", asFUNCTION(V3ToString), asCALL_CDECL_OBJFIRST));
 
     // bCVector2 / bCVector4
-    OG3_REG(
+    G3ASM_REG(
         e->RegisterObjectType("bCVector2", sizeof(SVec2), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_ALLFLOATS | asGetTypeTraits<SVec2>()));
-    OG3_REG(e->RegisterObjectProperty("bCVector2", "float x", asOFFSET(SVec2, x)));
-    OG3_REG(e->RegisterObjectProperty("bCVector2", "float y", asOFFSET(SVec2, y)));
-    OG3_REG(e->RegisterObjectBehaviour("bCVector2", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(V2Construct), asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectBehaviour("bCVector2", asBEHAVE_CONSTRUCT, "void f(float, float)", asFUNCTION(V2ConstructXY),
+    G3ASM_REG(e->RegisterObjectProperty("bCVector2", "float x", asOFFSET(SVec2, x)));
+    G3ASM_REG(e->RegisterObjectProperty("bCVector2", "float y", asOFFSET(SVec2, y)));
+    G3ASM_REG(e->RegisterObjectBehaviour("bCVector2", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(V2Construct), asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectBehaviour("bCVector2", asBEHAVE_CONSTRUCT, "void f(float, float)", asFUNCTION(V2ConstructXY),
                                        asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectMethod("bCVector2", "float GetMagnitude() const", asFUNCTION(V2Mag), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector2", "void Normalize()", asFUNCTION(V2Normalize), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector2", "bCVector2 opAdd(const bCVector2 &in) const", asFUNCTION(V2Add), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector2", "bCVector2 opSub(const bCVector2 &in) const", asFUNCTION(V2Sub), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector2", "bCVector2 opMul(float) const", asFUNCTION(V2Mul), asCALL_CDECL_OBJFIRST));
-    OG3_REG(
+    G3ASM_REG(e->RegisterObjectMethod("bCVector2", "float GetMagnitude() const", asFUNCTION(V2Mag), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector2", "void Normalize()", asFUNCTION(V2Normalize), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector2", "bCVector2 opAdd(const bCVector2 &in) const", asFUNCTION(V2Add), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector2", "bCVector2 opSub(const bCVector2 &in) const", asFUNCTION(V2Sub), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector2", "bCVector2 opMul(float) const", asFUNCTION(V2Mul), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(
         e->RegisterObjectType("bCVector4", sizeof(SVec4), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_ALLFLOATS | asGetTypeTraits<SVec4>()));
-    OG3_REG(e->RegisterObjectProperty("bCVector4", "float x", asOFFSET(SVec4, x)));
-    OG3_REG(e->RegisterObjectProperty("bCVector4", "float y", asOFFSET(SVec4, y)));
-    OG3_REG(e->RegisterObjectProperty("bCVector4", "float z", asOFFSET(SVec4, z)));
-    OG3_REG(e->RegisterObjectProperty("bCVector4", "float w", asOFFSET(SVec4, w)));
-    OG3_REG(e->RegisterObjectBehaviour("bCVector4", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(V4Construct), asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectBehaviour("bCVector4", asBEHAVE_CONSTRUCT, "void f(float, float, float, float)", asFUNCTION(V4ConstructXYZW),
+    G3ASM_REG(e->RegisterObjectProperty("bCVector4", "float x", asOFFSET(SVec4, x)));
+    G3ASM_REG(e->RegisterObjectProperty("bCVector4", "float y", asOFFSET(SVec4, y)));
+    G3ASM_REG(e->RegisterObjectProperty("bCVector4", "float z", asOFFSET(SVec4, z)));
+    G3ASM_REG(e->RegisterObjectProperty("bCVector4", "float w", asOFFSET(SVec4, w)));
+    G3ASM_REG(e->RegisterObjectBehaviour("bCVector4", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(V4Construct), asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectBehaviour("bCVector4", asBEHAVE_CONSTRUCT, "void f(float, float, float, float)", asFUNCTION(V4ConstructXYZW),
                                        asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectMethod("bCVector4", "float GetMagnitude() const", asFUNCTION(V4Mag), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCVector4", "void Normalize()", asFUNCTION(V4Normalize), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector4", "float GetMagnitude() const", asFUNCTION(V4Mag), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCVector4", "void Normalize()", asFUNCTION(V4Normalize), asCALL_CDECL_OBJFIRST));
 
     // bCQuaternion / bCMatrix3 (Matrix zuerst deklarieren, beide verweisen aufeinander)
-    OG3_REG(e->RegisterObjectType("bCQuaternion", sizeof(SQuat),
+    G3ASM_REG(e->RegisterObjectType("bCQuaternion", sizeof(SQuat),
                                   asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_ALLFLOATS | asGetTypeTraits<SQuat>()));
-    OG3_REG(
+    G3ASM_REG(
         e->RegisterObjectType("bCMatrix3", sizeof(SMat3), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_ALLFLOATS | asGetTypeTraits<SMat3>()));
-    OG3_REG(e->RegisterObjectProperty("bCQuaternion", "float x", asOFFSET(SQuat, x)));
-    OG3_REG(e->RegisterObjectProperty("bCQuaternion", "float y", asOFFSET(SQuat, y)));
-    OG3_REG(e->RegisterObjectProperty("bCQuaternion", "float z", asOFFSET(SQuat, z)));
-    OG3_REG(e->RegisterObjectProperty("bCQuaternion", "float w", asOFFSET(SQuat, w)));
-    OG3_REG(e->RegisterObjectBehaviour("bCQuaternion", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(QConstruct), asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectBehaviour("bCQuaternion", asBEHAVE_CONSTRUCT, "void f(float, float, float, float)", asFUNCTION(QConstructXYZW),
+    G3ASM_REG(e->RegisterObjectProperty("bCQuaternion", "float x", asOFFSET(SQuat, x)));
+    G3ASM_REG(e->RegisterObjectProperty("bCQuaternion", "float y", asOFFSET(SQuat, y)));
+    G3ASM_REG(e->RegisterObjectProperty("bCQuaternion", "float z", asOFFSET(SQuat, z)));
+    G3ASM_REG(e->RegisterObjectProperty("bCQuaternion", "float w", asOFFSET(SQuat, w)));
+    G3ASM_REG(e->RegisterObjectBehaviour("bCQuaternion", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(QConstruct), asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectBehaviour("bCQuaternion", asBEHAVE_CONSTRUCT, "void f(float, float, float, float)", asFUNCTION(QConstructXYZW),
                                        asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectMethod("bCQuaternion", "void Clear()", asFUNCTION(QClear), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCQuaternion", "void Normalize()", asFUNCTION(QNormalize), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCQuaternion", "void Invert()", asFUNCTION(QInvert), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCQuaternion", "float GetMagnitude() const", asFUNCTION(QMag), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCQuaternion", "bCQuaternion opMul(const bCQuaternion &in) const", asFUNCTION(QMul),
+    G3ASM_REG(e->RegisterObjectMethod("bCQuaternion", "void Clear()", asFUNCTION(QClear), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCQuaternion", "void Normalize()", asFUNCTION(QNormalize), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCQuaternion", "void Invert()", asFUNCTION(QInvert), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCQuaternion", "float GetMagnitude() const", asFUNCTION(QMag), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCQuaternion", "bCQuaternion opMul(const bCQuaternion &in) const", asFUNCTION(QMul),
                                     asCALL_CDECL_OBJFIRST));
-    OG3_REG(
+    G3ASM_REG(
         e->RegisterObjectMethod("bCQuaternion", "void SetQuaternion(const bCMatrix3 &in)", asFUNCTION(QFromMatrix), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectBehaviour("bCMatrix3", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(M3Construct), asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix3", "float GetElement(int row, int col) const", asFUNCTION(M3Get), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix3", "void SetElement(int row, int col, float)", asFUNCTION(M3Set), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix3", "void SetIdentity()", asFUNCTION(M3Identity), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix3", "void Transpose()", asFUNCTION(M3Transpose), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix3", "void Invert()", asFUNCTION(M3Invert), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix3", "bCMatrix3 opMul(const bCMatrix3 &in) const", asFUNCTION(M3MulM), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix3", "bCVector opMul(const bCVector &in) const", asFUNCTION(M3MulV), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix3", "void SetToRotationAxisX(float)", asFUNCTION(M3RotX), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix3", "void SetToRotationAxisY(float)", asFUNCTION(M3RotY), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix3", "void SetToRotationAxisZ(float)", asFUNCTION(M3RotZ), asCALL_CDECL_OBJFIRST));
-    OG3_REG(
+    G3ASM_REG(e->RegisterObjectBehaviour("bCMatrix3", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(M3Construct), asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix3", "float GetElement(int row, int col) const", asFUNCTION(M3Get), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix3", "void SetElement(int row, int col, float)", asFUNCTION(M3Set), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix3", "void SetIdentity()", asFUNCTION(M3Identity), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix3", "void Transpose()", asFUNCTION(M3Transpose), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix3", "void Invert()", asFUNCTION(M3Invert), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix3", "bCMatrix3 opMul(const bCMatrix3 &in) const", asFUNCTION(M3MulM), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix3", "bCVector opMul(const bCVector &in) const", asFUNCTION(M3MulV), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix3", "void SetToRotationAxisX(float)", asFUNCTION(M3RotX), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix3", "void SetToRotationAxisY(float)", asFUNCTION(M3RotY), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix3", "void SetToRotationAxisZ(float)", asFUNCTION(M3RotZ), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(
         e->RegisterObjectMethod("bCMatrix3", "void SetToRotation(const bCQuaternion &in)", asFUNCTION(M3FromQuat), asCALL_CDECL_OBJFIRST));
     // bCMatrix4 (API 19)
-    OG3_REG(
+    G3ASM_REG(
         e->RegisterObjectType("bCMatrix4", sizeof(SMat4), asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_ALLFLOATS | asGetTypeTraits<SMat4>()));
-    OG3_REG(e->RegisterObjectBehaviour("bCMatrix4", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(M4Construct), asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "float GetElement(int row, int col) const", asFUNCTION(M4Get), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "void SetElement(int row, int col, float)", asFUNCTION(M4Set), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "void SetIdentity()", asFUNCTION(M4Identity), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "void Transpose()", asFUNCTION(M4Transpose), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "void Invert()", asFUNCTION(M4Invert), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "bCMatrix4 GetInverted() const", asFUNCTION(M4GetInverted), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "float GetDeterminant() const", asFUNCTION(M4Det), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "bCMatrix4 opMul(const bCMatrix4 &in) const", asFUNCTION(M4MulM), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "bCVector opMul(const bCVector &in) const", asFUNCTION(M4MulV), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "bCVector GetTranslation() const", asFUNCTION(M4GetTranslation), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "void SetTranslation(const bCVector &in)", asFUNCTION(M4SetTranslation),
+    G3ASM_REG(e->RegisterObjectBehaviour("bCMatrix4", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(M4Construct), asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "float GetElement(int row, int col) const", asFUNCTION(M4Get), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "void SetElement(int row, int col, float)", asFUNCTION(M4Set), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "void SetIdentity()", asFUNCTION(M4Identity), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "void Transpose()", asFUNCTION(M4Transpose), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "void Invert()", asFUNCTION(M4Invert), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "bCMatrix4 GetInverted() const", asFUNCTION(M4GetInverted), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "float GetDeterminant() const", asFUNCTION(M4Det), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "bCMatrix4 opMul(const bCMatrix4 &in) const", asFUNCTION(M4MulM), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "bCVector opMul(const bCVector &in) const", asFUNCTION(M4MulV), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "bCVector GetTranslation() const", asFUNCTION(M4GetTranslation), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "void SetTranslation(const bCVector &in)", asFUNCTION(M4SetTranslation),
                                     asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "bCVector GetXAxis() const", asFUNCTION(M4GetX), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "bCVector GetYAxis() const", asFUNCTION(M4GetY), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "bCVector GetZAxis() const", asFUNCTION(M4GetZ), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToTranslation(const bCVector &in)", asFUNCTION(M4ToTranslation),
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "bCVector GetXAxis() const", asFUNCTION(M4GetX), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "bCVector GetYAxis() const", asFUNCTION(M4GetY), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "bCVector GetZAxis() const", asFUNCTION(M4GetZ), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToTranslation(const bCVector &in)", asFUNCTION(M4ToTranslation),
                                     asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToScaling(const bCVector &in)", asFUNCTION(M4ToScaling), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToRotation(const bCQuaternion &in)", asFUNCTION(M4ToRotation),
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToScaling(const bCVector &in)", asFUNCTION(M4ToScaling), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToRotation(const bCQuaternion &in)", asFUNCTION(M4ToRotation),
                                     asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToRotationAxisX(float)", asFUNCTION(M4RotX), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToRotationAxisY(float)", asFUNCTION(M4RotY), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToRotationAxisZ(float)", asFUNCTION(M4RotZ), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "bCMatrix3 GetRotationMatrix() const", asFUNCTION(M4RotationPart), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("bCMatrix4", "bCQuaternion GetRotation() const", asFUNCTION(M4Quaternion), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToRotationAxisX(float)", asFUNCTION(M4RotX), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToRotationAxisY(float)", asFUNCTION(M4RotY), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "void SetToRotationAxisZ(float)", asFUNCTION(M4RotZ), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "bCMatrix3 GetRotationMatrix() const", asFUNCTION(M4RotationPart), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("bCMatrix4", "bCQuaternion GetRotation() const", asFUNCTION(M4Quaternion), asCALL_CDECL_OBJFIRST));
 
     // globale Funktionen
-    OG3_REG(e->RegisterGlobalFunction("void print(const bCString &in)", asFUNCTION(Print), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool Super()", asFUNCTION(SuperCall), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetOverrideArg(int index, uint value)", asFUNCTION(SetOverrideArgScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("uint GetOverrideArg(int index)", asFUNCTION(GetOverrideArgScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString ToString(int)", asFUNCTION(ToStringInt), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString ToString(uint)", asFUNCTION(ToStringUInt), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString ToString(float)", asFUNCTION(ToStringFloat), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString ToString(double)", asFUNCTION(ToStringDouble), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString ToString(bool)", asFUNCTION(ToStringBool), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("void check(bool, const bCString &in)", asFUNCTION(Check), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("float GetFrameTime()", asFUNCTION(GetFrameTime), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("uint GetTimeStamp()", asFUNCTION(GetTimeStamp), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int GetApiVersion()", asFUNCTION(GetApiVersion), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool IsModActive(const bCString &in)", asFUNCTION(IsModActive), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetModVersion(const bCString &in)", asFUNCTION(GetModVersion), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString CallMod(const bCString &in mod, const bCString &in func, const bCString &in arg)", asFUNCTION(CallModScript),
+    G3ASM_REG(e->RegisterGlobalFunction("void print(const bCString &in)", asFUNCTION(Print), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool Super()", asFUNCTION(SuperCall), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetOverrideArg(int index, uint value)", asFUNCTION(SetOverrideArgScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("uint GetOverrideArg(int index)", asFUNCTION(GetOverrideArgScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString ToString(int)", asFUNCTION(ToStringInt), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString ToString(uint)", asFUNCTION(ToStringUInt), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString ToString(float)", asFUNCTION(ToStringFloat), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString ToString(double)", asFUNCTION(ToStringDouble), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString ToString(bool)", asFUNCTION(ToStringBool), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("void check(bool, const bCString &in)", asFUNCTION(Check), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("float GetFrameTime()", asFUNCTION(GetFrameTime), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("uint GetTimeStamp()", asFUNCTION(GetTimeStamp), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int GetApiVersion()", asFUNCTION(GetApiVersion), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool IsModActive(const bCString &in)", asFUNCTION(IsModActive), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetModVersion(const bCString &in)", asFUNCTION(GetModVersion), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString CallMod(const bCString &in mod, const bCString &in func, const bCString &in arg)", asFUNCTION(CallModScript),
                                       asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool ModFunctionExists(const bCString &in mod, const bCString &in func)", asFUNCTION(ModFunctionExistsScript),
+    G3ASM_REG(e->RegisterGlobalFunction("bool ModFunctionExists(const bCString &in mod, const bCString &in func)", asFUNCTION(ModFunctionExistsScript),
                                       asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int SendModMessage(const bCString &in topic, const bCString &in data)", asFUNCTION(SendModMessageScript),
+    G3ASM_REG(e->RegisterGlobalFunction("int SendModMessage(const bCString &in topic, const bCString &in data)", asFUNCTION(SendModMessageScript),
                                       asCALL_CDECL));
     if (!RegisterModSettingsBindings(e)) ok = false;
-    OG3_REG(e->RegisterGlobalFunction("void SetWindowTitle(const bCString &in)", asFUNCTION(SetWindowTitle), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool IsKeyDown(int)", asFUNCTION(IsKeyDown), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("void PlaySystemSound()", asFUNCTION(PlaySystemSound), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("void SetWindowTitle(const bCString &in)", asFUNCTION(SetWindowTitle), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool IsKeyDown(int)", asFUNCTION(IsKeyDown), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("void PlaySystemSound()", asFUNCTION(PlaySystemSound), asCALL_CDECL));
     static const int* keys[] = {&kKeyF1, &kKeyF2, &kKeyF3, &kKeyF4,  &kKeyF5,  &kKeyF6,
                                 &kKeyF7, &kKeyF8, &kKeyF9, &kKeyF10, &kKeyF11, &kKeyF12};
     for (int i = 0; i < 12; ++i) {
         char d[32];
         std::snprintf(d, sizeof d, "const int KEY_F%d", i + 1);
-        OG3_REG(e->RegisterGlobalProperty(d, const_cast<int*>(keys[i])));
+        G3ASM_REG(e->RegisterGlobalProperty(d, const_cast<int*>(keys[i])));
     }
     return ok;
 }
@@ -679,7 +679,7 @@ bool ScriptHost::Init(LogFn log) {
     const bool ok = RegisterAll(engine_) && RegisterEngineBindings(engine_);
     ctx_ = engine_->CreateContext();
     char b[160];
-    std::snprintf(b, sizeof b, "AngelScript %s bereit (Skript-Schnittstelle Version %d)%s", asGetLibraryVersion(), OG3_SCRIPT_API_VERSION,
+    std::snprintf(b, sizeof b, "AngelScript %s bereit (Skript-Schnittstelle Version %d)%s", asGetLibraryVersion(), G3ASM_SCRIPT_API_VERSION,
                   ok ? "" : " - mit Registrierungsfehlern");
     Log(b);
     return ok;
@@ -773,7 +773,7 @@ bool ScriptHost::Load(const std::string& path) {
 }
 
 // Gleitkomma-Zustand der Engine schuetzen (gefunden 2026-11-06): Genome rechnet mit x87-Steuerwort 007F (24 Bit Genauigkeit, bCFPUAdmin). Beim ersten Skriptaufruf,
-// der in C++ springt, setzt etwas im Patch die x87-Einheit auf den Windows-Standard 037F (64 Bit) zurueck. Ohne Schutz rechnete die Engine danach die ganze Sitzung
+// der in C++ springt, setzt etwas im Modkit die x87-Einheit auf den Windows-Standard 037F (64 Bit) zurueck. Ohne Schutz rechnete die Engine danach die ganze Sitzung
 // mit falscher Genauigkeit weiter: Gebaeude-Texturen blieben nach dem Laden verwaschen. Jeder Skriptaufruf stellt deshalb x87-Steuerwort und MXCSR danach wieder her.
 namespace {
 unsigned short FpuControlWord() {
@@ -1284,9 +1284,9 @@ static std::vector<std::string> DiscoverModsOfKind(const std::string& dir, unsig
         for (size_t i = 0; i < result.size() && !changed; ++i) {
             const ModMeta& m = meta[result[i]];
             std::string why;
-            if (m.api > OG3_SCRIPT_API_VERSION)
-                why = "braucht Skript-Schnittstelle " + std::to_string(m.api) + ", vorhanden ist " + std::to_string(OG3_SCRIPT_API_VERSION) +
-                      " (OG3-Patch aktualisieren)";
+            if (m.api > G3ASM_SCRIPT_API_VERSION)
+                why = "braucht Skript-Schnittstelle " + std::to_string(m.api) + ", vorhanden ist " + std::to_string(G3ASM_SCRIPT_API_VERSION) +
+                      " (G3ASM aktualisieren)";
             for (size_t j = 0; j < m.deps.size() && why.empty(); ++j) {
                 const ModDep& d = m.deps[j];
                 const std::string dep = spelled(result, d.name);
@@ -1570,4 +1570,4 @@ void ScriptHost::Check(bool ok, const char* msg) {
     }
 }
 
-}   // namespace og3p
+}   // namespace g3asm

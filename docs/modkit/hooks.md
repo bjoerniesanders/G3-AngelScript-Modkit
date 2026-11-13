@@ -6,7 +6,7 @@ ursprünglichen Funktion auf. Diese Mechanik entspricht dem `override` mit `Supe
 ```angelscript
 // Jens' Arbeit nur zwischen 8 und 20 Uhr Spielzeit anbieten
 bool Override_InfoAvailable(const bCString &in info, const bCString &in owner, const bCString &in quest) {
-    if (info == "OG3_Jens_Job") {
+    if (info == "G3ASM_Jens_Job") {
         int h = GetGameHour();
         if (h >= 0 && (h < 8 || h >= 20)) return false;   // Option verborgen, Original wird gar nicht gefragt
     }
@@ -80,7 +80,7 @@ bool Override_ReceiveItem(Entity giver, Entity receiver, const bCString &in name
 - **Rückgabe** ist immer `bool`.
 - Kein allgemeiner Treffer-Hook vor der Schadensberechnung: in der Game.dll fehlt dafür ein exportierter Einstiegspunkt. `Override_Script("AssessHit")` ersetzt die ganze Berechnung, `Override_MonsterDamage` greift an einer Stelle mittendrin.
 - Ein Override sollte schnell sein. `Override_InfoAvailable` wird für jede Option jedes NPCs beim Aufbau des Menüs aufgerufen.
-  Der Patch ruft sie nur auf, wenn irgendein Mod die Funktion definiert, sonst kostet es nichts.
+  Das Modkit ruft sie nur auf, wenn irgendein Mod die Funktion definiert, sonst kostet es nichts.
 
 ## Beispiel-Mod
 

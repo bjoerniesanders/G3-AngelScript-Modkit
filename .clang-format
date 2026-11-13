@@ -1,4 +1,4 @@
-# Stil des OG3-Patches (clang-format). Aufruf: clang-format -i src/*.cpp src/*.h tools/*.cpp tests/*.cpp
+# Stil von G3ASM (clang-format). Aufruf: clang-format -i src/*.cpp src/*.h tools/*.cpp tests/*.cpp
 Language: Cpp
 BasedOnStyle: LLVM
 IndentWidth: 4

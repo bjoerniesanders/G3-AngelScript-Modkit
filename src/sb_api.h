@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 #pragma once
 // Bruecke zur geladenen SharedBase.dll (Original, Classic oder og3-Nachbau): Funktionszeiger werden ueber die dekorierten Exportnamen
 // aufgeloest, die Huellklassen haben exakt das Speicherlayout der Genome-Typen. Damit arbeiten Skripte auf echten Original-Objekten
@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <string>
 
-namespace og3p {
+namespace g3asm {
 
 struct SbApi {
     // bCString
@@ -130,4 +130,4 @@ struct SMat3 {
 };   // zeilenweise (Element i = Zeile i/3, Spalte i%3)
 static_assert(sizeof(SVec3) == 12 && sizeof(SQuat) == 16 && sizeof(SMat3) == 36 && sizeof(SMat4) == 64, "Layouts");
 
-}   // namespace og3p
+}   // namespace g3asm

@@ -1,4 +1,4 @@
-# Statische Pruefung des OG3-Patches (clang-tidy). Aufruf: powershell -NoProfile -File tools\run_clang_tidy.ps1 -BuildDir <Build-Ordner>
+# Statische Pruefung von G3ASM (clang-tidy). Aufruf: powershell -NoProfile -File tools\run_clang_tidy.ps1 -BuildDir <Build-Ordner>
 # Bewusst eine kleine Auswahl: Fehlerquellen und teure Stellen, keine Stil- und Umbenennungsregeln.
 # Nicht dabei, weil Hook-Code sie zwangslaeufig bricht: cppcoreguidelines-pro-type-* (reinterpret_cast auf Spielobjekte, Zeigerarithmetik mit
 # festen Offsets), cppcoreguidelines-avoid-magic-numbers (Offsets und RVAs), modernize-* ausser den zwei unten.

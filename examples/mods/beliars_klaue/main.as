@@ -3,7 +3,7 @@
 // erzeugt, der Held als ihr Besitzer eingetragen (gCInteraction_PS.Owner; so laeuft der Schaden durch die echte Treffer-Kette: Quelle Smn_Lightning, Besitzer Held, Art 6 = Blitz)
 // und der Blitz-Effekt des Zaubers "Blitz beschwoeren" am Opfer gestartet.
 // Grenzen (gemessen): Die Schadenshoehe rechnet das Skript ZS_Lightning selbst (17 bis ueber 500), der Blitz kann mehrere NPCs im Umkreis treffen, auch Verbuendete.
-// Deshalb gibt es eine Wartezeit WARTE zwischen zwei Blitzen. Abschalten: "-beliars_klaue" in og3\mods\load_order.txt.
+// Deshalb gibt es eine Wartezeit WARTE zwischen zwei Blitzen. Abschalten: "-beliars_klaue" in g3asm\mods\load_order.txt.
 const bCString WAFFE = "It_1H_OrcSlayer_01";
 const bCString SCHADEN_VORLAGE = "Smn_Lightning";
 const bCString OPTIK = "eff_magic_summonlightning_target_01";

@@ -3,7 +3,7 @@
 Alle Angaben hier sind **geprüft**. Jede Tabelle nennt ihre Quelle:
 
 - **SDK**: Aufzählung aus dem Gothic-3-SDK (`GameEnum.h`), von uns übernommen.
-- **gemessen**: im Spiel beobachtet (Protokolle des OG3-Patch, Stand 2026-11-06).
+- **gemessen**: im Spiel beobachtet (Protokolle von G3ASM, Stand 2026-11-06).
 - **Dump**: mit der Mod `reference_dump` aus dem laufenden Spiel gelesen (Abschnitt 9).
 
 Was hier nicht steht, ist nicht belegt. Im Umlauf befindliche Listen mit Namen wie `Spell_Fireball`, `DamageType_Edge` oder `Strength` stimmen nicht mit dem Spiel überein
@@ -56,7 +56,7 @@ Quelle: SDK `gEItemQuality` (Bitmaske am Inventarstapel, bei `gCItem_PS` Offset 
 | 64 | `QUALITY_BLESSED` | `HUD_Quality_Blessed` (Symbol 2) |
 | 128 | `QUALITY_FORGED` | `HUD_Quality_Selfmade` (Symbol 3) |
 | 256 | `QUALITY_WORN` | `HUD_Quality_Worn` (Symbol 4) |
-| **512** | `QUALITY_LIFESTEAL` | eigenes Bit dieses Patches; `HUD_Quality_Lifesteal` aus der Mod-Stringtabelle |
+| **512** | `QUALITY_LIFESTEAL` | eigenes Bit dieses Modkits; `HUD_Quality_Lifesteal` aus der Mod-Stringtabelle |
 
 Die Anzeige (gemessen im Assembler, `Game.dll+0xA3DF0`) kennt nur die Bits 4, 32, 64, 128 und 256. Die Präfixe der Zeilen sind `(+10)` bei Scharf, Gesegnet und Selbstgeschmiedet, leer bei Vergiftet und Abgenutzt.
 
@@ -122,7 +122,7 @@ Quelle: SDK `gEAIMode` (`gCScriptRoutine_PS`). Zustände wie „besiegt“ und �
 
 ## 7. Attribute
 
-Quelle: Doku des Patches (`api-reference.md`) und Messung. Kennungen sind Zeichenketten wie `"STR"`.
+Quelle: Doku des Modkits (`api-reference.md`) und Messung. Kennungen sind Zeichenketten wie `"STR"`.
 
 | Kennung | Bedeutung | gemessen |
 |---|---|---|
@@ -157,7 +157,7 @@ Im Spiel sind `ReqAttrib2…4Op` in den Eigenschaftsdaten fälschlich als `ReqAt
 
 **Wichtig zur Suche:** `FindTemplateNames` findet Namen, die mit dem Suchtext **beginnen**. Die Suche ignoriert außerdem die Groß-/Kleinschreibung. Eine Gruppe wie `Teleport` enthält deshalb `Teleport_Ardea`, aber nicht `Spl_Teleport_Ardea`. Bis Version 28 war die Trefferzahl auf 200 begrenzt (die Gruppe `Spl_` hatte genau 200 Einträge und kann abgeschnitten sein, bis zum nächsten Dump).
 
-Die Mod `reference_dump` (Ziffernblock `/`) schreibt Attribute und Vorlagen-Gruppen ins Protokoll (`og3_patch.log`, Zeilen `[reference_dump] …`). Der Text zwischen den Markierungen
+Die Mod `reference_dump` (Ziffernblock `/`) schreibt Attribute und Vorlagen-Gruppen ins Protokoll (`g3asm.log`, Zeilen `[reference_dump] …`). Der Text zwischen den Markierungen
 wird von `tools/reference_from_log.py` aus dem Protokoll erzeugt und nicht von Hand gepflegt.
 
 <!-- DUMP-ANFANG -->

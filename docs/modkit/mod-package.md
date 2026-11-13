@@ -1,30 +1,35 @@
 # Mod-Ordner und Installation
 
-## Installation des Patches
+## Installation
 
-Gothic 3 muss beendet sein.
+Voraussetzung: Gothic 3 mit Community Patch 1.75 und Parallel-Universe-Patch. Gothic 3 muss beendet sein. Im entpackten Release-Ordner:
 
 ```
-powershell -NoProfile -File G:\OpenGothic3\tools\install_patch.ps1 [-Game G:\Gothic3]
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\install_loader.ps1 -Game "<Spielordner>" -BuildDir bin
 ```
 
 Das Skript
-- sichert `dbghelp.dll` und `og3_hooks.ini` nach `<Spiel>\og3_backup\patch_<Zeit>\`,
-- kopiert den Proxy (`dbghelp.dll`) und `og3_patch.dll` in den Spielordner,
-- legt `og3\scripts\` und `og3\mods\` an und setzt in `og3_hooks.ini` `[patch] enable=1`.
+- prüft die Voraussetzungen und bricht ab, wenn etwas fehlt,
+- legt die `dbghelp.dll` des Spiels als `dbghelp_orig.dll` beiseite und sichert sie nach `<Spiel>\g3asm_backup\loader_<Zeit>\`,
+- kopiert den Loader (als `dbghelp.dll`) und `g3asm.dll` in den Spielordner,
+- legt `g3asm.ini`, `g3asm\scripts\` (mit einem Mini-Mod) und `g3asm\mods\` an,
+- zieht eine ältere Installation mit den früheren Namen (`og3_patch.dll`, `og3_patch.ini`, Ordner `og3\`) auf die neuen Namen um.
 
-Rückbau: `install_patch.ps1 -Uninstall` stellt die Sicherung wieder her. Die Skripte unter `og3\` bleiben liegen.
+Rückbau: dasselbe mit `-Uninstall` statt `-BuildDir bin` stellt die originale `dbghelp.dll` wieder her und entfernt `g3asm.dll`. `g3asm.ini` und der Ordner
+`g3asm\` bleiben liegen.
 
-Änderungen an `og3_patch.dll` (C++) brauchen einen Neustart des Spiels. Änderungen an Skripten nicht (Hot-Reload).
+Änderungen an `g3asm.dll` (C++) brauchen einen Neustart des Spiels. Änderungen an Skripten nicht (Hot-Reload).
 
 ## Aufbau
 
 ```
 <Gothic 3>\
-  og3_patch.dll
-  og3_patch.log                 Protokoll (print() und Fehlermeldungen)
-  og3_hooks.ini                 Einstellungen, Abschnitt [patch]
-  og3\
+  g3asm.dll
+  g3asm.log                 Protokoll (print() und Fehlermeldungen)
+  g3asm.ini                 Einstellungen, Abschnitte [patch] und [loader]
+  g3asm_loader.log          Protokoll des Loaders (Absturzkandidaten)
+  dbghelp.dll               der Loader; dbghelp_orig.dll ist die des Spiels
+  g3asm\
     scripts\main.as             Einzelskript (läuft als Mod "main", wenn vorhanden)
     mods\
       load_order.txt            optional
@@ -33,7 +38,7 @@ Rückbau: `install_patch.ps1 -Uninstall` stellt die Sicherung wieder her. Die Sk
       mein_mod\ScriptPatches\   optional: *.patch (Unified Diff auf Spieldateien, siehe Datei-Patches)
 ```
 
-Jeder Ordner unter `og3\mods\`, der eine `main.as` oder einen Ordner `ScriptPatches` enthält, ist ein Mod. Der Ordnername ist der Modname und steht im Protokoll in eckigen Klammern (`[mein_mod] ...`).
+Jeder Ordner unter `g3asm\mods\`, der eine `main.as` oder einen Ordner `ScriptPatches` enthält, ist ein Mod. Der Ordnername ist der Modname und steht im Protokoll in eckigen Klammern (`[mein_mod] ...`).
 Der Name `main` ist für das Einzelskript reserviert.
 
 Jeder Mod ist ein **eigenes AngelScript-Modul**: globale Variablen und Funktionen sind von anderen Mods getrennt, Namen können doppelt vorkommen.
@@ -73,14 +78,14 @@ Stringtabelle. Das Protokoll nennt den Grund einmal, zum Beispiel:
 ```
 [mein_mod] wird nicht geladen: braucht die Mod 'basis_mod' ab Version 1.1, vorhanden ist Version 1.0
 [mein_mod] wird nicht geladen: braucht die Mod 'andere_mod', die abgeschaltet ist (in load_order.txt mit +andere_mod zuschalten)
-[mein_mod] wird nicht geladen: braucht Skript-Schnittstelle 41, vorhanden ist 40 (OG3-Patch aktualisieren)
+[mein_mod] wird nicht geladen: braucht Skript-Schnittstelle 41, vorhanden ist 40 (G3ASM aktualisieren)
 ```
 
 - Fehlt ein benötigter Mod, ist er abgeschaltet oder wird er selbst nicht geladen, wird auch der Mod nicht geladen, der ihn braucht.
 - Versionen werden Teil für Teil als Zahlen verglichen: `1.10` ist neuer als `1.9`, `1.2` gleich `1.2.0`. Text hinter einer Zahl zählt nicht (`1.0-beta` = `1.0`).
   Hat der benötigte Mod keine `version`, erfüllt er keine Mindestversion.
 - `api` ersetzt die Prüfung mit `GetApiVersion()` im Skript: Fehlt eine Funktion, scheitert sonst schon das Übersetzen, und der Spieler sieht nur einen
-  Übersetzungsfehler. Mit `api` sieht er, dass der Patch zu alt ist. Patches vor Version 40 kennen `api` und `requires` nicht und ignorieren sie.
+  Übersetzungsfehler. Mit `api` sieht er, dass das Modkit zu alt ist. Fassungen vor Version 40 kennen `api` und `requires` nicht und ignorieren sie.
 - Brauchen sich zwei Mods gegenseitig, meldet das Protokoll den Kreis; beide laden in der Reihenfolge von `load_order.txt`.
 - Ändert sich `mod.ini` oder `load_order.txt` im laufenden Spiel, gilt das beim nächsten Scan (einmal je Sekunde, mit `hotreload=1`).
 - Im Skript: `IsModActive("name")` und `GetModVersion("name")` für optionale Zusammenarbeit mit anderen Mods, siehe [API-Referenz](api-reference.md).
@@ -100,17 +105,17 @@ Anzeige=ja
 ```
 
 Das Skript liest sie mit `GetModSetting("Faktor")`, `GetModSettingFloat(...)` usw. und kann eigene Werte mit `SetModSetting` speichern. Die landen in
-`<Spiel>\og3\settings\<Mod>.ini`, nie in der `mod.ini`; ein Update des Mods behält sie also. Wer eine Einstellung von Hand ändert, trägt sie dort ein
+`<Spiel>\g3asm\settings\<Mod>.ini`, nie in der `mod.ini`; ein Update des Mods behält sie also. Wer eine Einstellung von Hand ändert, trägt sie dort ein
 (Abschnitt `[settings]`); sie gilt nach dem Neuladen des Mods (Hot-Reload) oder einem Neustart. Jeder Mod sieht nur seine eigenen Werte.
 
-## Einstellungen: `og3_patch.ini`
+## Einstellungen: `g3asm.ini`
 
 ```
 [patch]
-enable=1                    ; 1 = Patch laden
-script=og3\scripts\main.as  ; Einzelskript, relativ zum Spielordner oder absolut
+enable=1                    ; 1 = Modkit laden
+script=g3asm\scripts\main.as  ; Einzelskript, relativ zum Spielordner oder absolut
 hotreload=1                 ; Skripte bei Dateiänderung neu laden (Prüfung einmal je Sekunde)
-mods=og3\mods               ; Mod-Ordner
+mods=g3asm\mods               ; Mod-Ordner
 hooks=1                     ; 0 = keine Spielereignisse (Hooks auf Game.dll) einhängen
 filepatches=1               ; 0 = ScriptPatches (Datei-Patches) nicht anwenden
 navevents=0                 ; 1 = OnEnter/OnLeave melden auch interne Navigationszonen "Nav_*"
@@ -123,16 +128,16 @@ anispeedlog=0               ; 1 = Messung: wer die Abspielgeschwindigkeit von An
 
 ## Protokoll
 
-`<Spiel>\og3_patch.log`, während des Spiels lesbar. Es enthält:
+`<Spiel>\g3asm.log`, während des Spiels lesbar. Es enthält:
 
 - die Ausgaben deiner `print()`-Aufrufe mit `[Modname]` davor,
 - Übersetzungsfehler mit Datei, Zeile und Spalte (der Mod wird dann nicht geladen),
 - Laufzeitfehler (Funktion und Zeile), zum Beispiel Division durch 0,
-- Hinweise des Patches (`Spielereignisse: 6 von 6 Hooks aktiv`, `Skript geladen: ...`).
+- Hinweise des Modkits (`Spielereignisse: 6 von 6 Hooks aktiv`, `Skript geladen: ...`).
 
 ## Hot-Reload
 
-Speicherst du `main.as` (oder legst einen neuen Mod-Ordner an), erkennt der Patch das innerhalb einer Sekunde:
+Speicherst du `main.as` (oder legst einen neuen Mod-Ordner an), erkennt das Modkit das innerhalb einer Sekunde:
 
 1. Beim Neuladen eines Mods läuft sein `OnShutdown()`.
 2. Das neue Skript wird übersetzt. Bei Fehlern bleibt der Mod entladen, bis du die Datei wieder änderst.

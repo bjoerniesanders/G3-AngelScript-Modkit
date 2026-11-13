@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Weitere Ereignisse aus exportierten Funktionen (Skript-Schnittstelle ab Version 35, Roadmap 7.3; Beruehrung, Haendlerware, Verwandlung ab 37).
 //   Konsole:      Engine.dll eCConsole::OnExecute(const bCString &eingabe, bCString &ausgabe) -> bool
 //                 Override_ConsoleCommand(zeile): true ohne Super() = Befehl gehoert dem Mod; Antwort mit SetConsoleReply(text)
@@ -19,7 +19,7 @@
 #include "sb_api.h"
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 ScriptHost* g_host = nullptr;
@@ -342,8 +342,8 @@ bool __stdcall HCmStart(void* args, void* spu) {
 
 bool RegisterMoreEventBindings(asIScriptEngine* e) {
     bool ok = true;
-    OG3_REG(e->RegisterGlobalFunction("void SetConsoleReply(const bCString &in text)", asFUNCTION(SetConsoleReplyScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool OpenConsole()", asFUNCTION(OpenConsoleScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("void SetConsoleReply(const bCString &in text)", asFUNCTION(SetConsoleReplyScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool OpenConsole()", asFUNCTION(OpenConsoleScript), asCALL_CDECL));
     return ok;
 }
 
@@ -414,4 +414,4 @@ void MoreEventsFrame() {
     g_touchTicks.QuadPart = 0;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

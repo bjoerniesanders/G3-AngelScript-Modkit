@@ -5,7 +5,7 @@
 // nur der Rest der Lebenspunkte des Opfers.
 // Perk der Waffe: mit AUTO_PERK bekommt die Waffe PERK_WAFFE (Orkschlaechter) die Eigenschaft von selbst, sobald sie in der Hand oder auf dem Ruecken liegt, wie eine eingebaute Eigenschaft
 // der Waffe (die Taste schaltet dann nur noch andere Waffen um; an dieser Waffe setzt das Skript die Eigenschaft sofort wieder).
-// Zeigt: owner/inflictor in OnDamage, Qualitaet pro Slot lesen/setzen, eigener Text ueber die Mod-Stringtabelle. Abschalten: "-lifesteal_demo" in og3\mods\load_order.txt.
+// Zeigt: owner/inflictor in OnDamage, Qualitaet pro Slot lesen/setzen, eigener Text ueber die Mod-Stringtabelle. Abschalten: "-lifesteal_demo" in g3asm\mods\load_order.txt.
 const int LEBENSRAUB_PROZENT = 20;
 const int TASTE_LEBENSRAUB = 0x6A;   // Ziffernblock * (Ende, 0x23, kam bei einem Test nicht an)
 

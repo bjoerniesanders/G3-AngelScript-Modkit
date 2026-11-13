@@ -1,5 +1,5 @@
 // Beispiel-Mod: zeigt Spielereignisse (Kills, Items, Bereiche, Zauber) als Bildschirmtext und im Protokoll.
-// Installation: Ordner nach <Gothic3>\og3\mods\ereignisse kopieren. Abschalten: in og3\mods\load_order.txt "-ereignisse" eintragen.
+// Installation: Ordner nach <Gothic3>\g3asm\mods\ereignisse kopieren. Abschalten: in g3asm\mods\load_order.txt "-ereignisse" eintragen.
 // Bildschirmtext nur fuer den Helden (Items, Bereiche, Zauber); alles andere nur im Protokoll.
 bool IstHeld(Entity e) { return e.IsValid() && e == GetHero(); }
 

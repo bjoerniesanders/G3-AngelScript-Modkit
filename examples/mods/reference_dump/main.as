@@ -1,8 +1,8 @@
-// Referenz-Werkzeug (ab API 28): schreibt auf Tastendruck (Ziffernblock /) geprueft aus dem Spiel gelesene Listen ins Protokoll (og3_patch.log, Zeilen "[reference_dump] ..."):
+// Referenz-Werkzeug (ab API 28): schreibt auf Tastendruck (Ziffernblock /) geprueft aus dem Spiel gelesene Listen ins Protokoll (g3asm.log, Zeilen "[reference_dump] ..."):
 //   - die Attribut-Kennungen, die Quests des Spiels vergeben, und den Zustand des Helden (Wert/Grundwert/Maximum) fuer bekannte Kennungen
 //   - alle Vorlagen (Items, Geschosse, Zauber-Items, ...) nach Namensgruppen, mit Anzahl; grosse Gruppen werden gekuerzt
 //   - jeder zweite Druck (2., 4., ...): die GANZE Vorlagenliste (alle Namen) fuer docs/modkit/data/templates.txt; erzeugt tools/reference_from_log.py
-// Die Auswertung steht in docs/modkit/reference.md. Der Dump aendert nichts im Spiel. Abschalten: "-reference_dump" in og3\mods\load_order.txt.
+// Die Auswertung steht in docs/modkit/reference.md. Der Dump aendert nichts im Spiel. Abschalten: "-reference_dump" in g3asm\mods\load_order.txt.
 const int TASTE_DUMP = 0x6F;   // Ziffernblock /
 // Die Suche ignoriert Gross-/Kleinschreibung (gemessen): nur Grossbuchstaben abfragen, sonst verdoppelt sich die Arbeit mit jeder Ebene!
 const bCString ANFAENGE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";

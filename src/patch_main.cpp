@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// og3_patch.dll - offener Patch fuer Gothic 3 mit AngelScript-Modding (Meilenstein 1).
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// g3asm.dll - offener Patch fuer Gothic 3 mit AngelScript-Modding (Meilenstein 1).
 // Wird vom dbghelp-Proxy geladen (og3_hooks.ini [patch] enable=1) und arbeitet mit der geladenen SharedBase.dll (Original oder Nachbau).
 //
 // Einhaengen ohne Code-Eingriff (vertraeglich mit dem Parallel-Universe-Patch): die Importtabelle von Gothic3.exe wird fuer vier
@@ -10,8 +10,8 @@
 //   OnWorldActivate / OnWorldDeactivate -> gleichnamige Skript-Ereignisse
 // Beim Laden des Proxys sind die Importe der EXE eventuell noch nicht gebunden: ein Hilfsthread wartet darauf (hoechstens 60 s).
 //
-// ini [patch]: enable=0|1, script=og3\scripts\main.as (relativ zum Spielordner), hotreload=1
-// Protokoll: <Spielordner>\og3_patch.log
+// ini [patch]: enable=0|1, script=g3asm\scripts\main.as (relativ zum Spielordner), hotreload=1
+// Protokoll: <Spielordner>\g3asm.log
 #include <windows.h>
 #include <xmmintrin.h>
 
@@ -24,7 +24,7 @@
 #include "sb_api.h"
 #include "script_host.h"
 
-using namespace og3p;
+using namespace g3asm;
 
 namespace {
 
@@ -39,7 +39,7 @@ std::atomic<bool> g_initDone{false};
 bool g_mainRan = false;
 
 // Protokoll. Standard: sofort schreiben. Optional asynchron (ini [patch] asynclog=1): Der aufrufende Thread legt die Zeile nur in eine Warteschlange, ein
-// Hintergrund-Thread schreibt og3_patch.log und reicht die Zeilen an den Loader (og3_loader.log) weiter. Entstanden beim Suchen der verwaschenen Texturen;
+// Hintergrund-Thread schreibt g3asm.log und reicht die Zeilen an den Loader (g3asm_loader.log) weiter. Entstanden beim Suchen der verwaschenen Texturen;
 // das Schreiben war nicht die Ursache (die war fninit in der AngelScript-Aufrufbruecke, siehe CMakeLists.txt CLEAR_FPU_STACK).
 bool g_asyncLog = false;
 bool g_logWrite = true;   // ini [patch] logwrite=0: nach dem Start (main gelaufen) keine Protokollzeilen mehr (nur fuer Tests)
@@ -86,7 +86,7 @@ void Log(const std::string& s) {
     GetLocalTime(&t);
     char stamp[24];
     std::snprintf(stamp, sizeof stamp, "%02d:%02d:%02d.%03d ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
-    LogItem it{std::string(stamp) + s + "\n", "og3_patch: " + s};
+    LogItem it{std::string(stamp) + s + "\n", "g3asm: " + s};
     if (!g_asyncLog) {
         WriteItems(std::vector<LogItem>{std::move(it)});
         return;
@@ -214,7 +214,7 @@ void LogModuleVersion(const char* name) {
                   static_cast<unsigned long>(nt->FileHeader.TimeDateStamp), crcText, inGameDir ? "ja" : "nein");
     Log(b);
 }
-// Voraussetzungen: Community Patch 1.75 und Parallel-Universe-Patch (PU). Nur Pruefung und Protokoll, der Patch laeuft in jedem Fall weiter.
+// Voraussetzungen: Community Patch 1.75 und Parallel-Universe-Patch (PU). Nur Pruefung und Protokoll, das Modkit laeuft in jedem Fall weiter.
 // CP 1.75: PE-Zeitstempel der Gothic3.exe 4F959F4F (gleich in Entwicklerinstallation, Steam sauber und Steam gemoddet, gemessen 2026-11-13; die
 // Game.dll taugt nicht, gemoddete Installationen patchen sie binaer). PU: paru_s1.dll und scripts\Script_paru.dll im Spielordner.
 void LogPrerequisites() {
@@ -225,7 +225,7 @@ void LogPrerequisites() {
                     GetFileAttributesA((g_gameDir + "scripts\\Script_paru.dll").c_str()) != INVALID_FILE_ATTRIBUTES;
     Log(std::string("Voraussetzungen: Community Patch 1.75 ") + (cp ? "ja" : "NEIN") + ", Parallel-Universe-Patch " + (pu ? "ja" : "NEIN"));
     if (!cp || !pu)
-        Log("WARNUNG: OG3-Patch setzt Community Patch 1.75 und Parallel-Universe-Patch voraus; ohne sie ist er nicht getestet (Hooks pruefen ihre Bytes selbst)");
+        Log("WARNUNG: G3ASM setzt Community Patch 1.75 und Parallel-Universe-Patch voraus; ohne sie ist es nicht getestet (Hooks pruefen ihre Bytes selbst)");
 }
 void LogModuleVersions() {
     // Script.dll und Script_Game.dll laden erst nach OnPostInitializeModules (gemessen 2026-11-07); sie werden bei der ersten Weltaktivierung nachgetragen.
@@ -429,7 +429,7 @@ bool InitCommon(HMODULE sb, const char* gameDir, void (*hostLog)(const char*)) {
     g_hostLog = hostLog;
     g_gameDir = gameDir ? gameDir : "";
     if (!g_gameDir.empty() && g_gameDir.back() != '\\' && g_gameDir.back() != '/') g_gameDir += '\\';
-    g_log = _fsopen((g_gameDir + "og3_patch.log").c_str(), "w", _SH_DENYNO);   // waehrend des Spiels lesbar
+    g_log = _fsopen((g_gameDir + "g3asm.log").c_str(), "w", _SH_DENYNO);   // waehrend des Spiels lesbar
     if (!g_sb.Resolve(sb ? sb : GetModuleHandleA("SharedBase.dll"))) {
         Log("SharedBase-Exporte fuer bCString fehlen - Abbruch: " + g_sb.missing);
         return false;
@@ -442,9 +442,9 @@ bool InitCommon(HMODULE sb, const char* gameDir, void (*hostLog)(const char*)) {
 }   // namespace
 
 // Fuer Tests: Host ohne Spiel-Hooks anlegen
-extern "C" __declspec(dllexport) int og3_patch_init(HMODULE sharedBase, const char* logDir, void (*hostLog)(const char*)) {
+extern "C" __declspec(dllexport) int g3asm_init(HMODULE sharedBase, const char* logDir, void (*hostLog)(const char*)) {
     SetLoadDefaultOffMods(true);   // Testprogramm: auch Beispiel-Mods mit mod.ini enabled=0 laden (Kompilierpruefung aller Beispiele)
-    if (const char* ai = std::getenv("OG3_TEST_AITRACE")) {   // Testprogramm: Einhaengen von KI-Tracer und Geschwindigkeitsmessung pruefen
+    if (const char* ai = std::getenv("G3ASM_TEST_AITRACE")) {   // Testprogramm: Einhaengen von KI-Tracer und Geschwindigkeitsmessung pruefen
         SetAiTraceOptions(*ai == '1', "", 50);
         SetAniSpeedLog(*ai == '1');
     }
@@ -452,15 +452,15 @@ extern "C" __declspec(dllexport) int og3_patch_init(HMODULE sharedBase, const ch
 }
 
 // Fuer Tests: Datei-Patches auf ein Testverzeichnis anwenden
-extern "C" __declspec(dllexport) int og3_patch_apply_patches(const char* gameDir, const char* modsDir) {
+extern "C" __declspec(dllexport) int g3asm_apply_patches(const char* gameDir, const char* modsDir) {
     return ApplyScriptPatches(gameDir, modsDir, [](const std::string& s) { Log(s); });
 }
 
 // Fuer Tests: Spielereignis-Hooks einhaengen (Game.dll muss geladen sein); Rueckgabe = Zahl aktiver Hooks
-extern "C" __declspec(dllexport) int og3_patch_install_hooks() { return InstallGameHooks(g_host); }
+extern "C" __declspec(dllexport) int g3asm_install_hooks() { return InstallGameHooks(g_host); }
 
 // Fuer Tests: Skriptdatei laden und main() ausfuehren; Rueckgabe = Anzahl fehlgeschlagener check()-Aufrufe, -1 bei Ladefehler
-extern "C" __declspec(dllexport) int og3_patch_run_file(const char* path) {
+extern "C" __declspec(dllexport) int g3asm_run_file(const char* path) {
     const DWORD attr = GetFileAttributesA(path);
     const bool dirMode = attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY);
     if (dirMode) {   // Mod-Ordner (Tests)
@@ -546,10 +546,10 @@ extern "C" __declspec(dllexport) int og3_patch_run_file(const char* path) {
 }
 
 // Spielbetrieb (vom Proxy): Host anlegen und in die Importtabelle der EXE einhaengen
-extern "C" __declspec(dllexport) int og3_patch_start(HMODULE sharedBase, const char* ini, const char* gameDir,
+extern "C" __declspec(dllexport) int g3asm_start(HMODULE sharedBase, const char* ini, const char* gameDir,
                                                      void (*hostLog)(const char*)) {
     if (!InitCommon(sharedBase, gameDir, hostLog)) return 0;
-    char script[MAX_PATH] = "og3\\scripts\\main.as", modsRel[MAX_PATH] = "og3\\mods";
+    char script[MAX_PATH] = "g3asm\\scripts\\main.as", modsRel[MAX_PATH] = "g3asm\\mods";
     if (ini && *ini) {
         GetPrivateProfileStringA("patch", "script", script, script, MAX_PATH, ini);
         g_hotReload = GetPrivateProfileIntA("patch", "hotreload", 1, ini) != 0;

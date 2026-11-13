@@ -1,9 +1,9 @@
 // Hooks-Demo: Spielfunktionen abfangen (Override mit Super()).
-// 1) Jens gibt seine Mod-Arbeit ("OG3_Jens_Job") nur zwischen 8 und 20 Uhr Spielzeit: ausserhalb ist die Gespraechsoption verborgen.
+// 1) Jens gibt seine Mod-Arbeit ("G3ASM_Jens_Job") nur zwischen 8 und 20 Uhr Spielzeit: ausserhalb ist die Gespraechsoption verborgen.
 // 2) Jede Itemuebergabe an den Helden wird mitgeschrieben, bevor das Spiel sie ausfuehrt (Original laeuft wie gewohnt weiter).
-// Abschalten: in og3\mods\load_order.txt "-hooks_demo" eintragen.
+// Abschalten: in g3asm\mods\load_order.txt "-hooks_demo" eintragen.
 bool Override_InfoAvailable(const bCString &in info, const bCString &in owner, const bCString &in quest) {
-    if (info == "OG3_Jens_Job") {
+    if (info == "G3ASM_Jens_Job") {
         int h = GetGameHour();
         if (h >= 0 && (h < 8 || h >= 20)) return false;   // verborgen: Original nicht einmal gefragt
     }

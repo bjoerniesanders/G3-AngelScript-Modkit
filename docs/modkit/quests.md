@@ -48,10 +48,10 @@ Hinweise:
 ## Texte
 
 Die Namen im Questlog sind Text-IDs (`eCLocString`), die das Spiel in seiner Stringtabelle nachschlägt. Eine unbekannte ID liefert einen leeren Text.
-Der Patch fängt die Nachschlagefunktionen ab:
+Das Modkit fängt die Nachschlagefunktionen ab:
 
 - `RegisterText(id, text)` merkt sich einen Text für eine ID. Überall, wo das Spiel diese ID anzeigt, erscheint dein Text.
-- `SetQuestTopic(name, text)` und `SetQuestDescription(name, text)` legen dafür die IDs `OG3_QTOPIC_<Quest>` und `OG3_QDESC_<Quest>` an und tragen sie in die Quest ein.
+- `SetQuestTopic(name, text)` und `SetQuestDescription(name, text)` legen dafür die IDs `G3ASM_QTOPIC_<Quest>` und `G3ASM_QDESC_<Quest>` an und tragen sie in die Quest ein.
 
 Der Text wird als Windows-1252 gelesen (Umlaute funktionieren). Der Titel erscheint im Questlog (im Spieltest bestätigt).
 

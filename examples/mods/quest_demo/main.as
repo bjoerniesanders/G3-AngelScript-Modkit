@@ -1,8 +1,8 @@
 // Quest-Demo. Numblock 1 = Status der Demo-Quest zeigen, 2 = anlegen + starten, 3 = erfolgreich abschliessen, 4 = fehlgeschlagen, 5 = entfernen, 6 = XP auf 100 setzen.
 // Bild hoch = Quests auflisten (Statusverteilung, einzelne Eintraege im Protokoll), Bild runter = Infos/Dialoge im Protokoll ansehen, Einfg = Quest-Dateien neu laden.
 // (Numblock 7, 8, 9 sind Debug-Tasten des Spiels und werden von den Beispiel-Mods nicht benutzt; siehe docs/modkit/examples.md, Tastenbelegung.)
-// Zeigt, was das Questsystem des Spiels fuer Skripte kann. Abschalten: in og3\mods\load_order.txt "-quest_demo" eintragen.
-const bCString Q = "OG3_DemoQuest";
+// Zeigt, was das Questsystem des Spiels fuer Skripte kann. Abschalten: in g3asm\mods\load_order.txt "-quest_demo" eintragen.
+const bCString Q = "G3ASM_DemoQuest";
 
 bCString StatusText(int s) {
     if (s == QUEST_OPEN) return "offen";

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Datei-Patches ("Script Patches"): Mods liefern Unified-Diff-Dateien <Mod>\ScriptPatches\*.patch, die auf die Datendateien des Spiels (Quests, Infos, ...) angewendet werden,
 // BEVOR das Spiel sie liest. Das Spiel liest seine Textdaten (z. B. Data\Quests.pak -> G3_World_01\<Name>_quest_G3_World_01.quest) ueber das Dateisystem-Modul, bei dem
-// physische Dateien Vorrang vor Archiveintraegen haben. Der Patch erzeugt deshalb die gepatchte Fassung als physische Datei unter <Spiel>\Data\<Archiv>\<Pfad>
-// (Overlay); das Archiv selbst bleibt unveraendert. Bei jedem Start werden die zuletzt erzeugten Overlay-Dateien (Liste og3\patched_files.txt) entfernt und alles
+// physische Dateien Vorrang vor Archiveintraegen haben. Das Modkit erzeugt deshalb die gepatchte Fassung als physische Datei unter <Spiel>\Data\<Archiv>\<Pfad>
+// (Overlay); das Archiv selbst bleibt unveraendert. Bei jedem Start werden die zuletzt erzeugten Overlay-Dateien (Liste g3asm\patched_files.txt) entfernt und alles
 // neu aus dem Original berechnet - Mods lassen sich so ohne Spuren entfernen und mehrere Mods stapeln ihre Patches in Ladereihenfolge.
 //
 // Pfade im Diff: a/Data/<Archiv>/<Pfad im Archiv> bzw. b/..., z. B. b/Data/Quests/G3_World_01/Abbas_Artefakt_quest_G3_World_01.quest. Ein Eintrag --- /dev/null legt eine neue Datei an.
@@ -21,7 +21,7 @@
 
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 using Log = std::function<void(const std::string&)>;
@@ -367,7 +367,7 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
     std::string gameDir = gameDirIn;
     if (!gameDir.empty() && gameDir.back() != '\\' && gameDir.back() != '/') gameDir += '\\';
     gameDir = Win(gameDir);
-    const std::string manifest = gameDir + "og3\\patched_files.txt";
+    const std::string manifest = gameDir + "g3asm\\patched_files.txt";
 
     // 1) Overlay-Dateien des letzten Laufs entfernen
     std::string old;
@@ -482,4 +482,4 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
     return written;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

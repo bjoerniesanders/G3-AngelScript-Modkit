@@ -1,6 +1,6 @@
-"""Rundlauf-Test fuer og3_packmod: echte Gothic-3-Archive (z. B. Community-.mod) mit einem unabhaengigen Python-Leser entpacken, mit og3_packmod neu packen und
+"""Rundlauf-Test fuer g3asm_packmod: echte Gothic-3-Archive (z. B. Community-.mod) mit einem unabhaengigen Python-Leser entpacken, mit g3asm_packmod neu packen und
 Namen, Inhalte, geloeschte Eintraege und Kopf vergleichen.
-Aufruf: python -I tests/packmod_roundtrip.py <og3_packmod.exe> <Archiv> [<Archiv> ...]
+Aufruf: python -I tests/packmod_roundtrip.py <g3asm_packmod.exe> <Archiv> [<Archiv> ...]
 Rueckgabe 0 = alle Archive stimmen ueberein."""
 import os
 import shutil
@@ -69,7 +69,7 @@ def main():
     bad = 0
     for arc in sys.argv[2:]:
         h0, n0, dirs0, files0 = parse(arc)
-        tmp = tempfile.mkdtemp(prefix='og3pack_')
+        tmp = tempfile.mkdtemp(prefix='g3asmpack_')
         try:
             src = os.path.join(tmp, 'src')
             for name, f in files0.items():

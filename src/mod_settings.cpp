@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Einstellungen je Mod (Skript-Schnittstelle ab Version 44). Jeder Mod liest und schreibt nur seine eigenen Werte (Mod = der gerade laufende Mod).
 //   Vorgaben:  <Mod>\mod.ini, Abschnitt [settings] (liefert der Mod-Autor mit, wird nie geschrieben)
-//   Benutzer:  <Spiel>\og3\settings\<Mod>.ini, Abschnitt [settings] (schreibt SetModSetting; bleibt bei einem Update des Mods erhalten)
+//   Benutzer:  <Spiel>\g3asm\settings\<Mod>.ini, Abschnitt [settings] (schreibt SetModSetting; bleibt bei einem Update des Mods erhalten)
 // Lesen: Benutzerwert, sonst Vorgabe, sonst der Standard aus dem Aufruf. Schluessel ohne Beachtung von Gross-/Kleinschreibung.
 // Die Dateien werden einmal je Mod gelesen und zwischengespeichert; beim Neuladen des Mods (Hot-Reload) wird neu gelesen. Von Hand geaenderte
 // Dateien gelten also nach dem Neuladen des Mods oder einem Neustart. Ohne Mod-Ordner (Einzelskript) gibt es nur Vorgaben, Schreiben schlaegt fehl.
-// Testprogramm: Umgebungsvariable OG3_SETTINGS_DIR ersetzt den Ordner fuer Benutzerwerte.
+// Testprogramm: Umgebungsvariable G3ASM_SETTINGS_DIR ersetzt den Ordner fuer Benutzerwerte.
 #include <windows.h>
 
 #include <angelscript.h>
@@ -21,7 +21,7 @@
 #include "sb_api.h"
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 struct Entry {
@@ -81,7 +81,7 @@ void ReadSection(const std::string& path, std::map<std::string, Entry>& out) {
 std::string UserDir() {
     // Windows-Umgebung statt getenv: das Testprogramm setzt die Variable mit seiner eigenen C-Laufzeit, die DLL hat eine andere
     char env[MAX_PATH];
-    const DWORD n = GetEnvironmentVariableA("OG3_SETTINGS_DIR", env, sizeof env);
+    const DWORD n = GetEnvironmentVariableA("G3ASM_SETTINGS_DIR", env, sizeof env);
     if (n > 0 && n < sizeof env) return std::string(env);
     if (!ScriptHost::s_current) return std::string();
     std::string mods = ScriptHost::s_current->ModsDir();
@@ -137,7 +137,7 @@ bool WriteUser(const std::string& mod, const ModSettings& s) {
     const std::string path = dir + "\\" + mod + ".ini", tmp = path + ".tmp";
     FILE* f = nullptr;
     if (fopen_s(&f, tmp.c_str(), "wb") != 0 || !f) return false;
-    std::fprintf(f, "; Einstellungen des Mods %s (vom OG3-Patch geschrieben; Vorgaben stehen in der mod.ini des Mods)\r\n[settings]\r\n", mod.c_str());
+    std::fprintf(f, "; Einstellungen des Mods %s (von G3ASM geschrieben; Vorgaben stehen in der mod.ini des Mods)\r\n[settings]\r\n", mod.c_str());
     for (const auto& kv : s.user) std::fprintf(f, "%s=%s\r\n", kv.second.key.c_str(), kv.second.value.c_str());
     const bool ok = std::fflush(f) == 0;
     std::fclose(f);
@@ -212,14 +212,14 @@ void ModSettingsForget(const std::string& mod) {
 
 bool RegisterModSettingsBindings(asIScriptEngine* e) {
     bool ok = true;
-    OG3_REG(e->RegisterGlobalFunction("bCString GetModSetting(const bCString &in key, const bCString &in def = \"\")", asFUNCTION(GetSetting), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int GetModSettingInt(const bCString &in key, int def = 0)", asFUNCTION(GetSettingInt), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("float GetModSettingFloat(const bCString &in key, float def = 0)", asFUNCTION(GetSettingFloat), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool GetModSettingBool(const bCString &in key, bool def = false)", asFUNCTION(GetSettingBool), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool HasModSetting(const bCString &in key)", asFUNCTION(HasSetting), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetModSetting(const bCString &in key, const bCString &in value)", asFUNCTION(SetSetting), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool ResetModSetting(const bCString &in key)", asFUNCTION(ResetSetting), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetModSetting(const bCString &in key, const bCString &in def = \"\")", asFUNCTION(GetSetting), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int GetModSettingInt(const bCString &in key, int def = 0)", asFUNCTION(GetSettingInt), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("float GetModSettingFloat(const bCString &in key, float def = 0)", asFUNCTION(GetSettingFloat), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool GetModSettingBool(const bCString &in key, bool def = false)", asFUNCTION(GetSettingBool), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool HasModSetting(const bCString &in key)", asFUNCTION(HasSetting), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetModSetting(const bCString &in key, const bCString &in value)", asFUNCTION(SetSetting), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool ResetModSetting(const bCString &in key)", asFUNCTION(ResetSetting), asCALL_CDECL));
     return ok;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // PackMod: Ordner -> G3V0-Archiv. Format und Verhalten folgen G3PakDir (Quellcode im Union Starter, G3PakDef.pas/G3PakDir.pas) und den Archiven der Community:
 //   Kopf (0x30 Byte): Version 0, 'G3V0', Revision 0, Verschluesselung 0, Komprimierung, 'G3PD', OffsetToFiles = OffsetToFolders = Beginn des Verzeichnisses,
 //   OffsetToVolume = Ende des Verzeichnisses (= Dateigroesse - 4); danach Nutzdaten, Verzeichnis, 4 Nullbytes.
@@ -16,7 +16,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 constexpr uint32_t kProduct = 0x30563347;        // 'G3V0'
@@ -435,4 +435,4 @@ bool ReadArchiveEntry(const std::string& file, const ArchiveEntry& e, std::strin
     return ok;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

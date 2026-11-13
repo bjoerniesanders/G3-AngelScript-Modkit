@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 #pragma once
-// AngelScript-Host des OG3-Patches: Engine, Bindings der Genome-Grundtypen (ueber die geladene SharedBase), Laden der Mod-Skripte,
+// AngelScript-Host von G3ASM: Engine, Bindings der Genome-Grundtypen (ueber die geladene SharedBase), Laden der Mod-Skripte,
 // Ereignisse und Overrides fuer Skripte, Neuladen bei Dateiaenderung.
 //
-// Die Skript-Schnittstelle (Typen, Funktionen, Ereignisse, Override-Hooks, Version OG3_SCRIPT_API_VERSION) ist in docs/og3_patch.md
+// Die Skript-Schnittstelle (Typen, Funktionen, Ereignisse, Override-Hooks, Version G3ASM_SCRIPT_API_VERSION) ist in docs/g3asm.md
 // und docs/modkit/api-reference.md beschrieben; hier stehen nur die C++-Schnittstellen.
 #include <functional>
 #include <unordered_map>
 #include <string>
 #include <vector>
 
-#define OG3_SCRIPT_API_VERSION 46
+#define G3ASM_SCRIPT_API_VERSION 46
 
 class asIScriptEngine;
 class asIScriptContext;
@@ -20,7 +20,7 @@ class asIScriptFunction;
 struct HWND__;
 struct HINSTANCE__;
 
-namespace og3p {
+namespace g3asm {
 
 // Argument eines Spiel-Ereignisses fuer Skripte (siehe ScriptHost::CallEvent)
 struct EvArg {
@@ -132,8 +132,8 @@ inline void CheckRegistration(int r, const char* what, bool& ok) {
     ok = false;
     if (ScriptHost::s_current) ScriptHost::s_current->Log("Registrierung fehlgeschlagen (" + std::to_string(r) + "): " + what);
 }
-// Aufrufstelle: OG3_REG(engine->RegisterGlobalFunction(...)); braucht eine Variable "bool ok" im Gueltigkeitsbereich und gibt den Aufrufausdruck als Text mit aus
-#define OG3_REG(call) ::og3p::CheckRegistration((call), #call, ok)
+// Aufrufstelle: G3ASM_REG(engine->RegisterGlobalFunction(...)); braucht eine Variable "bool ok" im Gueltigkeitsbereich und gibt den Aufrufausdruck als Text mit aus
+#define G3ASM_REG(call) ::g3asm::CheckRegistration((call), #call, ok)
 
 // Eigenen Text fuer eine Text-ID registrieren (quest_bindings.cpp; installiert bei Bedarf die eCLocString-Hooks)
 void RegisterTextForId(const std::string& id, const std::string& text);
@@ -207,4 +207,4 @@ bool HookExport(HINSTANCE__* m, const char* sym, void* detour, void** orig, Scri
 // Unerwarteter Nullzeiger aus der Engine in einem Hook: einmal je Stelle protokollieren ("where" muss ein fester Text sein, er dient als Schluessel).
 void NoteNull(const char* where);
 
-}   // namespace og3p
+}   // namespace g3asm

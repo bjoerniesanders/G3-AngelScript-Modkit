@@ -5,7 +5,7 @@
 //   Numblock *      entfernt alle in dieser Sitzung erzeugten NPCs
 //   Numblock /      entfernt ALLE per SpawnNPC erzeugten Entities mit dem Suchtext im Namen, auch solche aus frueheren Sitzungen (nach dem Laden
 //                   eines Spielstands); Welt-NPCs bleiben (DestroyNPC lehnt Entities ausserhalb des Systemsektors ab)
-// Schaut der NPC vom Helden weg, BLICK_VERSATZ auf 180 setzen. Protokoll: og3_patch.log.
+// Schaut der NPC vom Helden weg, BLICK_VERSATZ auf 180 setzen. Protokoll: g3asm.log.
 const bCString SUCHE = "Diego";
 const float BLICK_VERSATZ = 0;
 array<Entity> erzeugt;

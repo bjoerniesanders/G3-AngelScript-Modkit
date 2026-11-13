@@ -1,8 +1,8 @@
 # Beispiele
 
-Die fertigen Mods liegen im Repository unter `examples/mods/` und werden mit `tools/install_patch.ps1` bzw. durch Kopieren nach `<Gothic 3>\og3\mods\` benutzt.
+Die fertigen Mods liegen im Repository unter `examples/mods/` und werden durch Kopieren nach `<Gothic 3>\g3asm\mods\` benutzt.
 
-**Alle Beispiele sind standardmäßig aus** (`mod.ini` mit `[mod] enabled=0` im Mod-Ordner). Zum Testen einen Mod in `og3\mods\load_order.txt` mit `+Name` zuschalten, z. B. `+lifesteal_demo`. Ein Spielstand, der mit einem Mod gespeichert wurde, braucht ihn beim Laden unter Umständen weiter (z. B. `perk_lifesteal`, siehe [Einschränkungen](limitations.md)).
+**Alle Beispiele sind standardmäßig aus** (`mod.ini` mit `[mod] enabled=0` im Mod-Ordner). Zum Testen einen Mod in `g3asm\mods\load_order.txt` mit `+Name` zuschalten, z. B. `+lifesteal_demo`. Ein Spielstand, der mit einem Mod gespeichert wurde, braucht ihn beim Laden unter Umständen weiter (z. B. `perk_lifesteal`, siehe [Einschränkungen](limitations.md)).
 
 ## 1. Protokoll aller Ereignisse (`ereignisse`)
 
@@ -68,7 +68,7 @@ Der Held nähert sich Jens (Kap Dun): er bittet um ein Wolfsfell, die Quest star
 Ausschnitt:
 
 ```angelscript
-const bCString NPC = "Jens", QUEST = "OG3_Jens_Wolfsfell", ITEM = "It_Wolf_Fur";
+const bCString NPC = "Jens", QUEST = "G3ASM_Jens_Wolfsfell", ITEM = "It_Wolf_Fur";
 
 void OnFrame(float dt) {
     timer += dt;
@@ -100,7 +100,7 @@ void OnKey(int vk, bool down) {
 
 ## 5. Quest-Werkzeuge (`quest_demo`)
 
-Numblock 1-6 und Bild hoch/runter, Einfg steuern die Demo-Quest `OG3_DemoQuest` (Numblock 1-6: Status zeigen, anlegen und starten, erfolgreich, fehlgeschlagen, entfernen, XP;
+Numblock 1-6 und Bild hoch/runter, Einfg steuern die Demo-Quest `G3ASM_DemoQuest` (Numblock 1-6: Status zeigen, anlegen und starten, erfolgreich, fehlgeschlagen, entfernen, XP;
 Bild hoch: alle Quests auflisten, Bild runter: Infos ansehen, Einfg: Quest-Dateien neu laden). Zum Ausprobieren der Quest-Funktionen und zum Herausfinden von Statuswerten.
 
 ## 7. Eigenschaften ansehen (`property_inspect`)
@@ -135,7 +135,7 @@ Ab Version 32. Beim ersten Weltstart prüft die Mod mit `ScriptExists`/`GetScrip
 (`AssessHit`, `MagicTeleport`, `IsDeadlyDamage`, ...) mit `WatchScript` an, reicht sie in `Override_Script` unverändert durch und schreibt die ersten
 Aufrufe je Name mit Self, Other, Zahl und Ergebnis ins Protokoll (`OnScript`). Strg + Ziffernblock + ruft lesende Skripte (`IsHumanoid`,
 `GetStaminaPoints`, `GetAttitude`, ...) per `CallScript` für den Helden und das anvisierte Entity auf. Standardmäßig aus (`+script_probe`).
-Mit `scriptlog=1` in `og3_patch.ini` schreibt der Patch zusätzlich alle 60 s die häufigsten Skriptnamen und den Zeitaufwand seiner Hooks.
+Mit `scriptlog=1` in `g3asm.ini` schreibt das Modkit zusätzlich alle 60 s die häufigsten Skriptnamen und den Zeitaufwand seiner Hooks.
 
 ## 10. Begleiter teleportieren mit (`teleport_party`)
 
@@ -170,7 +170,7 @@ Standardmäßig aus (`+learn_cost`).
 ## 15. Schema der Eigenschaften (`schema_dump`, Messmod)
 
 Ab Version 43. Ruft `DumpPropertySchema` bei den ersten beiden Weltaktivierungen auf (Hauptmenü, dann nach dem Laden) und schreibt
-`<Spiel>\og3\property_schema_1.json` und `_2.json`; die Zahl der Klassen steht im Protokoll. Keine Taste, etwa 0,1 s je Dump.
+`<Spiel>\g3asm\property_schema_1.json` und `_2.json`; die Zahl der Klassen steht im Protokoll. Keine Taste, etwa 0,1 s je Dump.
 Standardmäßig aus (`+schema_dump`).
 
 ## 16. Angriffsgeschwindigkeit (`attack_speed`, Messmod)
@@ -211,4 +211,4 @@ dazu Strg+Numblock 1-6. Frei sind außerdem Pos1, Bild hoch/runter, Einfg, Entf 
 - Zuerst mit `print()` herausfinden, welche Namen das Spiel verwendet, dann die Namen im Mod fest eintragen.
 - Eigene Mods klein anfangen und ein Ereignis nach dem anderen hinzufügen. Hot-Reload macht das schnell: speichern, 1 Sekunde warten, testen.
 - Ziffernblock-Tasten als Test-Auslöser verwenden, sie sind im Spiel unbelegt.
-- Mod abschalten: `-Name` in `og3\mods\load_order.txt`; Beispiel-Mods zuschalten: `+Name`.
+- Mod abschalten: `-Name` in `g3asm\mods\load_order.txt`; Beispiel-Mods zuschalten: `+Name`.

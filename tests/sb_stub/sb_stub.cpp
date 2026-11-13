@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 //
 // Ersatz-SharedBase.dll fuer Tests ohne Spieldateien (CI): exportiert unter den dekorierten Namen der Original-SharedBase genau die Funktionen,
-// die og3_patch.dll ueber src/sb_api.cpp aufloest (bCString, Vektoren, Quaternion, Matrizen, GE_MESSAGEF_INFO). Die Rechenregeln folgen dem
+// die g3asm.dll ueber src/sb_api.cpp aufloest (bCString, Vektoren, Quaternion, Matrizen, GE_MESSAGEF_INFO). Die Rechenregeln folgen dem
 // Original (Zeilenvektoren, Produktreihenfolge, Drehrichtung), die Rundung auf dem x87-Stapel ist nur angenaehert. Fuer Messungen am Verhalten
 // des Originals immer die echte SharedBase.dll nehmen.
 // Wie das Original importiert die DLL dbghelp.dll (MiniDumpWriteDump), damit auch der Loader-Test (tests/run_loader_test.ps1) damit laeuft.
@@ -406,4 +406,4 @@ extern "C" SB_API void __cdecl GE_MESSAGEF_INFO(const char* fmt, ...) {
 }
 
 // Haelt den Import von dbghelp.dll (MiniDumpWriteDump) wie beim Original fest; wird nie aufgerufen.
-extern "C" SB_API void* og3_sb_stub_dbghelp() { return reinterpret_cast<void*>(&MiniDumpWriteDump); }
+extern "C" SB_API void* g3asm_sb_stub_dbghelp() { return reinterpret_cast<void*>(&MiniDumpWriteDump); }

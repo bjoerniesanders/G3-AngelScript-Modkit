@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 """Liest G3V0-Archive (Gothic-3-.pak/.cpt/.p00/.m00/.mod): Verzeichnis anzeigen, Dateien ansehen und entpacken, auch komprimierte (zlib).
 
 Aufruf (nur Lesen; mit  python -I  starten):
@@ -7,8 +7,8 @@ Aufruf (nur Lesen; mit  python -I  starten):
   python -I tools/g3pak_read.py show    <Archiv> <Teilname> [Zeichen]   lesbare Zeichen der Datei(en) ausgeben (nicht lesbare Bytes als '.')
   python -I tools/g3pak_read.py extract <Archiv> <Teilname> <Ordner>    Datei(en) in den Ordner schreiben (Pfade aus dem Archiv, unterhalb des Ordners)
 
-Das Format ist das, das og3_packmod schreibt (siehe src/pack_mod.cpp): Kopf mit Verzeichnisversatz, Verzeichnis am Ende, je Datei Versatz, gepackte und
-echte Groesse, Komprimierung (0 gespeichert, sonst zlib). Dieses Werkzeug schliesst die Luecke, dass og3_packmod komprimierte Eintraege nur auflistet.
+Das Format ist das, das g3asm_packmod schreibt (siehe src/pack_mod.cpp): Kopf mit Verzeichnisversatz, Verzeichnis am Ende, je Datei Versatz, gepackte und
+echte Groesse, Komprimierung (0 gespeichert, sonst zlib). Dieses Werkzeug schliesst die Luecke, dass g3asm_packmod komprimierte Eintraege nur auflistet.
 Vorlagen (.tple) sind ein Eigenschaftsstrom (GENOMFLE/GENOMETP), kein Text; mit 'show' sieht man die Namen der Eigenschaften, die Werte stehen binaer.
 """
 import os

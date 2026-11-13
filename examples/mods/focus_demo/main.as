@@ -1,7 +1,7 @@
 // Fokus und Fadenkreuz.
 //   Pos1  meldet das anvisierte Entity (Fokus), das Entity unter dem Fadenkreuz und den Zielpunkt der Welt (Name, Abstand, Position, Weltmatrix)
 //   Entf  entfernt den NPC unter dem Fadenkreuz, wenn er per SpawnNPC erzeugt wurde (Welt-NPCs bleiben)
-// Protokoll: og3_patch.log.
+// Protokoll: g3asm.log.
 
 bCString Beschreibe(const bCString &in was, Entity e, Entity held) {
     if (!e.IsValid()) return was + ": nichts";

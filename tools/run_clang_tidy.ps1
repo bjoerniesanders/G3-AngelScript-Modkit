@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 # Runs clang-tidy (.clang-tidy in the repository root) over the patch sources. The Visual Studio generator writes no compile_commands.json,
 # so the compiler flags are passed explicitly; the third-party include folders come from the CMake build folder.
 #   powershell -NoProfile -File tools\run_clang_tidy.ps1 -BuildDir build32                  all sources
@@ -50,9 +50,9 @@ function Import-MsvcInclude {
 }
 $tidy = Find-ClangTidy
 Import-MsvcInclude
-$asInc = Find-Include "OG3P_ANGELSCRIPT_DIR" "angelscript\include\angelscript.h" "angelscript.h"
+$asInc = Find-Include "G3ASM_ANGELSCRIPT_DIR" "angelscript\include\angelscript.h" "angelscript.h"
 $asAddOn = Join-Path (Split-Path -Parent (Split-Path -Parent $asInc)) "add_on"
-$mhInc = Find-Include "OG3P_MINHOOK_DIR" "include\MinHook.h" "MinHook.h"
+$mhInc = Find-Include "G3ASM_MINHOOK_DIR" "include\MinHook.h" "MinHook.h"
 
 $Files = @($Files | ForEach-Object { $_ -split ',' } | Where-Object { $_ })   # powershell -File passes 'a,b' as one string
 if ($Changed) {

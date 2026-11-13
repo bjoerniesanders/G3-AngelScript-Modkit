@@ -7,9 +7,9 @@ Bauen, Testen und Einbau stehen in der [README](README.md), die Regeln fuer die 
 ## Vor jedem Commit
 1. Bauen (32 Bit) und die drei Testlaeufe aus der README: Selbsttest, `tests\mods`, Kompilierpruefung `examples\mods`
    (dort ist genau der eine Fehler "Override-Kette ueber mehrere Mods" erwartet).
-2. `powershell -NoProfile -File tools\check_no_fninit.ps1 -Dll <Build>\patch\og3_patch.dll` (siehe Gleitkomma).
+2. `powershell -NoProfile -File tools\check_no_fninit.ps1 -Dll <Build>\patch\g3asm.dll` (siehe Gleitkomma).
 3. `powershell -NoProfile -File tools\run_clang_tidy.ps1 -BuildDir <Build> -Changed -Strict` (siehe Statische Pruefung).
-4. Was das Verhalten im Spiel aendert, im Spiel pruefen und das Protokoll (`og3_patch.log`) lesen. Ohne Spieldateien geht nur der Teil mit der
+4. Was das Verhalten im Spiel aendert, im Spiel pruefen und das Protokoll (`g3asm.log`) lesen. Ohne Spieldateien geht nur der Teil mit der
    Ersatz-SharedBase (`tests/sb_stub`).
 
 ## Sprache
@@ -57,7 +57,7 @@ Das Spiel ist fremder, nicht geaenderter Code. Jeder Fehler hier ist ein Absturz
 Die Engine rechnet mit dem x87-Steuerwort `007F` (24 Bit). Ein einziges `fninit` stellt `037F` ein, und das Spiel rechnet den Rest der Sitzung
 falsch (verwaschene Gebaeude-Texturen, gemessen 2026-11-06).
 
-- Kein `fninit`, `fldcw`, `_controlfp` im Patch. AngelScript wird deshalb mit `CLEAR_FPU_STACK=emms` gebaut; `tools/check_no_fninit.ps1` prueft die DLL.
+- Kein `fninit`, `fldcw`, `_controlfp` im Modkit. AngelScript wird deshalb mit `CLEAR_FPU_STACK=emms` gebaut; `tools/check_no_fninit.ps1` prueft die DLL.
 - Jede neue Fremdbibliothek zuerst darauf pruefen.
 - Skriptaufrufe laufen ueber `ScriptHost::Execute`; nur dort wird der Gleitkomma-Zustand gesichert und wiederhergestellt.
 
@@ -69,7 +69,7 @@ falsch (verwaschene Gebaeude-Texturen, gemessen 2026-11-06).
 - Messpunkte und Diagnose haengen an einem ini-Schalter, der standardmaessig aus ist.
 
 ## Skript-Schnittstelle
-- Jede Aenderung an der Schnittstelle erhoeht `OG3_SCRIPT_API_VERSION` um 1; was erlaubt ist, steht in `docs/modkit/api-policy.md`.
+- Jede Aenderung an der Schnittstelle erhoeht `G3ASM_SCRIPT_API_VERSION` um 1; was erlaubt ist, steht in `docs/modkit/api-policy.md`.
 - **Erst messen, dann dokumentieren.** Eine neue Funktion steht erst ohne Vermerk in der Referenz, wenn ihre Wirkung im Spiel gemessen ist; bis
   dahin traegt sie den Vermerk *Experimentell* oder *Im Spiel nicht geprueft*.
 - Zu jeder neuen Funktion gehoeren: Eintrag in `docs/modkit/api-reference.md` (oder `events.md`/`hooks.md`), eine Pruefung im Selbsttest

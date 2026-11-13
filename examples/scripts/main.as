@@ -1,5 +1,5 @@
-// OG3-Patch Mini-Mod "Charakter-Info" (API 3) - Gothic-3-Gegenstueck zum Remake-Beispiel "ExampleStatsPageExtension".
-// Liegt im Spiel unter <Gothic3>\og3\scripts\main.as; Aenderungen werden im laufenden Spiel neu geladen.
+// G3ASM Mini-Mod "Charakter-Info" (API 3) - Gothic-3-Gegenstueck zum Remake-Beispiel "ExampleStatsPageExtension".
+// Liegt im Spiel unter <Gothic3>\g3asm\scripts\main.as; Aenderungen werden im laufenden Spiel neu geladen.
 //  - Bildschirmtext im Spielstil (PrintScreen) statt Windows-Toenen
 //  - F11:        Info auf dem Bildschirm: Position, Spielzeit, Attribute (wie der Text-Block im Beispiel)
 //  - Shift+F11:  Staerke +1 (wie der Knopf im Beispiel: IncreaseStrengthAttributeBy(1))
@@ -44,7 +44,7 @@ void ZeigeInfo(const Entity &in held) {
 }
 
 void main() {
-    print("OG3-Patch aktiv - AngelScript laeuft (API " + GetApiVersion() + ")");
+    print("G3ASM aktiv - AngelScript laeuft (API " + GetApiVersion() + ")");
 }
 
 void OnFrame(float dt) {
@@ -91,7 +91,7 @@ void OnFrame(float dt) {
         fps = bilder / sekunde;
         sekunde = 0;
         bilder = 0;
-        bCString titel = "Gothic 3 | OG3-Patch | " + int(fps) + " FPS";
+        bCString titel = "Gothic 3 | G3ASM | " + int(fps) + " FPS";
         if (held.IsValid()) titel += " | " + Spielzeit() + " | STR " + held.GetAttribute("STR");
         SetWindowTitle(titel + " | F11 Info, Shift+F11 Staerke+1, F10/Shift+F10 Teleport");
     }

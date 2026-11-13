@@ -4,18 +4,18 @@
 // Speichern/Laden: Quest und Dialoge sind Laufzeit-Objekte und gehen beim Laden verloren. Der Fortschritt steht deshalb in zwei Schaltern, die das
 // Spiel im Spielstand mitspeichert (SetGameEvent). Nach jedem Laden legt der Mod Quest und Dialoge neu an und stellt den Stand wieder her.
 // Hinweis: Jens hat im Spiel schon eine eigene Wolfsfell-Quest (KapDun_Hunter_Fur); diese Mod-Quest ist davon unabhaengig.
-// Der Mod jens_quest (Naehe + Rollen-Taste) sollte abgeschaltet sein: in og3\mods\load_order.txt "-jens_quest" eintragen.
+// Der Mod jens_quest (Naehe + Rollen-Taste) sollte abgeschaltet sein: in g3asm\mods\load_order.txt "-jens_quest" eintragen.
 const bCString NPC = "Jens";
-const bCString QUEST = "OG3_Jens_Wolfsfell";
+const bCString QUEST = "G3ASM_Jens_Wolfsfell";
 const bCString ITEM = "It_Wolf_Fur";
 const bCString BOGEN = "It_Bow_Ranger";
 const bCString PFEILE = "Arrow";
 const bCString REWARD_ATTRIBUTE = "DEX";   // Attribut-Belohnung der Quest (Erfolgsmeldung "Jagdgeschick"); DescribeQuestRewards() listet alle Kennungen
-const bCString INFO_JOB = "OG3_Jens_Job";
-const bCString INFO_TURNIN = "OG3_Jens_Turnin";
-const bCString EV_STARTED = "OG3_JensWolf_Started";   // Schalter im Spielstand
-const bCString EV_DONE = "OG3_JensWolf_Done";
-const bCString EV_FAILED = "OG3_JensWolf_Failed";
+const bCString INFO_JOB = "G3ASM_Jens_Job";
+const bCString INFO_TURNIN = "G3ASM_Jens_Turnin";
+const bCString EV_STARTED = "G3ASM_JensWolf_Started";   // Schalter im Spielstand
+const bCString EV_DONE = "G3ASM_JensWolf_Done";
+const bCString EV_FAILED = "G3ASM_JensWolf_Failed";
 
 float timer = 0;
 bool angelegt = false;
@@ -23,7 +23,7 @@ bool angelegt = false;
 void Zeige(const bCString &in t, int r = 255, int g = 255, int b = 180) { print(t); PrintScreen(t, 5, r, g, b); }
 
 // Quest: Ist das Mod-Archiv installiert (ModFiles\Quests.m0x -> Data\Quests.mod/.m00/..., siehe docs\modkit\archives.md), liefert das Spiel die Quest selbst aus der
-// Datei G3_World_01\OG3_Jens_Wolfsfell_quest_G3_World_01.quest (Typ, XP 100, Belohnung DEX +1; Titel und Beschreibung stehen in ModFiles\stringtable.ini).
+// Datei G3_World_01\G3ASM_Jens_Wolfsfell_quest_G3_World_01.quest (Typ, XP 100, Belohnung DEX +1; Titel und Beschreibung stehen in ModFiles\stringtable.ini).
 // Ohne Archiv legt das Skript die Quest zur Laufzeit an (Rueckfall) und setzt dieselben Werte. Status zunaechst "offen".
 bool selbstErzeugt = false;   // Quest wurde von diesem Skript angelegt (nicht aus dem Archiv)
 void QuestVorbereiten() {
@@ -65,12 +65,12 @@ void Wiederherstellen() {
 // Diagnose: was ist beim Laden schon da? (Protokoll)
 void Diagnose() {
     int n = GetQuestCount();
-    int og3 = 0;
+    int g3asm = 0;
     for (int i = 0; i < n; i++) {
         bCString name = GetQuestNameAt(i);
-        if (name.Left(3) == "OG3") { og3++; print("  Quest im Manager [" + i + "]: '" + name + "' Status " + GetQuestStatus(name) + ", XP " + GetQuestXP(name)); }
+        if (name.Left(5) == "G3ASM") { g3asm++; print("  Quest im Manager [" + i + "]: '" + name + "' Status " + GetQuestStatus(name) + ", XP " + GetQuestXP(name)); }
     }
-    print("Vor dem Anlegen: Quests " + n + ", eigene " + og3 + ", Quest existiert " + QuestExists(QUEST) + " (Status " + GetQuestStatus(QUEST) + "), Info Job existiert " + InfoExists(INFO_JOB) +
+    print("Vor dem Anlegen: Quests " + n + ", eigene " + g3asm + ", Quest existiert " + QuestExists(QUEST) + " (Status " + GetQuestStatus(QUEST) + "), Info Job existiert " + InfoExists(INFO_JOB) +
           ", Job gegeben " + IsInfoGiven(INFO_JOB));
 }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Spiel-Ereignisse fuer Skripte (Skript-Schnittstelle ab Version 5): Inline-Hooks (MinHook) auf die Ereignis-Eintrittspunkte des
 // Questsystems in Game.dll. Das Spiel meldet dort Kills, Itemuebergaben, Betreten/Verlassen von Bereichen und Zauber an
 // gCQuestManager_PS; der Hook ruft zuerst das Originalverhalten und danach die Skript-Ereignisse aller Mods
@@ -19,7 +19,7 @@
 #include "sb_api.h"
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 ScriptHost* g_host = nullptr;
@@ -716,7 +716,7 @@ int __fastcall HReadRuntime(void* self, void*, void* stream) {
     const long n = InterlockedIncrement(&g_readCount);
     const int r = o_readRuntime(self, stream);
     const char* nm = QuestNameOf(self);
-    if (n <= 3 || (nm && std::strncmp(nm, "OG3", 3) == 0)) {
+    if (n <= 3 || (nm && std::strncmp(nm, "G3ASM", 5) == 0)) {
         char b[160];
         std::snprintf(b, sizeof b, "Laden: Quest-Laufzeitdaten gelesen #%ld fuer '%s'", n, nm ? nm : "?");
         LogLine(b);
@@ -726,7 +726,7 @@ int __fastcall HReadRuntime(void* self, void*, void* stream) {
 int __fastcall HWriteRuntime(void* self, void*, void* stream) {
     const long n = InterlockedIncrement(&g_writeCount);
     const char* nm = QuestNameOf(self);
-    if (nm && std::strncmp(nm, "OG3", 3) == 0) {
+    if (nm && std::strncmp(nm, "G3ASM", 5) == 0) {
         char b[160];
         std::snprintf(b, sizeof b, "Speichern: Quest-Laufzeitdaten geschrieben #%ld fuer '%s'", n, nm);
         LogLine(b);
@@ -890,4 +890,4 @@ bool HookExport(HMODULE m, const char* sym, void* detour, void** orig, ScriptHos
     return true;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

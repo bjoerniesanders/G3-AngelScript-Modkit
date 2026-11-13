@@ -5,7 +5,7 @@ Diese Seite legt fest, was sich an der Skript-Schnittstelle zwischen zwei Versio
 
 ## Versionsnummer
 
-- Die Skript-Schnittstelle hat **eine** fortlaufende Zahl: `GetApiVersion()` (im Code `OG3_SCRIPT_API_VERSION`). Jede Version, die etwas an der
+- Die Skript-Schnittstelle hat **eine** fortlaufende Zahl: `GetApiVersion()` (im Code `G3ASM_SCRIPT_API_VERSION`). Jede Version, die etwas an der
   Schnittstelle ändert, erhöht sie um 1.
 - Releases heißen `v0.<API>.<Fix>`, zum Beispiel `v0.42.0-alpha.1`: die mittlere Zahl ist die Skript-Schnittstelle, die letzte zählt Fehlerbehebungen
   ohne Änderung an der Schnittstelle. `-alpha.N` und `-beta.N` sind Vorabversionen.
@@ -51,7 +51,7 @@ Entfernt mit 46 (nie funktionsfähig, Alpha): `GetPickPosition` (Ersatz `PickCen
 ```angelscript
 void main() {
     if (GetApiVersion() < 37) {
-        print("Dieser Mod braucht die Skript-Schnittstelle 37 (OnTouch). Bitte den OG3-Patch aktualisieren.");
+        print("Dieser Mod braucht die Skript-Schnittstelle 37 (OnTouch). Bitte G3ASM aktualisieren.");
         return;
     }
 }
@@ -59,4 +59,4 @@ void main() {
 
 Eine Funktion, die es in der laufenden Version nicht gibt, ist ein **Übersetzungsfehler**: Der Mod wird dann gar nicht geladen und das Protokoll nennt die
 Zeile. Die Prüfung oben hilft deshalb nur bei Verhalten, das sich zwischen Versionen geändert hat. Besser ist ab Version 40 der Eintrag `api=37` in der
-`mod.ini`: Dann lädt der Patch den Mod gar nicht erst und schreibt, dass er zu alt ist ([Mod-Paket](mod-package.md)).
+`mod.ini`: Dann lädt das Modkit den Mod gar nicht erst und schreibt, dass er zu alt ist ([Mod-Paket](mod-package.md)).

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Quest-Bindings des OG3-Patches (Skript-Schnittstelle ab Version 6): Questsystem des Spiels steuern.
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Quest-Bindings von G3ASM (Skript-Schnittstelle ab Version 6): Questsystem des Spiels steuern.
 // Quellen im Spiel: Game.dll gCQuestManager_PS (Singleton, GetInstance) und gCQuest_PS. Quests liegen als ini-Dateien im Quest-Verzeichnis
 // (Data\Quests.pak bzw. Ordner Quests); der Manager laedt sie beim Start (LoadQuestsFromInis).
 // Jeder Aufruf laeuft unter SEH-Schutz; ohne Spiel/ohne Manager liefern die Funktionen false bzw. -1.
@@ -20,7 +20,7 @@
 #include "pack_mod.h"
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 typedef void*(__stdcall* InstFn)();
@@ -228,12 +228,12 @@ void RegisterText(const SStr& id, const SStr& text);
 bool SetQuestText(SetLocFn fn, const SStr& name, const char* prefix, const SStr& text) {
     void* q = FindQuest(name);
     if (!q || !fn || !g_q.locCtor || !g_q.locDtor) return false;
-    SStr id((std::string(prefix) + name.c_str()).c_str());   // eigene Text-ID, z. B. OG3_QTOPIC_<Quest>
+    SStr id((std::string(prefix) + name.c_str()).c_str());   // eigene Text-ID, z. B. G3ASM_QTOPIC_<Quest>
     RegisterText(id, text);
     return SafeSetLoc(fn, q, &id);
 }
-bool SetQuestTopic(const SStr& name, const SStr& text) { return SetQuestText(g_q.setTopic, name, "OG3_QTOPIC_", text); }
-bool SetQuestDescription(const SStr& name, const SStr& text) { return SetQuestText(g_q.setDesc, name, "OG3_QDESC_", text); }
+bool SetQuestTopic(const SStr& name, const SStr& text) { return SetQuestText(g_q.setTopic, name, "G3ASM_QTOPIC_", text); }
+bool SetQuestDescription(const SStr& name, const SStr& text) { return SetQuestText(g_q.setDesc, name, "G3ASM_QDESC_", text); }
 bool LoadQuestFile(const SStr& name, const SStr& path) {   // gCQuest_PS::Read(path): Eigenschaften der Quest aus ini-Datei lesen
     void* q = FindQuest(name);
     bool r = false;
@@ -581,50 +581,50 @@ void SetQuestManagerOverride(void* mgr) { g_mgrOverride = mgr; }
 
 bool RegisterQuestBindings(asIScriptEngine* e) {
     bool ok = true;
-    OG3_REG(e->RegisterGlobalFunction("bool QuestExists(const bCString &in)", asFUNCTION(QuestExists), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool CreateQuest(const bCString &in)", asFUNCTION(CreateQuest), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool RunQuest(const bCString &in)", asFUNCTION(RunQuest), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SucceedQuest(const bCString &in)", asFUNCTION(SucceedQuest), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool FailQuest(const bCString &in)", asFUNCTION(FailQuest), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool CloseQuest(const bCString &in)", asFUNCTION(CloseQuest), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool RemoveQuest(const bCString &in)", asFUNCTION(RemoveQuest), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int GetQuestStatus(const bCString &in)", asFUNCTION(GetQuestStatus), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetQuestStatus(const bCString &in, int)", asFUNCTION(SetQuestStatus), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool IsQuestFinished(const bCString &in)", asFUNCTION(IsQuestFinished), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool IsQuestSucceeded(const bCString &in)", asFUNCTION(IsQuestSucceeded), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int GetQuestXP(const bCString &in)", asFUNCTION(GetQuestXP), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetQuestXP(const bCString &in, int)", asFUNCTION(SetQuestXP), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool ReloadQuestFiles()", asFUNCTION(ReloadQuestFiles), asCALL_CDECL));
-    OG3_REG(
+    G3ASM_REG(e->RegisterGlobalFunction("bool QuestExists(const bCString &in)", asFUNCTION(QuestExists), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool CreateQuest(const bCString &in)", asFUNCTION(CreateQuest), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool RunQuest(const bCString &in)", asFUNCTION(RunQuest), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SucceedQuest(const bCString &in)", asFUNCTION(SucceedQuest), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool FailQuest(const bCString &in)", asFUNCTION(FailQuest), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool CloseQuest(const bCString &in)", asFUNCTION(CloseQuest), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool RemoveQuest(const bCString &in)", asFUNCTION(RemoveQuest), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int GetQuestStatus(const bCString &in)", asFUNCTION(GetQuestStatus), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetQuestStatus(const bCString &in, int)", asFUNCTION(SetQuestStatus), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool IsQuestFinished(const bCString &in)", asFUNCTION(IsQuestFinished), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool IsQuestSucceeded(const bCString &in)", asFUNCTION(IsQuestSucceeded), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int GetQuestXP(const bCString &in)", asFUNCTION(GetQuestXP), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetQuestXP(const bCString &in, int)", asFUNCTION(SetQuestXP), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool ReloadQuestFiles()", asFUNCTION(ReloadQuestFiles), asCALL_CDECL));
+    G3ASM_REG(
         e->RegisterGlobalFunction("bool SetQuestTopic(const bCString &in, const bCString &in)", asFUNCTION(SetQuestTopic), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetQuestDescription(const bCString &in, const bCString &in)", asFUNCTION(SetQuestDescription),
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetQuestDescription(const bCString &in, const bCString &in)", asFUNCTION(SetQuestDescription),
                                       asCALL_CDECL));
-    OG3_REG(
+    G3ASM_REG(
         e->RegisterGlobalFunction("bool LoadQuestFile(const bCString &in, const bCString &in)", asFUNCTION(LoadQuestFile), asCALL_CDECL));   // funktioniert nicht
-    OG3_REG(e->RegisterGlobalFunction("int GetQuestCount()", asFUNCTION(GetQuestCount), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetQuestNameAt(int)", asFUNCTION(GetQuestNameAt), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetQuestReward(const bCString &in, const bCString &in, int)", asFUNCTION(SetQuestReward),
+    G3ASM_REG(e->RegisterGlobalFunction("int GetQuestCount()", asFUNCTION(GetQuestCount), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetQuestNameAt(int)", asFUNCTION(GetQuestNameAt), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetQuestReward(const bCString &in, const bCString &in, int)", asFUNCTION(SetQuestReward),
                                       asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetQuestReward(const bCString &in)", asFUNCTION(GetQuestReward), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString DescribeQuestRewards()", asFUNCTION(DescribeQuestRewards), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("void QuestDebug()", asFUNCTION(QuestDebug), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("void RegisterText(const bCString &in, const bCString &in)", asFUNCTION(RegisterText), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetQuestDir()", asFUNCTION(GetQuestDir), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetQuestFilePath(const bCString &in)", asFUNCTION(GetQuestFilePath), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetGameDir()", asFUNCTION(GetGameDir), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString PackMod(const bCString &in, const bCString &in, bool = false)", asFUNCTION(ScriptPackMod),
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetQuestReward(const bCString &in)", asFUNCTION(GetQuestReward), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString DescribeQuestRewards()", asFUNCTION(DescribeQuestRewards), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("void QuestDebug()", asFUNCTION(QuestDebug), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("void RegisterText(const bCString &in, const bCString &in)", asFUNCTION(RegisterText), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetQuestDir()", asFUNCTION(GetQuestDir), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetQuestFilePath(const bCString &in)", asFUNCTION(GetQuestFilePath), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetGameDir()", asFUNCTION(GetGameDir), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString PackMod(const bCString &in, const bCString &in, bool = false)", asFUNCTION(ScriptPackMod),
                                       asCALL_CDECL));
-    OG3_REG(
+    G3ASM_REG(
         e->RegisterGlobalFunction("bool PackFolder(const bCString &in, const bCString &in)", asFUNCTION(ScriptPackFolder), asCALL_CDECL));
-    OG3_REG(
+    G3ASM_REG(
         e->RegisterGlobalFunction("bCString NextModFile(const bCString &in, bool = false)", asFUNCTION(ScriptNextModFile), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetPackError()", asFUNCTION(ScriptPackError), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetPackError()", asFUNCTION(ScriptPackError), asCALL_CDECL));
     for (int i = 0; i < 8; ++i) {
         char d[48];
         std::snprintf(d, sizeof d, "const int %s", kStatusNames[i]);
-        OG3_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kStatus[i])));
+        G3ASM_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kStatus[i])));
     }
     return ok;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

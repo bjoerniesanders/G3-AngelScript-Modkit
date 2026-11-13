@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // KI-Tracer (Roadmap 6.2, nur Protokoll, keine Skript-Schnittstelle): schreibt Wechsel von KI-Zustand, -Aufgabe, -Routine, KI-Modus und Aktion
-// der NPCs ins Protokoll, um zu sehen, wann und warum die KI etwas abbricht (z. B. Animationen). Standard aus; og3_patch.ini:
+// der NPCs ins Protokoll, um zu sehen, wann und warum die KI etwas abbricht (z. B. Animationen). Standard aus; g3asm.ini:
 //   [patch] aitrace=1            einschalten (Hooks werden nur dann eingehaengt)
 //           aitracefilter=Diego  nur NPCs, deren Name diesen Text enthaelt (Gross-/Kleinschreibung egal; leer = alle)
 //           aitracemax=2000      hoechstens so viele Zeilen je Spielstart, danach eine Schlusszeile
@@ -24,7 +24,7 @@
 #include "sb_api.h"
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 ScriptHost* g_host = nullptr;
@@ -299,4 +299,4 @@ int InstallAiTrace(ScriptHost& host) {
     return n;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

@@ -1,7 +1,7 @@
-# OG3 Modkit: Modding für Gothic 3 mit AngelScript
+# G3 AngelScript Modkit (G3ASM): Modding für Gothic 3
 
-Mit dem **OG3-Patch** schreibst du Mods für Gothic 3 in einer Skriptsprache, ohne das Spiel neu zu kompilieren und ohne Spieldateien zu verändern.
-Die Skripte sind **AngelScript** (C++-ähnliche Syntax, `int`, `float`, `bCString`, Klassen, Arrays). Der Patch lädt sie beim Spielstart, führt sie
+Mit **G3ASM** schreibst du Mods für Gothic 3 in einer Skriptsprache, ohne das Spiel neu zu kompilieren und ohne Spieldateien zu verändern.
+Die Skripte sind **AngelScript** (C++-ähnliche Syntax, `int`, `float`, `bCString`, Klassen, Arrays). Das Modkit lädt sie beim Spielstart, führt sie
 bei Spielereignissen aus und lädt sie im laufenden Spiel neu, sobald du die Datei speicherst.
 
 Aktuelle Skript-Schnittstelle: **Version 46** (`GetApiVersion()`).
@@ -27,8 +27,9 @@ Aktuelle Skript-Schnittstelle: **Version 46** (`GetApiVersion()`).
 
 ## Schnellstart
 
-1. Patch einbauen (Spiel beenden; Voraussetzung Community Patch 1.75 und Parallel-Universe-Patch): `powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner>` (siehe [Mod-Ordner](mod-package.md)).
-2. Ordner `G:\Gothic3\og3\mods\hallo\` anlegen, darin `main.as`:
+1. Modkit einbauen (Spiel beenden; Voraussetzung Community Patch 1.75 und Parallel-Universe-Patch), im entpackten Release-Ordner:
+   `powershell -NoProfile -ExecutionPolicy Bypass -File tools\install_loader.ps1 -Game "<Spielordner>" -BuildDir bin` (siehe [Mod-Ordner](mod-package.md)).
+2. Ordner `<Spielordner>\g3asm\mods\hallo\` anlegen, darin `main.as`:
    ```angelscript
    void main() {
        print("Hallo aus meinem ersten Mod");
@@ -39,18 +40,18 @@ Aktuelle Skript-Schnittstelle: **Version 46** (`GetApiVersion()`).
            PrintScreen("Hallo!", 3, 255, 255, 255);  // Text, Sekunden, R, G, B
    }
    ```
-3. Spiel starten, die Rollen-Taste (Scroll Lock) drücken: der Text erscheint auf dem Bildschirm. In `G:\Gothic3\og3_patch.log` steht `[hallo] Hallo aus meinem ersten Mod`.
+3. Spiel starten, die Rollen-Taste (Scroll Lock) drücken: der Text erscheint auf dem Bildschirm. In `<Spielordner>\g3asm.log` steht `[hallo] Hallo aus meinem ersten Mod`.
 4. Datei ändern und speichern: nach einer Sekunde ist die neue Fassung aktiv, ohne Neustart.
 
 ## Wie es funktioniert (Kurzfassung)
 
-- Der Patch (`og3_patch.dll`) wird vom `dbghelp.dll`-Proxy im Spielordner geladen und hängt sich über die Importtabelle von `Gothic3.exe` ein
+- Das Modkit (`g3asm.dll`) wird vom Loader (einer Ersatz-`dbghelp.dll` im Spielordner) geladen und hängt sich über die Importtabelle von `Gothic3.exe` ein
   (kein Code-Eingriff, verträglich mit dem Parallel-Universe-Patch).
 - Für Spielereignisse (Kills, Items, Zauber, ...) werden einzelne Funktionen der `Game.dll` im Speicher abgefangen (MinHook). Auf der Platte bleibt alles unverändert.
 - Skripte rufen dieselben Engine-Funktionen auf wie das Spiel selbst, zum Beispiel für Attribute, Inventar und Quests. Das Verhalten ist deshalb das Originalverhalten.
 
 ## Lizenz deiner Mod
 
-Der Patch steht unter GPL-3.0-or-later. Eine Zusatzerlaubnis (`LICENSE-EXCEPTIONS.md` im Hauptordner) stellt klar: Mods, die den Patch nur über die
+Das Modkit steht unter GPL-3.0-or-later. Eine Zusatzerlaubnis (`LICENSE-EXCEPTIONS.md` im Hauptordner) stellt klar: Mods, die das Modkit nur über die
 Skript-Schnittstelle nutzen (Skripte, `mod.ini`, Stringtabellen, Datei-Patches, Archive), darfst du unter jeder Lizenz veröffentlichen. Die Beispiel-Mods
 sind gemeinfrei (CC0), du kannst sie ohne Bedingungen in eigene Mods übernehmen.

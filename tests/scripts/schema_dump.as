@@ -1,7 +1,7 @@
-// Schema-Dump ohne Spiel: mit der echten SharedBase.dll und (ueber OG3_TEST_GAMEDLL) der echten Game.dll aufrufen, dann sind auch die Klassen von
-// Engine und Game registriert. Ergebnis: og3\property_schema.json neben og3_patch.dll.
-//   set OG3_TEST_GAMEDLL=G:\Gothic3\Game.dll
-//   og3_patch_test.exe G:\Gothic3\SharedBase.dll og3-patch\tests\scripts\schema_dump.as
+// Schema-Dump ohne Spiel: mit der echten SharedBase.dll und (ueber G3ASM_TEST_GAMEDLL) der echten Game.dll aufrufen, dann sind auch die Klassen von
+// Engine und Game registriert. Ergebnis: g3asm\property_schema.json neben g3asm.dll.
+//   set G3ASM_TEST_GAMEDLL=G:\Gothic3\Game.dll
+//   g3asm_test.exe G:\Gothic3\SharedBase.dll g3-angelscript-modkit\tests\scripts\schema_dump.as
 void main() {
     const int n = DumpPropertySchema("property_schema.json");
     check(n > 0, "DumpPropertySchema: Klassen geschrieben (" + n + ")");

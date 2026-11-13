@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 #include "sb_api.h"
 
-namespace og3p {
+namespace g3asm {
 
 SbApi g_sb;
 
@@ -75,4 +75,4 @@ bool SbApi::Resolve(HMODULE m) {
     return strCtor && strCtorText && strCopy && strDtor && strAssign && strGetText && strGetLength;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

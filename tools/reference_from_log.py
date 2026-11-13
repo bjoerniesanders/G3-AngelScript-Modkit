@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 """Erzeugt Abschnitt 8 von docs/modkit/reference.md aus dem Protokoll der Mod reference_dump.
 
 Aufruf:  python -I tools/reference_from_log.py [Protokoll] [reference.md]
-  Protokoll   Standard G:\\Gothic3\\og3_patch.log (der letzte Dump darin zaehlt)
+  Protokoll   Standard G:\\Gothic3\\g3asm.log (der letzte Dump darin zaehlt)
   reference.md  Standard docs/modkit/reference.md; der Text zwischen <!-- DUMP-ANFANG --> und <!-- DUMP-ENDE --> wird ersetzt.
 Ohne zweites Argument wird nur auf die Standardausgabe geschrieben, wenn die Marker fehlen.
 """
@@ -12,7 +12,7 @@ import os
 import re
 import sys
 
-log_path = sys.argv[1] if len(sys.argv) > 1 else r'G:\Gothic3\og3_patch.log'
+log_path = sys.argv[1] if len(sys.argv) > 1 else r'G:\Gothic3\g3asm.log'
 md_path = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'docs', 'modkit', 'reference.md')
 
 PREFIX = re.compile(r'^\d\d:\d\d:\d\d\.\d+ \[reference_dump\] ')

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Schema-Dump der Eigenschaften (Skript-Schnittstelle ab Version 43, Roadmap 6.1): alle beim Aufruf registrierten Eigenschaftsklassen aus
 // bCPropertyObjectSingleton (SharedBase.dll) mit Basisklasse, Beschreibung und allen Eigenschaften (Name, Typ, Kategorie, Beschreibung, Art,
 // Nur-Lesen, Offset, Groesse, Enum-Werte) als JSON-Datei.
 //   int DumpPropertySchema(const bCString &in file)  -> Zahl der Klassen, < 0 bei Fehler (-1 Exporte fehlen, -2 Dateiname ungueltig, -3 Datei)
-// Die Datei liegt im Ordner og3 neben og3_patch.dll (im Spiel: <Spiel>\og3\<file>). Nur ein schlichter Dateiname ist erlaubt.
+// Die Datei liegt im Ordner g3asm neben g3asm.dll (im Spiel: <Spiel>\g3asm\<file>). Nur ein schlichter Dateiname ist erlaubt.
 // Klassen registrieren sich beim Laden ihrer DLL. Ohne Spiel (Testprogramm mit Original-SharedBase und Game.dll, 2026-11-11): 273 Klassen,
 // 1584 Eigenschaften, 1534 Enum-Werte, 110 ms, 258 KB. Ob die spaet geladenen Script_*.dll im Spiel weitere Klassen anmelden, ist nicht gemessen.
 // Aufbau (SDK, gemessen): Iterator der Klassenliste = {bTPtrArray<bSNode*>* Faecher, int Fach, bSNode* Knoten}, bSNode = {bCString Name,
@@ -24,7 +24,7 @@
 #include "sb_api.h"
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 constexpr int kMaxClasses = 20000, kMaxProps = 4000, kMaxEnum = 2000, kMaxBuckets = 1 << 20;
@@ -164,7 +164,7 @@ std::string OutputDir() {
                        &self);
     GetModuleFileNameA(self, path, MAX_PATH);
     std::string d(path);
-    d = d.substr(0, d.find_last_of("\\/") + 1) + "og3\\";
+    d = d.substr(0, d.find_last_of("\\/") + 1) + "g3asm\\";
     CreateDirectoryA(d.c_str(), nullptr);
     return d;
 }
@@ -211,7 +211,7 @@ int DumpPropertySchemaImpl(const std::string& file, std::string& report) {
     if (nBuckets < 0 || nBuckets > kMaxBuckets || !ReadableMem(buckets, size_t(nBuckets) * 4)) return -1;
     std::string o;
     o.reserve(4 << 20);
-    o += "{\"format\":\"og3-property-schema\",\"version\":1,\"classes\":[\n";
+    o += "{\"format\":\"g3asm-property-schema\",\"version\":1,\"classes\":[\n";
     int classes = 0, props = 0, enums = 0, broken = 0;
     for (int h = 0; h < nBuckets && classes < kMaxClasses; ++h) {
         const unsigned* node = reinterpret_cast<const unsigned*>(static_cast<uintptr_t>(buckets[h]));
@@ -291,8 +291,8 @@ int DumpPropertySchemaScript(const SStr& file) {
 
 bool RegisterSchemaBindings(asIScriptEngine* e) {
     bool ok = true;
-    OG3_REG(e->RegisterGlobalFunction("int DumpPropertySchema(const bCString &in file)", asFUNCTION(DumpPropertySchemaScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int DumpPropertySchema(const bCString &in file)", asFUNCTION(DumpPropertySchemaScript), asCALL_CDECL));
     return ok;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

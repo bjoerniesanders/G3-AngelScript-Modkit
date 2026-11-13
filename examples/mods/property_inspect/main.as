@@ -1,8 +1,8 @@
-// Eigenschaften-Inspektion (ab API 29): Strg + Ziffernblock / schreibt alle Eigenschaften eines Items samt Werten ins Protokoll (og3_patch.log, Zeilen "[property_inspect] ...").
+// Eigenschaften-Inspektion (ab API 29): Strg + Ziffernblock / schreibt alle Eigenschaften eines Items samt Werten ins Protokoll (g3asm.log, Zeilen "[property_inspect] ...").
 // Ziel: das Item in der rechten Hand, sonst in der linken Hand oder am Ruecken, sonst das Entity unter dem Fadenkreuz (z. B. ein Item am Boden oder ein NPC).
 // Gelesen werden die Eigenschaftssets Item (Wert, Kategorie, Voraussetzungen, Fertigkeiten, Attributmodifikationen), Damage (Schadensart und -menge) und Interaction.
 // Nur Lesen, aendert nichts im Spiel. Die Werte sind der Text, den die Engine fuer die Eigenschaft liefert (Verweise auf Vorlagen sind nicht immer aussagekraeftig).
-// Abschalten: "-property_inspect" in og3\mods\load_order.txt.
+// Abschalten: "-property_inspect" in g3asm\mods\load_order.txt.
 const int TASTE_INSPEKT = 0x6F;   // Ziffernblock /, zusammen mit Strg
 const int VK_STRG = 0x11;
 

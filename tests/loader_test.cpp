@@ -1,7 +1,7 @@
-// Test des OG3-Loaders (src/loader): laedt SharedBase.dll mit angepasstem Suchpfad (die dbghelp.dll aus demselben Ordner ist der Loader), prueft
-//   1. der Loader ist geladen und hat og3_patch.dll gestartet (og3_loader.log: "OG3-Patch gestartet", og3_patch.log entsteht),
+// Test von G3ASM-Loaders (src/loader): laedt SharedBase.dll mit angepasstem Suchpfad (die dbghelp.dll aus demselben Ordner ist der Loader), prueft
+//   1. der Loader ist geladen und hat g3asm.dll gestartet (g3asm_loader.log: "G3ASM gestartet", g3asm.log entsteht),
 //   2. MiniDumpWriteDump wird an dbghelp_orig.dll weitergereicht (Aufruf mit ungueltigen Argumenten liefert FALSE, ohne Absturz).
-// Aufruf: loader_test <Ordner>   (Ordner enthaelt SharedBase.dll, dbghelp.dll = Loader, dbghelp_orig.dll, og3_patch.dll, og3_patch.ini); tests/run_loader_test.ps1 richtet ihn ein.
+// Aufruf: loader_test <Ordner>   (Ordner enthaelt SharedBase.dll, dbghelp.dll = Loader, dbghelp_orig.dll, g3asm.dll, g3asm.ini); tests/run_loader_test.ps1 richtet ihn ein.
 #include <windows.h>
 
 #include <cstdio>
@@ -42,11 +42,11 @@ int main(int argc, char** argv) {
     std::string loaded = path;
     check(dbg && _strnicmp(loaded.c_str(), dir.c_str(), dir.size()) == 0, "dbghelp.dll kommt aus dem Testordner (der Loader)");
 
-    const std::string log = ReadAll(dir + "og3_loader.log");
-    check(log.find("OG3-Loader gestartet") != std::string::npos, "og3_loader.log: Loader gestartet");
-    check(log.find("OG3-Patch gestartet") != std::string::npos, "og3_loader.log: OG3-Patch gestartet");
-    check(Exists(dir + "og3_patch.log"), "og3_patch.log angelegt");
-    check(GetModuleHandleA("og3_patch.dll") != nullptr, "og3_patch.dll im Prozess");
+    const std::string log = ReadAll(dir + "g3asm_loader.log");
+    check(log.find("G3ASM-Loader gestartet") != std::string::npos, "g3asm_loader.log: Loader gestartet");
+    check(log.find("G3ASM gestartet") != std::string::npos, "g3asm_loader.log: G3ASM gestartet");
+    check(Exists(dir + "g3asm.log"), "g3asm.log angelegt");
+    check(GetModuleHandleA("g3asm.dll") != nullptr, "g3asm.dll im Prozess");
 
     typedef BOOL(__stdcall * Dump)(HANDLE, DWORD, HANDLE, int, void*, void*, void*);
     Dump fn = dbg ? reinterpret_cast<Dump>(GetProcAddress(dbg, "MiniDumpWriteDump")) : nullptr;

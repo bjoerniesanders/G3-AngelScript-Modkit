@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// og3_packmod: Kommandozeilenwerkzeug zum Packen und Pruefen von Gothic-3-Mod-Archiven (G3V0), Gegenstueck zu G3PakDir.
-//   og3_packmod pack    <Ordner> <Archiv>                  Ordner als Archiv schreiben (z. B. Quests.mod)
-//   og3_packmod install <Ordner> <Data-Ordner> <Volume> [m|n]   als naechste freie Generation ablegen (Quests.mod, Quests.m00, ...; n = .nod/.n00)
-//   og3_packmod copy    <Archiv> <Spielordner|Data-Ordner> <Volume> [m|n]   fertiges Archiv (z. B. ModFiles\Quests.m0x) als naechste Generation einspielen
-//   og3_packmod next    <Data-Ordner> <Volume> [m|n]       naechsten freien Dateinamen anzeigen
-//   og3_packmod list    <Archiv>                           Inhalt anzeigen
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// g3asm_packmod: Kommandozeilenwerkzeug zum Packen und Pruefen von Gothic-3-Mod-Archiven (G3V0), Gegenstueck zu G3PakDir.
+//   g3asm_packmod pack    <Ordner> <Archiv>                  Ordner als Archiv schreiben (z. B. Quests.mod)
+//   g3asm_packmod install <Ordner> <Data-Ordner> <Volume> [m|n]   als naechste freie Generation ablegen (Quests.mod, Quests.m00, ...; n = .nod/.n00)
+//   g3asm_packmod copy    <Archiv> <Spielordner|Data-Ordner> <Volume> [m|n]   fertiges Archiv (z. B. ModFiles\Quests.m0x) als naechste Generation einspielen
+//   g3asm_packmod next    <Data-Ordner> <Volume> [m|n]       naechsten freien Dateinamen anzeigen
+//   g3asm_packmod list    <Archiv>                           Inhalt anzeigen
 // Optionen (vor den Argumenten): --comments (Quellpfade speichern), --no-deleted (".deleted"-Dateien als normale Dateien packen)
 #include <windows.h>
 
@@ -16,13 +16,13 @@
 
 #include "../src/pack_mod.h"
 
-using namespace og3p;
+using namespace g3asm;
 
 static int Usage() {
-    std::printf("og3_packmod pack    <Ordner> <Archiv>\n"
-                "og3_packmod install <Ordner> <Data-Ordner> <Volume> [m|n]\n"
-                "og3_packmod next    <Data-Ordner> <Volume> [m|n]\n"
-                "og3_packmod list    <Archiv>\n"
+    std::printf("g3asm_packmod pack    <Ordner> <Archiv>\n"
+                "g3asm_packmod install <Ordner> <Data-Ordner> <Volume> [m|n]\n"
+                "g3asm_packmod next    <Data-Ordner> <Volume> [m|n]\n"
+                "g3asm_packmod list    <Archiv>\n"
                 "Optionen: --comments, --no-deleted\n");
     return 2;
 }

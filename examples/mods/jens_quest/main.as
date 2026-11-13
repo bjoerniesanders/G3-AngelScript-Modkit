@@ -1,8 +1,8 @@
 // Quest "Wolfsfell fuer Jens": Naehert sich der Held Jens, bittet er um ein Wolfsfell (Quest startet). Abgabe: Rollen-Taste in Jens' Naehe
 // (nimmt ein Wolfsfell aus dem Inventar) oder durch Uebergabe im Spiel (OnReceiveItem). Belohnung: Quest-XP. Toetet man Jens, scheitert die Quest.
-// Abschalten: in og3\mods\load_order.txt "-jens_quest" eintragen.
+// Abschalten: in g3asm\mods\load_order.txt "-jens_quest" eintragen.
 const bCString NPC = "Jens";
-const bCString QUEST = "OG3_Jens_Wolfsfell";
+const bCString QUEST = "G3ASM_Jens_Wolfsfell";
 const bCString ITEM = "It_Wolf_Fur";
 const float REICHWEITE = 400.0f;   // Zentimeter (4 m)
 

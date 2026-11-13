@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 param([Parameter(Mandatory)][string]$Dll)
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path $Dll)) { throw "$Dll is missing" }
@@ -10,5 +10,5 @@ if (-not $dumpbin) { throw "dumpbin.exe not found" }
 $asm = & $dumpbin.FullName /disasm:nobytes /nologo $Dll
 $fninit = @($asm | Select-String -Pattern '\bfninit\b').Count
 $emms = @($asm | Select-String -Pattern '\bemms\b').Count
-"og3_patch.dll: fninit $fninit, emms $emms"
-if ($fninit -gt 0) { throw "og3_patch.dll contains fninit - CLEAR_FPU_STACK=emms is missing from the AngelScript build" }
+"g3asm.dll: fninit $fninit, emms $emms"
+if ($fninit -gt 0) { throw "g3asm.dll contains fninit - CLEAR_FPU_STACK=emms is missing from the AngelScript build" }

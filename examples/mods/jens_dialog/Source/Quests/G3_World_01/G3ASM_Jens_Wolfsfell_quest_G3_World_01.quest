@@ -1,9 +1,9 @@
 [Quest]
-Name=OG3_Jens_Wolfsfell
+Name=G3ASM_Jens_Wolfsfell
 Type=0
 FinishedQuests
-LogTopic=OG3_JENS_WOLFSFELL
-LogText=OG3_JENS_WOLFSFELL_TEXT
+LogTopic=G3ASM_JENS_WOLFSFELL
+LogText=G3ASM_JENS_WOLFSFELL_TEXT
 ExperiencePoints=100
 PoliticalSuccess=0
 EnclaveSuccess

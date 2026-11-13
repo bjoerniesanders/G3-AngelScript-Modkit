@@ -1,16 +1,16 @@
-# OG3-Patch: license and additional permissions
+# G3 AngelScript Modkit (G3ASM): license and additional permissions
 
-OG3-Patch is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
+G3ASM is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or (at your option) any later version. See `LICENSE`.
 
-Copyright (C) 2026 OG3-Patch authors
+Copyright (C) 2026 G3ASM authors
 
 The example mods and the template script in `examples/` are dedicated to the public domain under CC0 1.0 (see `examples/LICENSE`).
 You may copy them into your own mods without any conditions.
 
 ## Additional permissions under GNU GPL version 3 section 7
 
-The following additional permissions apply to the parts of OG3-Patch whose copyright is held by the OG3-Patch authors. They do not
+The following additional permissions apply to the parts of G3ASM whose copyright is held by the G3ASM authors. They do not
 extend to third-party code that may be included in the future under the plain GPL (for example code taken from the Gothic 3 SDK).
 As stated in section 7, anyone who conveys a modified version may remove these permissions from their version.
 
@@ -36,9 +36,9 @@ versions of the Program itself (its C++ sources and the binaries built from them
 
 ## Zusammenfassung (Deutsch, nicht rechtsverbindlich)
 
-- Der Patch (C++-Quellen, `og3_patch.dll`, Loader, Werkzeuge) steht unter **GPL-3.0-or-later**. Wer ihn verändert und weitergibt, muss
+- Das Modkit (C++-Quellen, `g3asm.dll`, Loader, Werkzeuge) steht unter **GPL-3.0-or-later**. Wer es verändert und weitergibt, muss
   den Quellcode der Änderung ebenfalls unter der GPL offenlegen.
-- **Erlaubnis 1:** Der Patch darf mit den Programmdateien von Gothic 3 zusammen laufen und weitergegeben werden, obwohl das Spiel nicht frei ist.
-- **Erlaubnis 2:** Mods, die den Patch nur über die Skript-Schnittstelle nutzen, darfst du unter jeder Lizenz veröffentlichen, auch
+- **Erlaubnis 1:** Das Modkit darf mit den Programmdateien von Gothic 3 zusammen laufen und weitergegeben werden, obwohl das Spiel nicht frei ist.
+- **Erlaubnis 2:** Mods, die das Modkit nur über die Skript-Schnittstelle nutzen, darfst du unter jeder Lizenz veröffentlichen, auch
   geschlossen. Die GPL gilt für sie nicht.
 - Die Beispiel-Mods unter `examples/` sind gemeinfrei (CC0): beliebig kopieren und ändern.

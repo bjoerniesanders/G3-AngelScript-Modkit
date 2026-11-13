@@ -1,6 +1,6 @@
-"""Test der Generationsvergabe von og3_packmod: Mod-Archive muessen ohne Luecke nummeriert werden (.mod, .m00, .m01, ...; Alternatives Balancing: .nod, .n00, ...),
+"""Test der Generationsvergabe von g3asm_packmod: Mod-Archive muessen ohne Luecke nummeriert werden (.mod, .m00, .m01, ...; Alternatives Balancing: .nod, .n00, ...),
 weil die Engine an der ersten fehlenden Nummer aufhoert. Ausserdem: ".deleted"-Dateien, Kommentare aus, leere Ordner, ungueltige Volume-Namen.
-Aufruf: python -I tests/packmod_generations.py <og3_packmod.exe>"""
+Aufruf: python -I tests/packmod_generations.py <g3asm_packmod.exe>"""
 import os
 import shutil
 import subprocess
@@ -23,7 +23,7 @@ def check(cond, msg):
     print(('OK       ' if cond else 'FEHLER   ') + msg)
 
 
-tmp = tempfile.mkdtemp(prefix='og3gen_')
+tmp = tempfile.mkdtemp(prefix='g3asmgen_')
 try:
     data = os.path.join(tmp, 'Data')
     src = os.path.join(tmp, 'src', 'G3_World_01')

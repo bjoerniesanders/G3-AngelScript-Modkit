@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Zeichen-API (Skript-Schnittstelle ab Version 34, Bilder ab 38, Zeichnen ueber dem HUD ab 39, Roadmap 7.2).
 // Gemessen 2026-11-09:
 //  - eCGUIAdmin::EndFrame (Export) laeuft im Spiel praktisch nie; eCGUIAdmin::CreateTexture(Farbe) und eCGUIRenderer::DrawRect sind leere Rumpfe
@@ -13,7 +13,7 @@
 // Darum: OnDraw() laeuft am Bildende des Haupt-Renderers; DrawText/TextWidth gehen an eCGUIRenderer::DrawTextA/CalcTextRect, DrawImage an
 // eCGUIRenderer::DrawSprite (Textur + Ausschnitt aus eCGUIAdmin::LoadBitmapA). Die GUI-Flaeche (GetScreenWidth/Height, z. B. 1365x768) bringt der
 // Renderer selbst auf das Fenster (sein Zeichen-Massstab, gemessen 1,875; eine eigene Skalierung ueber die Transformation verdoppelt ihn).
-// Kommt das Bildende einmal nicht (2 Bilder lang), zeichnet der Patch wie frueher beim ersten Fenster ueber den Geraetekontext des Desktops (CFFGFCDeviceContext::DrawTextA/CalcTextRect/DrawBitmap).
+// Kommt das Bildende einmal nicht (2 Bilder lang), zeichnet das Modkit wie frueher beim ersten Fenster ueber den Geraetekontext des Desktops (CFFGFCDeviceContext::DrawTextA/CalcTextRect/DrawBitmap).
 // Schriften legt eCGUIAdmin::CreateFontA an (Name, Hoehe, Breite, -, fett, kursiv; fett = Gewicht 700); beide Wege benutzen dieselben Nummern.
 // Bilder: Namen wie in g3.gui.res ("\data\gui\icons\hud\v3\icons\misc\g3_hud_icon_misc_compass.tga") oder nur der Dateiname. Rueckfallweg: CFFGFCBitmap
 // (8 Byte: vtable, IFFGUIBitmap*) ::Create(Name); CFFGFCDeviceContext::DrawBitmap(Bild, bCRect*, Flags, Winkel im Bogenmass - so dreht Game.dll die
@@ -34,7 +34,7 @@
 #include "sb_api.h"
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 struct Rect {
@@ -588,18 +588,18 @@ bool WorldToScreenScript(const SVec3& p, float& sx, float& sy) {
 
 bool RegisterDrawBindings(asIScriptEngine* e) {
     bool ok = true;
-    OG3_REG(e->RegisterGlobalFunction("int CreateFont(const bCString &in face, int height, bool bold = false, bool italic = false)",
+    G3ASM_REG(e->RegisterGlobalFunction("int CreateFont(const bCString &in face, int height, bool bold = false, bool italic = false)",
                                       asFUNCTION(CreateFontScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction(
+    G3ASM_REG(e->RegisterGlobalFunction(
         "bool DrawText(int font, int x, int y, const bCString &in text, uint argb = 0xFFFFFFFF, bool shadow = true)", asFUNCTION(DrawTextScript),
         asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int TextWidth(int font, const bCString &in text)", asFUNCTION(TextWidthScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int LoadImage(const bCString &in name)", asFUNCTION(LoadImageScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool DrawImage(int image, int x, int y, int w, int h, float angle = 0)", asFUNCTION(DrawImageScript),
+    G3ASM_REG(e->RegisterGlobalFunction("int TextWidth(int font, const bCString &in text)", asFUNCTION(TextWidthScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int LoadImage(const bCString &in name)", asFUNCTION(LoadImageScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool DrawImage(int image, int x, int y, int w, int h, float angle = 0)", asFUNCTION(DrawImageScript),
                                       asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int GetScreenWidth()", asFUNCTION(ScreenWidth), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int GetScreenHeight()", asFUNCTION(ScreenHeight), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool WorldToScreen(const bCVector &in pos, float &out x, float &out y)", asFUNCTION(WorldToScreenScript),
+    G3ASM_REG(e->RegisterGlobalFunction("int GetScreenWidth()", asFUNCTION(ScreenWidth), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int GetScreenHeight()", asFUNCTION(ScreenHeight), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool WorldToScreen(const bCVector &in pos, float &out x, float &out y)", asFUNCTION(WorldToScreenScript),
                                       asCALL_CDECL));
     return ok;
 }
@@ -627,4 +627,4 @@ int InstallDrawHooks(ScriptHost& host) {
     return ok ? 1 : 0;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

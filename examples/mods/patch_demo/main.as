@@ -1,5 +1,5 @@
 // Patch-Demo: ScriptPatches\abbas_xp.patch aendert die Quest-Datei "Abbas_Artefakt" des Spiels (ExperiencePoints 300 -> 600), bevor das Spiel sie liest.
-// Dieser Mod prueft nach dem Laden, ob die Aenderung angekommen ist. Abschalten: in og3\\mods\\load_order.txt "-patch_demo" eintragen.
+// Dieser Mod prueft nach dem Laden, ob die Aenderung angekommen ist. Abschalten: in g3asm\\mods\\load_order.txt "-patch_demo" eintragen.
 bool geprueft = false;
 float zeit = 0;
 void OnFrame(float dt) {

@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // PackMod: Ordner -> Gothic-3-Archiv (G3V0). Das Ergebnis entspricht dem, was G3PakDir (Union Starter) schreibt, und wird von der Engine wie ein .pak geladen.
 // Mod-Archive tragen die Endungen .mod (.m00, .m01, ...) bzw. .nod (.n00, ...): sie setzen die Reihe der .pak-Dateien fort, werden immer geladen und ueberschreiben
 // alles Normale; ohne Luecke in der Nummerierung (die Engine hoert an der ersten Luecke auf). .nod gilt nur bei aktivem "Alternativen Balancing".
-// Keine Abhaengigkeit von Skript-Host oder Spiel (auch als Kommandozeilenwerkzeug og3_packmod).
+// Keine Abhaengigkeit von Skript-Host oder Spiel (auch als Kommandozeilenwerkzeug g3asm_packmod).
 #pragma once
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace og3p {
+namespace g3asm {
 
 struct PackOptions {
     bool comments = false;   // Quellpfad als Kommentar je Datei speichern (G3PakDir-Standard; verraet lokale Pfade, deshalb hier aus)
@@ -47,4 +47,4 @@ struct ArchiveEntry {
 bool ListArchive(const std::string& file, std::vector<ArchiveEntry>* out, std::string* error);
 bool ReadArchiveEntry(const std::string& file, const ArchiveEntry& e, std::string* data);
 
-}   // namespace og3p
+}   // namespace g3asm

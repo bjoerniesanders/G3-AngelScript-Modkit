@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Eingriffe mitten in Spielskripten der Script_Game.dll (Skript-Schnittstelle ab Version 42). Anders als die uebrigen Hooks haengen sie nicht an einem
 // Export, sondern an einer festen Stelle: Vor dem Umleiten werden die Originalbytes Byte fuer Byte verglichen. Passt eine Stelle nicht (andere Version der
 // Script_Game.dll, oder eine Script-DLL wie Script_MonsterDamage.dll hat sie schon geaendert), bleibt sie unberuehrt und das Protokoll sagt es.
@@ -19,7 +19,7 @@
 
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 ScriptHost* g_host = nullptr;
@@ -387,4 +387,4 @@ int InstallScriptGamePatches(ScriptHost& host) {
     return ok;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

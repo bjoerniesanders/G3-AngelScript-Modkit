@@ -1,4 +1,4 @@
-// Test (API 44): Einstellungen je Mod - Vorgaben aus mod.ini [settings], Benutzerwerte in OG3_SETTINGS_DIR\einstellungen.ini
+// Test (API 44): Einstellungen je Mod - Vorgaben aus mod.ini [settings], Benutzerwerte in G3ASM_SETTINGS_DIR\einstellungen.ini
 void main() {
     ResetModSetting("Zahl");   // Rest eines abgebrochenen Laufs
     check(GetModSetting("name") == "Wolf" && GetModSetting("fehlt", "vorgabe") == "vorgabe", "Einstellungen: Text aus mod.ini, Standard bei fehlendem Schluessel");

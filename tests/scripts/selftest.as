@@ -1,4 +1,4 @@
-// Selbsttest der og3_patch-Skriptschnittstelle (laeuft ohne Spiel: og3_patch_test <SharedBase.dll> tests\scripts\selftest.as)
+// Selbsttest der g3asm-Skriptschnittstelle (laeuft ohne Spiel: g3asm_test <SharedBase.dll> tests\scripts\selftest.as)
 // Jede check()-Bedingung muss wahr sein; das Testprogramm meldet die Zahl der Fehlschlaege.
 
 bool near(float a, float b) { return abs(a - b) < 0.0001f; }
@@ -133,7 +133,7 @@ void TestEntity() {
     check(GetGameDay() == -1 && GetGameHour() == -1 && GetGameMinute() == -1, "ohne Spiel keine Uhr");
     check(!SetGameTime(1, 12, 0), "ohne Spiel keine Uhr setzen");
     check(e.GetItemCount("It_Wolf_Fur") == -1 && e.RemoveItems("It_Wolf_Fur", 1) == -1 && e.AddItems("It_Wolf_Fur", 1) == -1, "ohne Spiel kein Inventar");
-    check(CloneTemplate("It_Wolf_Fur", "OG3_Klon") < 0, "ohne Spiel kein Template-Klonen");
+    check(CloneTemplate("It_Wolf_Fur", "G3ASM_Klon") < 0, "ohne Spiel kein Template-Klonen");
     check(!SpawnNPC("Diego", bCVector(0, 0, 0)).IsValid() && FindTemplateNames("Diego") == "", "ohne Spiel kein SpawnNPC");
     { Entity z; check(!DestroyNPC(z) && !IsDynamicSpawn(z) && !z.LookAt(z) && !z.SetRotation(bCQuaternion()), "ohne Spiel kein DestroyNPC/LookAt/SetRotation"); }
     check(!QuestExists("X") && !CreateQuest("X") && !RunQuest("X") && !SucceedQuest("X") && !FailQuest("X") && !CloseQuest("X") && !RemoveQuest("X"), "ohne Spiel keine Quests");
@@ -165,7 +165,7 @@ void main() {
     TestPackMod();
     check(!SetOverrideArg(0, 1), "SetOverrideArg ausserhalb eines Overrides wird abgelehnt");
     check(AI_STATE == 1 && AI_FUNCTION == 2 && AI_CALLBACK == 3 && AI_ROUTINE == 4, "KI-Konstanten");
-    check(GetLocText("OG3_Gibt_Es_Nicht").IsEmpty() && !IsModActive("gibts_nicht") && GetModVersion("gibts_nicht").IsEmpty() && GetSpeechText("INFO_A_B_German").IsEmpty(), "GetLocText/GetSpeechText/IsModActive ohne Spiel");
+    check(GetLocText("G3ASM_Gibt_Es_Nicht").IsEmpty() && !IsModActive("gibts_nicht") && GetModVersion("gibts_nicht").IsEmpty() && GetSpeechText("INFO_A_B_German").IsEmpty(), "GetLocText/GetSpeechText/IsModActive ohne Spiel");
     check(DumpPropertySchema("../x.json") == -2 && DumpPropertySchema("a/b.json") == -2 && DumpPropertySchema("") == -2, "DumpPropertySchema: nur schlichte Dateinamen");
     TestEntity();
     print("Selbsttest fertig");

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Spielskripte nach Namen (Skript-Schnittstelle ab Version 32, Roadmap 7.1).
 // Die Spielskripte der Script_*.dll (z. B. "AssessHit", "MagicTeleport", "SetHitPoints") stehen in der Tabelle gCScriptAdmin::m_Scripts (Name -> Funktion
 // int __stdcall(gCScriptProcessingUnit*, Entity* self, Entity* other, int arg)). Jeder Aufruf nach Namen laeuft ueber einen von zwei Exporten der Game.dll
@@ -12,7 +12,7 @@
 // Fuer Mods:
 //   int CallScript(name, self, other, arg)  - Skript aufrufen (ueber CallScriptFromScript, wie ein Spielskript es tut)
 //   bool ScriptExists(name), bCString GetScriptDll(name)
-//   WatchScript(name)                        - nur fuer beobachtete Namen ruft der Patch Override_Script/OnScript (sonst kostet jeder Skriptaufruf Zeit)
+//   WatchScript(name)                        - nur fuer beobachtete Namen ruft das Modkit Override_Script/OnScript (sonst kostet jeder Skriptaufruf Zeit)
 //   bool Override_Script(const bCString &in name, Entity self, Entity other, int arg)   - Super() = Original; SetOverrideArg(3, x) aendert arg
 //   void OnScript(const bCString &in name, Entity self, Entity other, int arg, int result)  - danach, nur wenn das Original lief
 //   SetScriptResult(int)                     - Ergebnis fuers Spiel, wenn Override_Script das Original NICHT aufruft (sonst 1 bei true, 0 bei false)
@@ -43,7 +43,7 @@
 #include "sb_api.h"
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 struct Entity {
@@ -513,16 +513,16 @@ bool MakeScriptEntity(void* buf, void* ent) {
 
 bool RegisterScriptCallBindings(asIScriptEngine* e) {
     bool ok = true;
-    OG3_REG(e->RegisterGlobalFunction("int CallScript(const bCString &in name, const Entity &in self, const Entity &in other, int arg = 0)",
+    G3ASM_REG(e->RegisterGlobalFunction("int CallScript(const bCString &in name, const Entity &in self, const Entity &in other, int arg = 0)",
                                       asFUNCTION(CallScriptScript), asCALL_CDECL));   // experimentell
-    OG3_REG(e->RegisterGlobalFunction("bool ScriptExists(const bCString &in name)", asFUNCTION(ScriptExistsScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetScriptDll(const bCString &in name)", asFUNCTION(GetScriptDllScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("void WatchScript(const bCString &in name)", asFUNCTION(WatchScriptScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("void SetScriptResult(int value)", asFUNCTION(SetScriptResultScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalProperty("const int AI_STATE", const_cast<int*>(&kAIState)));
-    OG3_REG(e->RegisterGlobalProperty("const int AI_FUNCTION", const_cast<int*>(&kAIFunction)));
-    OG3_REG(e->RegisterGlobalProperty("const int AI_CALLBACK", const_cast<int*>(&kAICallback)));
-    OG3_REG(e->RegisterGlobalProperty("const int AI_ROUTINE", const_cast<int*>(&kAIRoutine)));
+    G3ASM_REG(e->RegisterGlobalFunction("bool ScriptExists(const bCString &in name)", asFUNCTION(ScriptExistsScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetScriptDll(const bCString &in name)", asFUNCTION(GetScriptDllScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("void WatchScript(const bCString &in name)", asFUNCTION(WatchScriptScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("void SetScriptResult(int value)", asFUNCTION(SetScriptResultScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalProperty("const int AI_STATE", const_cast<int*>(&kAIState)));
+    G3ASM_REG(e->RegisterGlobalProperty("const int AI_FUNCTION", const_cast<int*>(&kAIFunction)));
+    G3ASM_REG(e->RegisterGlobalProperty("const int AI_CALLBACK", const_cast<int*>(&kAICallback)));
+    G3ASM_REG(e->RegisterGlobalProperty("const int AI_ROUTINE", const_cast<int*>(&kAIRoutine)));
     return ok;
 }
 
@@ -576,4 +576,4 @@ int InstallScriptCallHooks(ScriptHost& host) {
     return n;
 }
 
-}   // namespace og3p
+}   // namespace g3asm

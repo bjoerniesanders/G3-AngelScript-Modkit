@@ -1,7 +1,7 @@
 // Blitz-Test, Schritt 1e (fuer "Klaue Beliars"): Strg + Ziffernblock - schlaegt einen Blitz auf den anvisierten NPC.
 // Schaden: Beschwoerung Smn_Lightning mit dem Helden als Besitzer (gCInteraction_PS.Owner) - laeuft durch die echte Treffer-Kette (gemessen: Quelle Smn_Lightning, Besitzer PC_Hero, Typ 6, toetet).
 // Optik: Die Beschwoerung selbst zeigt keinen Blitz. Jeder Druck probiert die naechste Blitz-Optik der Reihe nach aus (siehe OPTIK_*): ein benannter Effekt (StartEffect) oder die Effekt-Vorlage (SpawnNPC).
-// Sicherungen: nur NPCs als Ziel, mindestens WARTE Sekunden zwischen zwei Blitzen. Abschalten: "-blitz_test" in og3\mods\load_order.txt.
+// Sicherungen: nur NPCs als Ziel, mindestens WARTE Sekunden zwischen zwei Blitzen. Abschalten: "-blitz_test" in g3asm\mods\load_order.txt.
 const int TASTE = 0x6D;          // Ziffernblock -, zusammen mit Strg (ohne Strg gehoert die Taste spawn_demo)
 const float WARTE = 3.0f;        // Sekunden zwischen zwei Blitzen
 const bCString SCHADEN_VORLAGE = "Smn_Lightning";

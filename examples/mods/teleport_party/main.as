@@ -7,7 +7,7 @@
 // Gemessen 2026-11-09: MagicTeleport selbst schaltet alle Begleiter auf Warten (im normalen Spiel bleiben sie so am alten Ort stehen). Darum zaehlt der
 // Wartestatus von VOR dem Teleport, und die Mod hebt das Warten der Mitgenommenen danach wieder auf (sofort und nach NACHHOLEN Sekunden).
 // Nach TeleportTo setzt die Mod jeden Begleiter NEBEN cm neben den Helden, mehrere im Kreis verteilt (genau auf dem Helden spricht er ihn sofort an).
-// Protokoll: og3_patch.log (Positionen vor/nach, je Mitglied Typ, Abstand, Ergebnis).
+// Protokoll: g3asm.log (Positionen vor/nach, je Mitglied Typ, Abstand, Ergebnis).
 const bool WARTENDE_MIT = false;
 const float NACHHOLEN = 1.5f;   // Sekunden
 const float WEIT = 1500.0f;     // Abstand in Spieleinheiten (cm)

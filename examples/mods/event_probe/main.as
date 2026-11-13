@@ -1,12 +1,12 @@
 // Mess-Mod fuer die Ereignisse ab API 35: Konsolenbefehle (Override_ConsoleCommand, SetConsoleReply) und Quest-Status (OnQuestStatus).
-//   Konsole: Befehl "og3" antwortet mit der API-Version; alle anderen Befehle laufen unveraendert ans Spiel.
+//   Konsole: Befehl "g3asm" antwortet mit der API-Version; alle anderen Befehle laufen unveraendert ans Spiel.
 //   Strg + Ziffernblock * oeffnet die Konsole (OpenConsole), falls das Spiel keine Taste dafuer hat.
 //   Quests:  jeder Statuswechsel steht im Protokoll (0 Open, 1 Running, 2 Success, 3 Failed, 4 Obsolete, 5 Cancelled, 6 Lost, 7 Won).
 // Ab API 37: Beruehrungen mit dem Helden (OnTouch, gezaehlt je 10 s), Haendlerware (OnTradeGenerated), Verwandlung (OnTransformStart/End).
 //   Umschalt + Ziffernblock / erzeugt die Ware des anvisierten Haendlers neu (GenerateTradeGoods) und meldet die Stapel vorher/nachher.
 bool Override_ConsoleCommand(const bCString &in line) {
-    if (line.Find("og3", 0) != 0) return Super();
-    SetConsoleReply("OG3-Patch, Skript-Schnittstelle " + GetApiVersion());
+    if (line.Find("g3asm", 0) != 0) return Super();
+    SetConsoleReply("G3ASM, Skript-Schnittstelle " + GetApiVersion());
     print("Konsolenbefehl uebernommen: '" + line + "'");
     return true;
 }

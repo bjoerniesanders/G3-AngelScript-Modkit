@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Engine-/Game-Bindings des OG3-Patches (Skript-Schnittstelle ab Version 2): Typ Entity (Held, Spieler, Entity nach Namen),
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Engine-/Game-Bindings von G3ASM (Skript-Schnittstelle ab Version 2): Typ Entity (Held, Spieler, Entity nach Namen),
 // Name, Position, Rotation, Abstand, Position setzen.
 // Alle Funktionen werden bei der ersten Benutzung aus Engine.dll/Game.dll aufgeloest (die DLLs laden nach dem Proxy).
 // Sicherheit: Entity ist ein Wert mit rohem Zeiger. Vor jedem Zugriff wird geprueft, dass der Zeiger lesbar ist und seine vtable in
@@ -20,7 +20,7 @@
 #include "sb_api.h"
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 bool RegisterQuestBindings(asIScriptEngine* e);    // quest_bindings.cpp
 bool RegisterDialogBindings(asIScriptEngine* e);   // dialog_bindings.cpp
 bool RegisterScriptCallBindings(asIScriptEngine* e);   // script_calls.cpp
@@ -687,7 +687,7 @@ bool EntDeactivateSkill(const Entity& e, const SStr& s) { return SkillOp(e, s, 2
 bool EntHasLearnedSkill(const Entity& e, const SStr& s) { return SkillOp(e, s, 3) == 1; }
 bool EntIsSkillActive(const Entity& e, const SStr& s) { return SkillOp(e, s, 4) == 1; }
 int EntSkillActivationCount(const Entity& e, const SStr& s) { return SkillOp(e, s, 5); }
-// Globale Skriptfunktion: CloneTemplate("It_Wolf_Fur", "OG3_Fell") -> 0 angelegt, 1 vorhanden, <0 Fehler (Protokoll). Danach hero.AddItems("OG3_Fell", n).
+// Globale Skriptfunktion: CloneTemplate("It_Wolf_Fur", "G3ASM_Fell") -> 0 angelegt, 1 vorhanden, <0 Fehler (Protokoll). Danach hero.AddItems("G3ASM_Fell", n).
 // Die Kopie lebt nur im Speicher (nicht im Spielstand, GUID wechselt bei jedem Start).
 int CloneTemplate(const SStr& base, const SStr& newName) {
     int rc;
@@ -1119,7 +1119,7 @@ bool EntSetStatus(Entity& e, int effect, bool on) {
 }
 
 // ---- Item-Qualitaet (API 28): Bitmaske des Inventarstapels in einem Ausruestungs-Slot (gCInventory_PS::FindStack(gESlot), gCInventoryStack::Get/SetQuality).
-// Bits: 2 Krank, 4 Vergiftet, 8 Brennend, 16 Gefroren, 32 Scharf, 64 Gesegnet, 128 Selbstgeschmiedet, 256 Abgenutzt; 512 = Lebensraub (eigenes Bit dieses Patches, wird von der Beschreibung
+// Bits: 2 Krank, 4 Vergiftet, 8 Brennend, 16 Gefroren, 32 Scharf, 64 Gesegnet, 128 Selbstgeschmiedet, 256 Abgenutzt; 512 = Lebensraub (eigenes Bit dieses Modkits, wird von der Beschreibung
 // der Waffe angezeigt, siehe game_hooks.cpp). Die Qualitaet gehoert zum Stapel: verschiedene Qualitaeten sind verschiedene Stapel und werden mit dem Spielstand gespeichert.
 // Slots (gESlot): 1 rechte Hand, 2 linke Hand, 5 Ruecken links, 6 Ruecken rechts, 7 Bogen, 14 Munition.
 typedef void*(__thiscall* PSGetFn2)(void*, int);
@@ -2176,62 +2176,62 @@ int GetActivePage() { return ResolveScreen() ? SafeActivePage() : -1; }
 
 bool RegisterEngineBindings(asIScriptEngine* e) {
     bool ok = true;
-    OG3_REG(e->RegisterObjectType("Entity", sizeof(Entity), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Entity>()));
-    OG3_REG(e->RegisterObjectBehaviour("Entity", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(EntConstruct), asCALL_CDECL_OBJLAST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool IsValid() const", asFUNCTION(EntIsValid), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bCString GetName() const", asFUNCTION(EntName), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bCVector GetPosition() const", asFUNCTION(EntPos), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bCString GetTemplateName() const", asFUNCTION(EntTemplateName), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bCVector GetBoundsMin() const", asFUNCTION(EntBoundsMin), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bCVector GetBoundsMax() const", asFUNCTION(EntBoundsMax), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetParent() const", asFUNCTION(EntParent), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bCMatrix4 GetWorldMatrix() const", asFUNCTION(EntWorldMatrix), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bCQuaternion GetRotation() const", asFUNCTION(EntRot), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "float GetDistanceTo(const Entity &in) const", asFUNCTION(EntDist), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetPosition(const bCVector &in)", asFUNCTION(EntSetPos), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool opEquals(const Entity &in) const", asFUNCTION(EntEquals), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectType("Entity", sizeof(Entity), asOBJ_VALUE | asOBJ_POD | asGetTypeTraits<Entity>()));
+    G3ASM_REG(e->RegisterObjectBehaviour("Entity", asBEHAVE_CONSTRUCT, "void f()", asFUNCTION(EntConstruct), asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool IsValid() const", asFUNCTION(EntIsValid), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bCString GetName() const", asFUNCTION(EntName), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bCVector GetPosition() const", asFUNCTION(EntPos), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bCString GetTemplateName() const", asFUNCTION(EntTemplateName), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bCVector GetBoundsMin() const", asFUNCTION(EntBoundsMin), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bCVector GetBoundsMax() const", asFUNCTION(EntBoundsMax), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "Entity GetParent() const", asFUNCTION(EntParent), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bCMatrix4 GetWorldMatrix() const", asFUNCTION(EntWorldMatrix), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bCQuaternion GetRotation() const", asFUNCTION(EntRot), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "float GetDistanceTo(const Entity &in) const", asFUNCTION(EntDist), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool SetPosition(const bCVector &in)", asFUNCTION(EntSetPos), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool opEquals(const Entity &in) const", asFUNCTION(EntEquals), asCALL_CDECL_OBJFIRST));
     // API 3: Attribute + Spieluhr (Fehler/kein Spiel: -1 bzw. false)
-    OG3_REG(e->RegisterObjectMethod("Entity", "int GetAttribute(const bCString &in) const", asFUNCTION(EntAttr), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "int GetAttributeBase(const bCString &in) const", asFUNCTION(EntAttrBase),
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "int GetAttribute(const bCString &in) const", asFUNCTION(EntAttr), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "int GetAttributeBase(const bCString &in) const", asFUNCTION(EntAttrBase),
                                     asCALL_CDECL_OBJFIRST));
-    OG3_REG(
+    G3ASM_REG(
         e->RegisterObjectMethod("Entity", "int GetAttributeMax(const bCString &in) const", asFUNCTION(EntAttrMax), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetAttributeBase(const bCString &in, int)", asFUNCTION(EntSetAttrBase),
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool SetAttributeBase(const bCString &in, int)", asFUNCTION(EntSetAttrBase),
                                     asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool AddAttributeBase(const bCString &in, int)", asFUNCTION(EntAddAttrBase),
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool AddAttributeBase(const bCString &in, int)", asFUNCTION(EntAddAttrBase),
                                     asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetAttribute(const bCString &in, int)", asFUNCTION(EntSetAttr), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool AddAttribute(const bCString &in, int)", asFUNCTION(EntAddAttr), asCALL_CDECL_OBJFIRST));
-    OG3_REG(
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool SetAttribute(const bCString &in, int)", asFUNCTION(EntSetAttr), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool AddAttribute(const bCString &in, int)", asFUNCTION(EntAddAttr), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(
         e->RegisterObjectMethod("Entity", "int GetItemCount(const bCString &in) const", asFUNCTION(EntItemCount), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "int AddItems(const bCString &in, int)", asFUNCTION(EntAddItems), asCALL_CDECL_OBJFIRST));
-    OG3_REG(
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "int AddItems(const bCString &in, int)", asFUNCTION(EntAddItems), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(
         e->RegisterObjectMethod("Entity", "int RemoveItems(const bCString &in, int)", asFUNCTION(EntRemoveItems), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool LearnSkill(const bCString &in)", asFUNCTION(EntLearnSkill), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool ActivateSkill(const bCString &in)", asFUNCTION(EntActivateSkill), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool DeactivateSkill(const bCString &in)", asFUNCTION(EntDeactivateSkill), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool HasLearnedSkill(const bCString &in) const", asFUNCTION(EntHasLearnedSkill), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool IsSkillActive(const bCString &in) const", asFUNCTION(EntIsSkillActive), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "int GetSkillActivationCount(const bCString &in) const", asFUNCTION(EntSkillActivationCount), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "int DeleteItemStack(const bCString &in)", asFUNCTION(EntDeleteItemStack), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "int HurtHitPoints(int amount, int minHp = 0)", asFUNCTION(EntHurtHP), asCALL_CDECL_OBJFIRST));   // experimentell
-    OG3_REG(e->RegisterGlobalFunction("int CloneTemplate(const bCString &in base, const bCString &in newName)", asFUNCTION(CloneTemplate),
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool LearnSkill(const bCString &in)", asFUNCTION(EntLearnSkill), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool ActivateSkill(const bCString &in)", asFUNCTION(EntActivateSkill), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool DeactivateSkill(const bCString &in)", asFUNCTION(EntDeactivateSkill), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool HasLearnedSkill(const bCString &in) const", asFUNCTION(EntHasLearnedSkill), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool IsSkillActive(const bCString &in) const", asFUNCTION(EntIsSkillActive), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "int GetSkillActivationCount(const bCString &in) const", asFUNCTION(EntSkillActivationCount), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "int DeleteItemStack(const bCString &in)", asFUNCTION(EntDeleteItemStack), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "int HurtHitPoints(int amount, int minHp = 0)", asFUNCTION(EntHurtHP), asCALL_CDECL_OBJFIRST));   // experimentell
+    G3ASM_REG(e->RegisterGlobalFunction("int CloneTemplate(const bCString &in base, const bCString &in newName)", asFUNCTION(CloneTemplate),
                                       asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("Entity SpawnNPC(const bCString &in templateName, const bCVector &in position)", asFUNCTION(SpawnNPC),
+    G3ASM_REG(e->RegisterGlobalFunction("Entity SpawnNPC(const bCString &in templateName, const bCVector &in position)", asFUNCTION(SpawnNPC),
                                       asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("Entity PickScreen(int x, int y, float maxDistance = 100000)", asFUNCTION(PickScreen), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("Entity PickCenter(float maxDistance = 100000)", asFUNCTION(PickCenter), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCVector GetPickPoint()", asFUNCTION(GetPickPoint), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool HasPickPoint()", asFUNCTION(HasPickPoint), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("Entity GetFocusedEntity()", asFUNCTION(GetFocusedEntity), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("Entity GetCrosshairEntity()", asFUNCTION(GetCrosshairEntity), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetCrosshairVisible(bool)", asFUNCTION(SetCrosshairVisible), asCALL_CDECL));   // API 46: gCGUIManager::ShowCrossHair
-    OG3_REG(e->RegisterGlobalFunction("bool DestroyNPC(const Entity &in)", asFUNCTION(DestroyNPC), asCALL_CDECL));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bCString GetCategory() const", asFUNCTION(EntCategory), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetCurrentAttacker() const", asFUNCTION(EntCurrentAttacker), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "uint GetStatusEffects() const", asFUNCTION(EntStatusMask), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool HasStatusEffect(int) const", asFUNCTION(EntHasStatus), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetStatusEffect(int, bool)", asFUNCTION(EntSetStatus), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterGlobalFunction("Entity PickScreen(int x, int y, float maxDistance = 100000)", asFUNCTION(PickScreen), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("Entity PickCenter(float maxDistance = 100000)", asFUNCTION(PickCenter), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCVector GetPickPoint()", asFUNCTION(GetPickPoint), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool HasPickPoint()", asFUNCTION(HasPickPoint), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("Entity GetFocusedEntity()", asFUNCTION(GetFocusedEntity), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("Entity GetCrosshairEntity()", asFUNCTION(GetCrosshairEntity), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetCrosshairVisible(bool)", asFUNCTION(SetCrosshairVisible), asCALL_CDECL));   // API 46: gCGUIManager::ShowCrossHair
+    G3ASM_REG(e->RegisterGlobalFunction("bool DestroyNPC(const Entity &in)", asFUNCTION(DestroyNPC), asCALL_CDECL));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bCString GetCategory() const", asFUNCTION(EntCategory), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "Entity GetCurrentAttacker() const", asFUNCTION(EntCurrentAttacker), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "uint GetStatusEffects() const", asFUNCTION(EntStatusMask), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool HasStatusEffect(int) const", asFUNCTION(EntHasStatus), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool SetStatusEffect(int, bool)", asFUNCTION(EntSetStatus), asCALL_CDECL_OBJFIRST));
     {
         static const int kSE[] = {1, 2, 4, 8, 16, 64, 128, 256, 512};
         static const char* kSEN[] = {"STATUS_BURNING", "STATUS_FROZEN",  "STATUS_POISONED",     "STATUS_DISEASED",     "STATUS_TRANSFORMED",
@@ -2239,12 +2239,12 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
         for (int i = 0; i < 9; ++i) {
             char d[64];
             std::snprintf(d, sizeof d, "const int %s", kSEN[i]);
-            OG3_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kSE[i])));
+            G3ASM_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kSE[i])));
         }
     }
-    OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetSlotItem(int) const", asFUNCTION(EntSlotItem), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "uint GetSlotQuality(int) const", asFUNCTION(EntSlotQuality), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetSlotQuality(int, uint)", asFUNCTION(EntSetSlotQuality), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "Entity GetSlotItem(int) const", asFUNCTION(EntSlotItem), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "uint GetSlotQuality(int) const", asFUNCTION(EntSlotQuality), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool SetSlotQuality(int, uint)", asFUNCTION(EntSetSlotQuality), asCALL_CDECL_OBJFIRST));
     {
         static const int kQ[] = {2, 4, 8, 16, 32, 64, 128, 256, 512};
         static const char* kQN[] = {"QUALITY_DISEASED", "QUALITY_POISONED", "QUALITY_BURNING", "QUALITY_FROZEN", "QUALITY_SHARP",
@@ -2252,66 +2252,66 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
         for (int i = 0; i < 9; ++i) {
             char d[64];
             std::snprintf(d, sizeof d, "const int %s", kQN[i]);
-            OG3_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kQ[i])));
+            G3ASM_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kQ[i])));
         }
         static const int kSlots[] = {1, 2, 5, 6, 7, 14};
         static const char* kSN[] = {"SLOT_RIGHT_HAND", "SLOT_LEFT_HAND", "SLOT_BACK_LEFT", "SLOT_BACK_RIGHT", "SLOT_BOW", "SLOT_AMMO"};
         for (int i = 0; i < 6; ++i) {
             char d[64];
             std::snprintf(d, sizeof d, "const int %s", kSN[i]);
-            OG3_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kSlots[i])));
+            G3ASM_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kSlots[i])));
         }
     }
-    OG3_REG(e->RegisterGlobalFunction("bCString GetProperty(const Entity &in, const bCString &in set, const bCString &in prop)", asFUNCTION(GetPropertyText), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetProperty(const Entity &in, const bCString &in set, const bCString &in prop, const bCString &in value)", asFUNCTION(SetPropertyText), asCALL_CDECL));   // experimentell
-    OG3_REG(e->RegisterGlobalFunction("bool SetTemplateRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const bCString &in target)", asFUNCTION(SetTemplateRefScript), asCALL_CDECL));   // experimentell
-    OG3_REG(e->RegisterGlobalFunction("bool SetEntityRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const Entity &in target)", asFUNCTION(SetEntityRefScript), asCALL_CDECL));   // experimentell
-    OG3_REG(e->RegisterObjectMethod("Entity", "int GetPartyMemberCount() const", asFUNCTION(EntPartyCount), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetPartyMember(int index) const", asFUNCTION(EntPartyMember), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "Entity GetPartyLeader() const", asFUNCTION(EntPartyLeader), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool IsPartyWaiting() const", asFUNCTION(EntIsPartyWaiting), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool SetPartyWaiting(bool)", asFUNCTION(EntSetPartyWaiting), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool TeleportTo(const Entity &in target)", asFUNCTION(EntTeleportTo), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool Kill(const Entity &in killer)", asFUNCTION(EntKill), asCALL_CDECL_OBJFIRST));   // API 46
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool Kill()", asFUNCTION(EntKillNoKiller), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "int GetInventoryStackCount() const", asFUNCTION(EntStackCount), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool GenerateTradeGoods()", asFUNCTION(EntGenerateTradeGoods), asCALL_CDECL_OBJFIRST));   // experimentell
-    OG3_REG(e->RegisterGlobalFunction("bool EffectExists(const bCString &in name)", asFUNCTION(EffectExistsScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool StartEffect(const bCString &in name, const Entity &in at)", asFUNCTION(StartEffectScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("Entity GetTemplateEntity(const bCString &in name)", asFUNCTION(GetTemplateEntityScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString ListProperties(const Entity &in, const bCString &in set, int max = 200)", asFUNCTION(ListPropertyTexts), asCALL_CDECL));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool IsBuilding() const", asFUNCTION(EntIsBuilding), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterGlobalFunction("bool IsNPC(const Entity &in)", asFUNCTION(IsNPCScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool IsDynamicSpawn(const Entity &in)", asFUNCTION(IsDynamicSpawn), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int CountEntities(const bCString &in part)", asFUNCTION(CountEntities), asCALL_CDECL));
-    OG3_REG(
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetProperty(const Entity &in, const bCString &in set, const bCString &in prop)", asFUNCTION(GetPropertyText), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetProperty(const Entity &in, const bCString &in set, const bCString &in prop, const bCString &in value)", asFUNCTION(SetPropertyText), asCALL_CDECL));   // experimentell
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetTemplateRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const bCString &in target)", asFUNCTION(SetTemplateRefScript), asCALL_CDECL));   // experimentell
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetEntityRef(const Entity &in, const bCString &in classSet, const bCString &in prop, const Entity &in target)", asFUNCTION(SetEntityRefScript), asCALL_CDECL));   // experimentell
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "int GetPartyMemberCount() const", asFUNCTION(EntPartyCount), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "Entity GetPartyMember(int index) const", asFUNCTION(EntPartyMember), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "Entity GetPartyLeader() const", asFUNCTION(EntPartyLeader), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool IsPartyWaiting() const", asFUNCTION(EntIsPartyWaiting), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool SetPartyWaiting(bool)", asFUNCTION(EntSetPartyWaiting), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool TeleportTo(const Entity &in target)", asFUNCTION(EntTeleportTo), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool Kill(const Entity &in killer)", asFUNCTION(EntKill), asCALL_CDECL_OBJFIRST));   // API 46
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool Kill()", asFUNCTION(EntKillNoKiller), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "int GetInventoryStackCount() const", asFUNCTION(EntStackCount), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool GenerateTradeGoods()", asFUNCTION(EntGenerateTradeGoods), asCALL_CDECL_OBJFIRST));   // experimentell
+    G3ASM_REG(e->RegisterGlobalFunction("bool EffectExists(const bCString &in name)", asFUNCTION(EffectExistsScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool StartEffect(const bCString &in name, const Entity &in at)", asFUNCTION(StartEffectScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("Entity GetTemplateEntity(const bCString &in name)", asFUNCTION(GetTemplateEntityScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString ListProperties(const Entity &in, const bCString &in set, int max = 200)", asFUNCTION(ListPropertyTexts), asCALL_CDECL));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool IsBuilding() const", asFUNCTION(EntIsBuilding), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterGlobalFunction("bool IsNPC(const Entity &in)", asFUNCTION(IsNPCScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool IsDynamicSpawn(const Entity &in)", asFUNCTION(IsDynamicSpawn), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int CountEntities(const bCString &in part)", asFUNCTION(CountEntities), asCALL_CDECL));
+    G3ASM_REG(
         e->RegisterGlobalFunction("Entity GetEntityByPart(const bCString &in part, int index)", asFUNCTION(GetEntityByPart), asCALL_CDECL));
-    OG3_REG(
+    G3ASM_REG(
         e->RegisterObjectMethod("Entity", "bool SetRotation(const bCQuaternion &in)", asFUNCTION(EntSetRotation), asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterObjectMethod("Entity", "bool LookAt(const Entity &in, float yawOffsetDegrees = 0)", asFUNCTION(EntLookAt),
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bool LookAt(const Entity &in, float yawOffsetDegrees = 0)", asFUNCTION(EntLookAt),
                                     asCALL_CDECL_OBJFIRST));
-    OG3_REG(e->RegisterGlobalFunction("int CountTemplateNames(const bCString &in prefix)", asFUNCTION(CountTemplateNames), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString FindTemplateNames(const bCString &in part, int max = 20)", asFUNCTION(FindTemplateNames),
+    G3ASM_REG(e->RegisterGlobalFunction("int CountTemplateNames(const bCString &in prefix)", asFUNCTION(CountTemplateNames), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString FindTemplateNames(const bCString &in part, int max = 20)", asFUNCTION(FindTemplateNames),
                                       asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetGameEvent(const bCString &in)", asFUNCTION(SetGameEvent), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool ClearGameEvent(const bCString &in)", asFUNCTION(ClearGameEvent), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool IsGameEventSet(const bCString &in)", asFUNCTION(IsGameEventSet), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int GetGameDay()", asFUNCTION(GameDay), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int GetGameHour()", asFUNCTION(GameHour), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int GetGameMinute()", asFUNCTION(GameMinute), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetGameTime(int day, int hour, int minute)", asFUNCTION(SetGameTime), asCALL_CDECL));   // im Spiel nicht geprueft
-    OG3_REG(e->RegisterGlobalFunction("float GetTimeScale()", asFUNCTION(GetTimeScaleScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetTimeScale(float scale)", asFUNCTION(SetTimeScaleScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("float GetClockFactor()", asFUNCTION(GetClockFactorScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetClockFactor(float factor)", asFUNCTION(SetClockFactorScript), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool PrintScreen(const bCString &in, float seconds = 3, int r = 255, int g = 255, int b = 255)",
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetGameEvent(const bCString &in)", asFUNCTION(SetGameEvent), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool ClearGameEvent(const bCString &in)", asFUNCTION(ClearGameEvent), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool IsGameEventSet(const bCString &in)", asFUNCTION(IsGameEventSet), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int GetGameDay()", asFUNCTION(GameDay), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int GetGameHour()", asFUNCTION(GameHour), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int GetGameMinute()", asFUNCTION(GameMinute), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetGameTime(int day, int hour, int minute)", asFUNCTION(SetGameTime), asCALL_CDECL));   // im Spiel nicht geprueft
+    G3ASM_REG(e->RegisterGlobalFunction("float GetTimeScale()", asFUNCTION(GetTimeScaleScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetTimeScale(float scale)", asFUNCTION(SetTimeScaleScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("float GetClockFactor()", asFUNCTION(GetClockFactorScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetClockFactor(float factor)", asFUNCTION(SetClockFactorScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool PrintScreen(const bCString &in, float seconds = 3, int r = 255, int g = 255, int b = 255)",
                                       asFUNCTION(PrintScreenText), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool PrintGameMessage(const bCString &in, int type = 0)", asFUNCTION(PrintGameMessageText),
+    G3ASM_REG(e->RegisterGlobalFunction("bool PrintGameMessage(const bCString &in, int type = 0)", asFUNCTION(PrintGameMessageText),
                                       asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("int GetActivePage()", asFUNCTION(GetActivePage), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("Entity GetHero()", asFUNCTION(GetHero), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("Entity GetPlayer()", asFUNCTION(GetPlayer), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("Entity FindEntity(const bCString &in)", asFUNCTION(FindEntity), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int GetActivePage()", asFUNCTION(GetActivePage), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("Entity GetHero()", asFUNCTION(GetHero), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("Entity GetPlayer()", asFUNCTION(GetPlayer), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("Entity FindEntity(const bCString &in)", asFUNCTION(FindEntity), asCALL_CDECL));
     if (!RegisterQuestBindings(e)) ok = false;
     if (!RegisterDialogBindings(e)) ok = false;
     if (!RegisterScriptCallBindings(e)) ok = false;
@@ -2343,4 +2343,4 @@ bool AdjustHeroHitPoints(const void* ent, int delta) {
     return AttrSet(e, hp, delta, &StatsApi::addValue);
 }
 
-}   // namespace og3p
+}   // namespace g3asm

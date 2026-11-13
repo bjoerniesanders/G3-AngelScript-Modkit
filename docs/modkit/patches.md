@@ -4,7 +4,7 @@ Wie beim G1R-Modkit kann ein Mod **Unified-Diff-Dateien** mitbringen, die die Da
 seine Quests, Dialoge und Tabellen sind Textdateien in Archiven (`Data\Quests.pak`, `Data\Infos.pak`, ...). Genau auf diese Textdateien wirken die Patches.
 
 ```
-<Gothic 3>\og3\mods\mein_mod\ScriptPatches\wolfsfell_xp.patch
+<Gothic 3>\g3asm\mods\mein_mod\ScriptPatches\wolfsfell_xp.patch
 ```
 
 Ein Mod kann **nur** aus Patches bestehen (ohne `main.as`). Er braucht nur den Ordner `ScriptPatches` mit `.patch`-Dateien.
@@ -32,8 +32,8 @@ Standard-Unified-Diff (`diff -u`, `git diff`). Pfade stehen mit `a/` und `b/` da
 
 ## Wie es wirkt
 
-Das Dateisystem des Spiels bevorzugt **physische Dateien** vor Archiveinträgen. Der Patch berechnet die geänderte Fassung und legt sie als physische Datei unter
-`<Spiel>\Data\<Archiv>\<Pfad>` ab. Das Archiv selbst bleibt unverändert. Bei jedem Start werden die zuletzt erzeugten Dateien (Liste `og3\patched_files.txt`) gelöscht und alles aus dem Original neu berechnet.
+Das Dateisystem des Spiels bevorzugt **physische Dateien** vor Archiveinträgen. Das Modkit berechnet die geänderte Fassung und legt sie als physische Datei unter
+`<Spiel>\Data\<Archiv>\<Pfad>` ab. Das Archiv selbst bleibt unverändert. Bei jedem Start werden die zuletzt erzeugten Dateien (Liste `g3asm\patched_files.txt`) gelöscht und alles aus dem Original neu berechnet.
 Entfernst du einen Mod, ist beim nächsten Start der Originalzustand zurück.
 
 ## Fehler

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 OG3-Patch authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
+// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Dialog-Bindings (Skript-Schnittstelle ab Version 10), Teil 1: die Infos des Spiels LESEN.
 // Dialoge in Gothic 3 sind "Infos" (gCInfo_PS) im gCInfoManager_PS: jede Info hat Besitzer (NPC), Eltern-Info, Quest, Bedingungsart,
 // Typ und ein Info-Skript aus Zeilen (gCInfoScriptLine_PS: Befehl, Entity1/2, ID1/2, Text als Text-ID). Bevor eigene Dialoge angelegt werden,
@@ -22,7 +22,7 @@
 #include "sb_api.h"
 #include "script_host.h"
 
-namespace og3p {
+namespace g3asm {
 namespace {
 
 typedef void*(__stdcall* InstFn)();
@@ -485,7 +485,7 @@ bool SetInfoCondition(const SStr& name, int cond) {
     void* info = Resolve() ? FindInfoByName(name.c_str()) : nullptr;
     return info && g_d.accessCond && SafeSetEnum(g_d.accessCond, info, cond);
 }
-// Zeile an das Info-Skript haengen. Text (falls nicht leer) wird als eigene Text-ID OG3_INFO_<Info>_<n> registriert.
+// Zeile an das Info-Skript haengen. Text (falls nicht leer) wird als eigene Text-ID G3ASM_INFO_<Info>_<n> registriert.
 bool AddInfoLine(const SStr& name, const SStr& command, const SStr& e1, const SStr& e2, const SStr& id1, const SStr& id2,
                  const SStr& text) {
     if (!WriteReady()) return false;
@@ -497,7 +497,7 @@ bool AddInfoLine(const SStr& name, const SStr& command, const SStr& e1, const SS
     const int idx = SafeCmdCount(script);
     SStr idStr("");
     if (text.length() > 0) {
-        std::string id = std::string("OG3_INFO_") + name.c_str() + "_" + std::to_string(idx < 0 ? 0 : idx);
+        std::string id = std::string("G3ASM_INFO_") + name.c_str() + "_" + std::to_string(idx < 0 ? 0 : idx);
         RegisterTextForId(id, text.c_str());
         idStr = SStr(id);
     }
@@ -563,29 +563,29 @@ void __fastcall HInfoFinished(void* self, void*, const void* info) {
 
 bool RegisterDialogBindings(asIScriptEngine* e) {
     bool ok = true;
-    OG3_REG(e->RegisterGlobalFunction("int GetInfoCount()", asFUNCTION(GetInfoCount), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetLocText(const bCString &in id)", asFUNCTION(GetLocText), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetSpeechText(const bCString &in id)", asFUNCTION(GetSpeechText), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetInfoName(int)", asFUNCTION(GetInfoName), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString GetInfoOwner(int)", asFUNCTION(GetInfoOwner), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString DescribeInfo(const bCString &in)", asFUNCTION(DescribeInfo), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetInfoGiven(const bCString &in, bool)", asFUNCTION(SetInfoGiven), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool IsInfoGiven(const bCString &in)", asFUNCTION(IsInfoGiven), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool InfoExists(const bCString &in)", asFUNCTION(InfoExists), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool CreateInfo(const bCString &in name, const bCString &in owner)", asFUNCTION(CreateInfo),
+    G3ASM_REG(e->RegisterGlobalFunction("int GetInfoCount()", asFUNCTION(GetInfoCount), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetLocText(const bCString &in id)", asFUNCTION(GetLocText), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetSpeechText(const bCString &in id)", asFUNCTION(GetSpeechText), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetInfoName(int)", asFUNCTION(GetInfoName), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetInfoOwner(int)", asFUNCTION(GetInfoOwner), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString DescribeInfo(const bCString &in)", asFUNCTION(DescribeInfo), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetInfoGiven(const bCString &in, bool)", asFUNCTION(SetInfoGiven), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool IsInfoGiven(const bCString &in)", asFUNCTION(IsInfoGiven), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool InfoExists(const bCString &in)", asFUNCTION(InfoExists), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool CreateInfo(const bCString &in name, const bCString &in owner)", asFUNCTION(CreateInfo),
                                       asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool RemoveInfo(const bCString &in)", asFUNCTION(RemoveInfoByName), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetInfoQuest(const bCString &in, const bCString &in)", asFUNCTION(SetInfoQuest), asCALL_CDECL));
-    OG3_REG(
+    G3ASM_REG(e->RegisterGlobalFunction("bool RemoveInfo(const bCString &in)", asFUNCTION(RemoveInfoByName), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetInfoQuest(const bCString &in, const bCString &in)", asFUNCTION(SetInfoQuest), asCALL_CDECL));
+    G3ASM_REG(
         e->RegisterGlobalFunction("bool SetInfoParent(const bCString &in, const bCString &in)", asFUNCTION(SetInfoParent), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetInfoType(const bCString &in, int)", asFUNCTION(SetInfoType), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool SetInfoCondition(const bCString &in, int)", asFUNCTION(SetInfoCondition), asCALL_CDECL));
-    OG3_REG(
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetInfoType(const bCString &in, int)", asFUNCTION(SetInfoType), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetInfoCondition(const bCString &in, int)", asFUNCTION(SetInfoCondition), asCALL_CDECL));
+    G3ASM_REG(
         e->RegisterGlobalFunction("bool AddInfoLine(const bCString &in info, const bCString &in command, const bCString &in entity1, const "
                                   "bCString &in entity2, const bCString &in id1, const bCString &in id2, const bCString &in text)",
                                   asFUNCTION(AddInfoLine), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bool RebuildInfos()", asFUNCTION(RebuildInfos), asCALL_CDECL));
-    OG3_REG(e->RegisterGlobalFunction("bCString DescribeCommands()", asFUNCTION(DescribeCommands), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool RebuildInfos()", asFUNCTION(RebuildInfos), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString DescribeCommands()", asFUNCTION(DescribeCommands), asCALL_CDECL));
     static const int kCond[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
     static const char* kCondNames[] = {"INFO_COND_CRIME",    "INFO_COND_FIGHT",        "INFO_COND_HELLO",     "INFO_COND_GENERAL",
                                        "INFO_COND_OVERTIME", "INFO_COND_OPEN",         "INFO_COND_ACTIVATOR", "INFO_COND_RUNNING",
@@ -597,12 +597,12 @@ bool RegisterDialogBindings(asIScriptEngine* e) {
     for (int i = 0; i < 13; ++i) {
         char d[64];
         std::snprintf(d, sizeof d, "const int %s", kCondNames[i]);
-        OG3_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kCond[i])));
+        G3ASM_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kCond[i])));
     }
     for (int i = 0; i < 7; ++i) {
         char d[64];
         std::snprintf(d, sizeof d, "const int %s", kTypeNames[i]);
-        OG3_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kType[i])));
+        G3ASM_REG(e->RegisterGlobalProperty(d, const_cast<int*>(&kType[i])));
     }
     return ok;
 }
@@ -638,4 +638,4 @@ void InstallInfoHook(ScriptHost& host) {
     host.Log(ok ? "Dialog-Ereignis OnInfoFinished aktiv" : "Dialog-Ereignis OnInfoFinished: Einhaengen fehlgeschlagen");
 }
 
-}   // namespace og3p
+}   // namespace g3asm
