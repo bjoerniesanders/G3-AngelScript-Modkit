@@ -4,7 +4,7 @@ Alle Angaben hier sind **geprüft**. Jede Tabelle nennt ihre Quelle:
 
 - **SDK**: Aufzählung aus dem Gothic-3-SDK (`GameEnum.h`), von uns übernommen.
 - **gemessen**: im Spiel beobachtet (Protokolle von G3ASM, Stand 2026-11-06).
-- **Dump**: mit der Mod `reference_dump` aus dem laufenden Spiel gelesen (Abschnitt 9).
+- **Dump**: mit der Mod `probe_reference` aus dem laufenden Spiel gelesen (Abschnitt 9).
 
 Was hier nicht steht, ist nicht belegt. Im Umlauf befindliche Listen mit Namen wie `Spell_Fireball`, `DamageType_Edge` oder `Strength` stimmen nicht mit dem Spiel überein
 (gemessen sind `Spl_Fireball`, `Mis_Fireball`, Schadensart 2 = Klinge und die Attribut-Kennung `"STR"`). Amulette heißen `It_Am_*` (21 Vorlagen), Artefakte `It_Artefact_*`, gewöhnliche Ringe `It_Ring*`; `It_Belt` und `It_Ri_` gibt es nicht. Talente heißen im Spiel `Perk_*` (nicht `It_Perk_*`), Zauber gibt es als `Spl_*`, als Zauber-Item `It_Spell_*` und als Geschoss `Mis_*`; Munition heißt `Arrow` und `Bolt` (nicht `It_Arrow`/`It_Bolt`).
@@ -136,7 +136,7 @@ Operationen von `gCPlayerMemory_PS::ApplyMod` (SDK `EAttribModOperation`): 0 Add
 
 ## 8. Beispiel: eine Waffe im Detail (`It_1H_OrcSlayer_01`)
 
-Quelle: gemessen mit `ListProperties` (Mod `property_inspect`) im laufenden Spiel am Orkschlächter.
+Quelle: gemessen mit `ListProperties` (Mod `demo_properties`) im laufenden Spiel am Orkschlächter.
 
 | Eigenschaft | Wert | Bedeutung |
 |---|---|---|
@@ -157,11 +157,11 @@ Im Spiel sind `ReqAttrib2…4Op` in den Eigenschaftsdaten fälschlich als `ReqAt
 
 **Wichtig zur Suche:** `FindTemplateNames` findet Namen, die mit dem Suchtext **beginnen**. Die Suche ignoriert außerdem die Groß-/Kleinschreibung. Eine Gruppe wie `Teleport` enthält deshalb `Teleport_Ardea`, aber nicht `Spl_Teleport_Ardea`. Bis Version 28 war die Trefferzahl auf 200 begrenzt (die Gruppe `Spl_` hatte genau 200 Einträge und kann abgeschnitten sein, bis zum nächsten Dump).
 
-Die Mod `reference_dump` (Ziffernblock `/`) schreibt Attribute und Vorlagen-Gruppen ins Protokoll (`g3asm.log`, Zeilen `[reference_dump] …`). Der Text zwischen den Markierungen
+Die Mod `probe_reference` (Ziffernblock `/`) schreibt Attribute und Vorlagen-Gruppen ins Protokoll (`g3asm.log`, Zeilen `[probe_reference] …`). Der Text zwischen den Markierungen
 wird von `tools/reference_from_log.py` aus dem Protokoll erzeugt und nicht von Hand gepflegt.
 
 <!-- DUMP-ANFANG -->
-Quelle: Dump der Mod `reference_dump` aus dem laufenden Spiel, erzeugt mit `tools/reference_from_log.py`. `FindTemplateNames` liefert die meisten Namen mehrfach; unten stehen eindeutige Namen.
+Quelle: Dump der Mod `probe_reference` aus dem laufenden Spiel, erzeugt mit `tools/reference_from_log.py`. `FindTemplateNames` liefert die meisten Namen mehrfach; unten stehen eindeutige Namen.
 
 ### Attribute
 

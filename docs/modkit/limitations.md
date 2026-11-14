@@ -1,6 +1,6 @@
 # Grenzen und Stand
 
-Stand: 2026-11-11, Skript-Schnittstelle Version 46 (Alpha). Was sich zwischen Versionen ändern darf: [Versionsregeln](api-policy.md).
+Stand: Skript-Schnittstelle Version 46. Was sich zwischen Versionen ändern darf: [Versionsregeln](api-policy.md).
 Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke **Experimentell**, **Im Spiel nicht geprüft**, **Funktioniert nicht** oder **Veraltet**.
 
 ## Im Spiel geprüft
@@ -31,13 +31,13 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 - NPCs erzeugen und entfernen (`SpawnNPC`, `DestroyNPC`), auch aus früheren Sitzungen; Welt-NPCs, Held und Welt-Objekte werden abgelehnt
 - Fokus und Fadenkreuz (`GetFocusedEntity`, `PickCenter`/`GetPickPoint`, Kategorien), Gruppe und Teleport (`TeleportTo`, `SetPosition`, `teleport_party`)
 - Zeitrate (`SetTimeScale`) und Uhrfaktor (`SetClockFactor`)
-- Eigenschaften lesen (`GetProperty`, `ListProperties`, `property_inspect`)
+- Eigenschaften lesen (`GetProperty`, `ListProperties`, `demo_properties`)
 
 **Quests, Dialoge, Dateien**
 - Quests anlegen, starten, abschließen, scheitern lassen, Status, Titel, Beschreibung, XP, Attribut-Belohnung; Questliste aller 571 Quests
 - Dialoge lesen (4593 Infos) und eigene anlegen: Optionen im Gesprächsmenü, Zeilen im Questlog, `OnInfoFinished`
 - Eigene Quests und Dialoge kommen nach Speichern und Laden mit Status und Questlog zurück (`OnQuestsLoaded`/`OnInfosLoaded`); Schalter im Spielstand (`SetGameEvent`)
-- Datei-Patches auf Quest-Dateien (`patch_demo`); Mod-Archive (`PackMod`) werden geladen und überschreiben vorhandene Dateien
+- Datei-Patches auf Quest-Dateien (`demo_patch`); Mod-Archive (`PackMod`) werden geladen und überschreiben vorhandene Dateien
 - Zeichnen über HUD und Inventar: Text (`DrawText`) und Bilder aus den GUI-Daten (`DrawImage`), `WorldToScreen`
 
 **Installationen:** Voraussetzung sind Community Patch 1.75 und Parallel-Universe-Patch. Geprüft: Entwicklerinstallation, eine stark gemoddete und eine saubere Steam-Kopie, siehe `docs/compatibility.md` im Repository.
@@ -46,14 +46,13 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 
 - **Schema-Dump** (`DumpPropertySchema`, Version 43): im Spiel bestätigt (2026-11-11, 273 Klassen, Hauptmenü und nach dem Laden gleich); drei Eigenschaften ohne Namen. Die Getter `bCPOTypeListItem::GetBaseClassName` und `bCPropertyObjectTypeBase::GetPropertyType(int)` blieben im Test hängen (vermutlich ein Assert-Dialog der Original-DLL); die Liste wird deshalb direkt aus dem Speicher gelesen (SDK-Aufbau).
 - **KI-Tracer** (`aitrace=1` in `g3asm.ini`, nur Protokoll): sechs Hooks auf `gCScriptRoutine_PS` (Zustand, Aufgabe, Routine, KI-Modus, Aktion) und `gCNavigation_PS::SetRoutine`. Im Spiel gemessen (2026-11-11, 3,5 min, 40 NPCs, 574 Zeilen, kein Ruckeln): Es kommen nur **Aufgabe**, **KI-Modus** und **Aktion**; Zustand, Routine und Navigation-Routine wurden nie gesetzt. Die Aufgabe trägt die Zustandsnamen (`ZS_Ambient`, `ZS_HangAround`, `ZS_Guard`, `ZS_WatchFight`, `ZS_Sleep`, beim Helden `PS_Normal`, `ZS_Talk`, `PS_Interact`); Zustandswechsel sieht man also über `SetCurrentTask`.
-- **Angriffsgeschwindigkeit:** noch kein Override. Messpunkt gebaut (`anispeedlog=1`): `eCWrapper_emfx2Actor::SetPlaySpeed`/`GetPlaySpeed` der Engine.dll, die Game.dll importiert. Erste Messung (2026-11-11): fast alle Aufrufe von `Game.dll+0xDC5AA` mit fließenden Werten 0,34 bis 0,98 für die Bewegungsarten 0 bis 3 (vermutlich Überblendung der Laufbewegung), einmal `Game.dll+0xDA21A` mit 1,778. Die Messung lief nur 2 s (Zeilenzahl erschöpft) und erfasste keinen Kampf. Zweite Messung mit Kampf (2026-11-11) und Assembler: `SetPlaySpeed` steuert nur die **Laufbewegung** (`+0xDC5AA`, Schleife über vier Bewegungsschichten, Wert aus dem Betrag der Bewegungsgeschwindigkeit, daher Werte bis über 10000) und das **Drehen auf der Stelle** (`+0xDA031`/`+0xDA21A`, Wert = Winkel × Länge / 90). Die Kampfschleife `gCScriptProcessingUnit::sAICombatMoveItlLoop` liest die Geschwindigkeit nur, um eine Pause (0) zu erkennen. Angriffe starten über `eCVisualAnimation_PS::PlayMotion(Art, eSMotionDesc*)`; der Aufbau von `eSMotionDesc` ist im SDK leer; gemessen: +8 Geschwindigkeit, +0x10 Gewicht. Angriffe kommen aus `gCScriptProcessingUnit::sAICombatMoveStart`, das die Geschwindigkeit aus seinen Argumenten (+0x10) übernimmt (ein NPC mit 1,3). Daraus `Override_CombatMove` (Version 45, experimentell), im Spiel bestätigt (2026-11-11: Faktor 2 sichtbar schneller, Schaden normal; `Recover` meldet einmal die Waffe als `self`).
-- **Lernkosten** (`Override_LearnCost`, Version 42): im Spiel bestätigt (Messmod `learn_cost`, 2026-11-11): STR +5 bei Bufford zeigte und kostete 3 LP und 125 Gold statt 5 LP und 250 Gold, der Held bekam +5 STR; die Bezahlung der Lernpunkte lief genau einmal, auch `ALC` geht durch den Hook. Sieben feste Stellen; Bytes und Stapelaufbau stimmen in der Entwicklerinstallation und der Steam-Game.dll überein. Nur Attribute, keine Talente. Nicht ausgelöst: die Verdopplung mit „Alternative Balance“ ab 250 (nur am Code gelesen; im Test war der Wert darunter oder der Schalter aus).
-- **Monsterschaden** (`Override_MonsterDamage`, Version 42): im Spiel bestätigt (Wolf gegen NPC, 2026-11-10); der Teiler 2 für beschworene Angreifer ist nicht ausgelöst. Als einziger Hook an einer festen Stelle statt an einem Export; die Bytes der Stelle und des Codes davor stimmen in der Entwicklerinstallation, im Steam-Original und in der Steam-Kopie überein, obwohl sich die Script_Game.dll sonst unterscheidet. Nicht zusammen mit `Script_MonsterDamage.dll`, die dieselbe Stelle ändert.
+- **Angriffsgeschwindigkeit** (`Override_CombatMove`, experimentell): Messpunkt gebaut (`anispeedlog=1`): `eCWrapper_emfx2Actor::SetPlaySpeed`/`GetPlaySpeed` der Engine.dll, die Game.dll importiert. Erste Messung (2026-11-11): fast alle Aufrufe von `Game.dll+0xDC5AA` mit fließenden Werten 0,34 bis 0,98 für die Bewegungsarten 0 bis 3 (vermutlich Überblendung der Laufbewegung), einmal `Game.dll+0xDA21A` mit 1,778. Die Messung lief nur 2 s (Zeilenzahl erschöpft) und erfasste keinen Kampf. Zweite Messung mit Kampf (2026-11-11) und Assembler: `SetPlaySpeed` steuert nur die **Laufbewegung** (`+0xDC5AA`, Schleife über vier Bewegungsschichten, Wert aus dem Betrag der Bewegungsgeschwindigkeit, daher Werte bis über 10000) und das **Drehen auf der Stelle** (`+0xDA031`/`+0xDA21A`, Wert = Winkel × Länge / 90). Die Kampfschleife `gCScriptProcessingUnit::sAICombatMoveItlLoop` liest die Geschwindigkeit nur, um eine Pause (0) zu erkennen. Angriffe starten über `eCVisualAnimation_PS::PlayMotion(Art, eSMotionDesc*)`; der Aufbau von `eSMotionDesc` ist im SDK leer; gemessen: +8 Geschwindigkeit, +0x10 Gewicht. Angriffe kommen aus `gCScriptProcessingUnit::sAICombatMoveStart`, das die Geschwindigkeit aus seinen Argumenten (+0x10) übernimmt (ein NPC mit 1,3). Daraus `Override_CombatMove` (Version 45, experimentell), im Spiel bestätigt (2026-11-11: Faktor 2 sichtbar schneller, Schaden normal; `Recover` meldet einmal die Waffe als `self`).
+- **Lernkosten** (`Override_LearnCost`, Version 42): im Spiel bestätigt (Messmod `probe_learn_cost`, 2026-11-11): STR +5 bei Bufford zeigte und kostete 3 LP und 125 Gold statt 5 LP und 250 Gold, der Held bekam +5 STR; die Bezahlung der Lernpunkte lief genau einmal, auch `ALC` geht durch den Hook. Sieben feste Stellen; Bytes und Stapelaufbau stimmen in der Entwicklerinstallation und der Steam-Game.dll überein. Nur Attribute, keine Talente. Nicht ausgelöst: die Verdopplung mit „Alternative Balance“ ab 250 (nur am Code gelesen; im Test war der Wert darunter oder der Schalter aus).
+- **Monsterschaden** (`Override_MonsterDamage`, Version 42): im Spiel bestätigt (Wolf gegen NPC, 2026-11-10); der Teiler 2 für beschworene Angreifer ist nicht ausgelöst. Hängt wie `Override_LearnCost` an einer festen Stelle statt an einem Export; die Bytes der Stelle und des Codes davor stimmen in der Entwicklerinstallation, im Steam-Original und in der Steam-Kopie überein, obwohl sich die Script_Game.dll sonst unterscheidet. Nicht zusammen mit `Script_MonsterDamage.dll`, die dieselbe Stelle ändert.
 - **KI-Zustände** (`Override_AI`/`OnAI` mit `AI_STATE`, Version 41): Zustand, Callback und KI-Funktion sind im Spiel bestätigt (Zustand nach der Korrektur mit kopiertem Namen, 2026-11-10). Routinen (`AI_ROUTINE`) sind nie ausgelöst worden.
 - **Satztexte:** `GetSpeechText` liefert Dialogzeilen und Befehle des Helden; das Umgebungsgerede (`SVM_..._Smalltalk_NN`) hat keinen gefundenen Text.
 - **Abhängigkeiten in `mod.ini`** (`version`, `api`, `requires`, Version 40): ohne Spiel getestet (Testmods in `tests/mods`), im Spiel noch nicht.
 - **Datei-Patches auf `.info`-Dateien:** offen, weil das Spiel Infos aus der kompilierten `Infos.cpt` lädt; ebenso komprimierte Archiveinträge (`Strings.pak`).
-- **`GenerateTradeGoods`:** liefert `true`, ob dabei andere Items entstehen, ist nicht geprüft.
 - **`owner` im Gruppenkampf** ist eine Näherung (der aktuelle Gegner des Opfers, nicht zwingend der Schläger).
 - **Attribut `"XP"`** las im Test 0. Quest-XP zahlt das Spiel selbst aus.
 - **Entfernt mit Version 46:** `DoDamage` (verdreht; Ersatz `Kill`), `ExecuteInfo` (kein `OnInfoFinished`), `GetPickPosition` (immer Nullvektor), `DumpQuest` (schrieb mit keinem Pfad eine Datei).
@@ -62,11 +61,12 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 
 ## Bekannte Risiken
 
-- **Dauerhafte Zustände im Spielstand.** Was ein Mod ins Spiel schreibt (Item-Stapel aus Klon-Vorlagen, Talente, Uhrfaktor), steht im Spielstand. Fehlt der
+- **Dauerhafte Zustände im Spielstand.** Was eine Mod ins Spiel schreibt (Item-Stapel aus Klon-Vorlagen, Talente, Uhrfaktor), steht im Spielstand. Fehlt der
   Mod beim Laden, zeigen solche Einträge ins Leere; ein Spielstand mit dem Talent-Stapel ohne `perk_lifesteal` **stürzte beim Öffnen des Charakterbogens ab**
-  (gemessen). Mods müssen solche Zustände in `OnBeforeSave` entfernen und in `OnAfterSave` wiederherstellen, siehe [Speichern und Laden](saving.md). Mit diesem Muster lädt der Spielstand auch ohne den Mod (geprüft mit `perk_lifesteal`).
-- **Feste Adressen.** Die Lebensraub-Zeile in der Item-Beschreibung hängt an zwei festen Adressen in `Game.dll`. Weichen ihre Bytes ab (z. B. in der
-  Steam-Fassung), wird dieser eine Hook ausgelassen und das Protokoll sagt es; alle anderen Hooks hängen an exportierten Namen.
+  (gemessen). Mods müssen solche Zustände in `OnBeforeSave` entfernen und in `OnAfterSave` wiederherstellen, siehe [Speichern und Laden](saving.md). Mit diesem Muster lädt der Spielstand auch ohne die Mod (geprüft mit `perk_lifesteal`).
+- **Feste Adressen.** Drei Funktionen hängen an festen Stellen statt an exportierten Namen: die Lebensraub-Zeile in der Item-Beschreibung (`Game.dll`),
+  `Override_LearnCost` (sieben Stellen in `Game.dll`) und `Override_MonsterDamage` (`Script_Game.dll`). Weichen die Bytes ab (z. B. in einer binär
+  veränderten Steam-Fassung), wird nur die betroffene Funktion ausgelassen und das Protokoll sagt es; alle anderen Hooks hängen an exportierten Namen.
 - **Andere Script-Plugins** mit eigenen Hooks (z. B. CombatFix) sind nicht zusammen mit dem Modkit geprüft.
 
 ## Fehlt noch
@@ -81,7 +81,7 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 | **Talente vom Spiel lernen lassen** | `LearnSkill` am Klon liefert `false` (Voraussetzungen des Originals); die Wirkung eines eigenen Talents stellt die Mod selbst her |
 | **Spielseiten** | `GetActivePage()` liefert Zahlen (-1, 4, 5, 6, 17), die Bedeutung ist nur teilweise bekannt |
 | **Einfarbige Flächen zeichnen** | Die Rechteck-Funktionen von GUI und Renderer sind im Spiel leer; Ersatz ist ein Bild aus den GUI-Daten |
-| **Selbsttest in der CI** | Die CI baut und packt; Selbsttest und Kompilierprüfung der Beispiele brauchen die `SharedBase.dll` des Spiels und laufen nur lokal |
+| **Messungen in der CI** | Die CI testet mit einer Ersatz-`SharedBase.dll`; was das Verhalten des Originals misst, läuft nur lokal mit den Spieldateien |
 | **Englische Dokumentation** | Die Doku ist deutsch |
 
 Ideen aus dem Editor AdanosEdit, nichts davon verbindlich: Truhen und Schlösser (Inhalt, Schlosshärte, Schlüssel, auch für Türen); Tagesabläufe von NPCs
@@ -91,8 +91,8 @@ Navigationskarte dürfen nur einzeln integriert werden); NPC-Aussehen und -Ausst
 
 ## Vergleich mit dem G1R-Modkit
 
-Der Kernunterschied: Im Gothic-1-Remake ist die Spiellogik selbst in AngelScript geschrieben, und das Modkit liefert die Spielskripte mit. Ein Mod kann dort jede
-Skriptklasse ableiten oder per Patch ändern. In Gothic 3 liegt die Logik in nativen DLLs; ein Mod kann nur an den Stellen eingreifen, die das Modkit freilegt.
+Der Kernunterschied: Im Gothic-1-Remake ist die Spiellogik selbst in AngelScript geschrieben, und das Modkit liefert die Spielskripte mit. Eine Mod kann dort jede
+Skriptklasse ableiten oder per Patch ändern. In Gothic 3 liegt die Logik in nativen DLLs; eine Mod kann nur an den Stellen eingreifen, die das Modkit freilegt.
 
 | G1R-Modkit | G3ASM |
 |---|---|

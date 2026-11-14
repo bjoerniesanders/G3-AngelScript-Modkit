@@ -83,7 +83,7 @@ try:
 
     start(True)
     ersetzt = 'X=1\r\nY=9\r\nZ=3\r\n'
-    write(quest, ersetzt)   # jemand ersetzt die gepatchte Datei (z. B. Update des anderen Mods)
+    write(quest, ersetzt)   # jemand ersetzt die gepatchte Datei (z. B. Update der anderen Mod)
     rc, out = start(False)
     check(rc < 100 and read(quest) == ersetzt, 'Lauf 5: inzwischen ersetzte Datei bleibt unangetastet')
     check(not os.path.exists(backup), 'Lauf 5: die veraltete Sicherung ist entfernt')

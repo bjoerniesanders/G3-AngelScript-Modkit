@@ -24,7 +24,9 @@ Copy-Item (Join-Path $root "examples") $stage -Recurse
 Copy-Item (Join-Path $root "docs\modkit") (Join-Path $stage "docs") -Recurse
 # Private planning files live next to the public docs on the maintainer's machine only (git-excluded); never ship them in a package.
 foreach ($p in "roadmap.md", "plugin-analyse.md") { Remove-Item (Join-Path $stage "docs\modkit\$p") -Force -ErrorAction SilentlyContinue }
-foreach ($f in "README.md", "LICENSE", "LICENSE-EXCEPTIONS.md") { if (Test-Path (Join-Path $root $f)) { Copy-Item (Join-Path $root $f) $stage } }
+foreach ($f in "README.md", "README.en.md", "LICENSE", "LICENSE-EXCEPTIONS.md") { if (Test-Path (Join-Path $root $f)) { Copy-Item (Join-Path $root $f) $stage } }
+# Both READMEs link docs/compatibility.md
+Copy-Item (Join-Path $root "docs\compatibility.md") (Join-Path $stage "docs\")
 
 $install = @"
 G3 AngelScript Modkit (G3ASM) $Version for Gothic 3 (original game, 32-bit)
@@ -39,7 +41,8 @@ Uninstall:
   powershell -NoProfile -ExecutionPolicy Bypass -File tools\install_loader.ps1 -Game "C:\Path\to\Gothic 3" -Uninstall
 
 Example mods: copy examples\mods\<name> to <Gothic 3>\g3asm\mods\ and enable it with a line "+<name>" in g3asm\mods\load_order.txt.
-Documentation: docs\modkit\index.md
+Overview: README.en.md (English), README.md (German)
+Documentation (German): docs\modkit\index.md
 "@
 [IO.File]::WriteAllText((Join-Path $stage "INSTALL.txt"), $install.Replace("`n", "`r`n"), (New-Object Text.UTF8Encoding($false)))
 

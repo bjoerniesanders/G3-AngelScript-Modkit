@@ -12,7 +12,7 @@ Das Skript
 - prüft die Voraussetzungen und bricht ab, wenn etwas fehlt,
 - legt die `dbghelp.dll` des Spiels als `dbghelp_orig.dll` beiseite und sichert sie nach `<Spiel>\g3asm_backup\loader_<Zeit>\`,
 - kopiert den Loader (als `dbghelp.dll`) und `g3asm.dll` in den Spielordner,
-- legt `g3asm.ini`, `g3asm\scripts\` (mit einem Mini-Mod) und `g3asm\mods\` an,
+- legt `g3asm.ini`, `g3asm\scripts\` (mit einer Mini-Mod) und `g3asm\mods\` an,
 - zieht eine ältere Installation mit den früheren Namen (`og3_patch.dll`, `og3_patch.ini`, Ordner `og3\`, ini-Abschnitt `[patch]`) auf die neuen Namen um.
 
 Rückbau: dasselbe mit `-Uninstall` statt `-BuildDir bin` stellt die originale `dbghelp.dll` wieder her und entfernt `g3asm.dll`. `g3asm.ini` und der Ordner
@@ -33,16 +33,16 @@ Rückbau: dasselbe mit `-Uninstall` statt `-BuildDir bin` stellt die originale `
     scripts\main.as             Einzelskript (läuft als Mod "main", wenn vorhanden)
     mods\
       load_order.txt            optional
-      mein_mod\main.as          ein Mod = ein Ordner mit main.as
+      mein_mod\main.as          eine Mod = ein Ordner mit main.as
       anderer_mod\main.as
       mein_mod\ScriptPatches\   optional: *.patch (Unified Diff auf Spieldateien, siehe Datei-Patches)
 ```
 
-Jeder Ordner unter `g3asm\mods\`, der eine `main.as` oder einen Ordner `ScriptPatches` enthält, ist ein Mod. Der Ordnername ist der Modname und steht im Protokoll in eckigen Klammern (`[mein_mod] ...`).
+Jeder Ordner unter `g3asm\mods\`, der eine `main.as`, einen Ordner `ScriptPatches` oder eine `stringtable.ini` (siehe unten) enthält, ist eine Mod. Der Ordnername ist der Modname und steht im Protokoll in eckigen Klammern (`[mein_mod] ...`).
 Der Name `main` ist für das Einzelskript reserviert.
 
-Jeder Mod ist ein **eigenes AngelScript-Modul**: globale Variablen und Funktionen sind von anderen Mods getrennt, Namen können doppelt vorkommen.
-`#include "datei.as"` funktioniert relativ zur Datei, die es einbindet. So kannst du einen Mod auf mehrere Dateien verteilen.
+Jede Mod ist ein **eigenes AngelScript-Modul**: globale Variablen und Funktionen sind von anderen Mods getrennt, Namen können doppelt vorkommen.
+`#include "datei.as"` funktioniert relativ zur Datei, die es einbindet. So kannst du eine Mod auf mehrere Dateien verteilen.
 
 ## Ladereihenfolge: `load_order.txt`
 
@@ -50,29 +50,29 @@ Jeder Mod ist ein **eigenes AngelScript-Modul**: globale Variablen und Funktione
 # Kommentar
 basis_mod
 mein_mod
--kaputter_mod        # Minuszeichen davor schaltet einen Mod ab
-+lifesteal_demo      # Pluszeichen schaltet einen standardmaessig abgeschalteten Mod zu
+-kaputter_mod        # Minuszeichen davor schaltet eine Mod ab
++demo_lifesteal      # Pluszeichen schaltet eine standardmaessig abgeschaltete Mod zu
 ```
 
 - Je Zeile ein Modname. Die genannten Mods laden in dieser Reihenfolge.
 - Nicht genannte Mods folgen alphabetisch.
-- `-Name` schaltet den Mod ab (er wird nicht geladen, bzw. im laufenden Spiel entladen).
-- Ein Mod mit `mod.ini` und `[mod] enabled=0` im eigenen Ordner ist **standardmäßig aus** (so sind alle Beispiel-Mods ausgeliefert). Er lädt nur, wenn `+Name` in `load_order.txt` steht; `+Name` legt zugleich seine Stelle in der Reihenfolge fest. Mods ohne `mod.ini` laden wie bisher.
+- `-Name` schaltet die Mod ab (sie wird nicht geladen, bzw. im laufenden Spiel entladen).
+- Eine Mod mit `mod.ini` und `[mod] enabled=0` im eigenen Ordner ist **standardmäßig aus** (so sind alle Beispiel-Mods ausgeliefert). Sie lädt nur, wenn `+Name` in `load_order.txt` steht; `+Name` legt zugleich ihre Stelle in der Reihenfolge fest. Mods ohne `mod.ini` laden wie bisher.
 - Das Einzelskript `main` läuft immer zuerst.
 - Jedes Ereignis geht der Reihe nach an alle Mods.
-- Braucht ein Mod einen anderen (`requires` in `mod.ini`, siehe unten), lädt der benötigte zuerst, auch wenn `load_order.txt` es anders sagt. Das Protokoll nennt jede solche Umstellung.
+- Braucht eine Mod eine andere (`requires` in `mod.ini`, siehe unten), lädt die benötigte zuerst, auch wenn `load_order.txt` es anders sagt. Das Protokoll nennt jede solche Umstellung.
 
 ## Version und Abhängigkeiten: `mod.ini` (ab Version 40)
 
 ```
 [mod]
 enabled=1                              ; 0 = standardmäßig aus (siehe oben)
-version=1.2.0                          ; Version dieses Mods
+version=1.2.0                          ; Version dieser Mod
 api=40                                 ; mindestens nötige Skript-Schnittstelle (GetApiVersion)
 requires=basis_mod >= 1.1, andere_mod  ; benötigte Mods, Komma-getrennt, Mindestversion optional
 ```
 
-Alle Einträge sind freiwillig. Ein Mod, dessen Bedingungen nicht erfüllt sind, **wird nicht geladen**: weder sein Skript noch seine Datei-Patches oder seine
+Alle Einträge sind freiwillig. Eine Mod, deren Bedingungen nicht erfüllt sind, **wird nicht geladen**: weder ihr Skript noch ihre Datei-Patches oder ihre
 Stringtabelle. Das Protokoll nennt den Grund einmal, zum Beispiel:
 
 ```
@@ -81,9 +81,9 @@ Stringtabelle. Das Protokoll nennt den Grund einmal, zum Beispiel:
 [mein_mod] wird nicht geladen: braucht Skript-Schnittstelle 41, vorhanden ist 40 (G3ASM aktualisieren)
 ```
 
-- Fehlt ein benötigter Mod, ist er abgeschaltet oder wird er selbst nicht geladen, wird auch der Mod nicht geladen, der ihn braucht.
+- Fehlt eine benötigte Mod, ist sie abgeschaltet oder wird sie selbst nicht geladen, wird auch die Mod nicht geladen, die sie braucht.
 - Versionen werden Teil für Teil als Zahlen verglichen: `1.10` ist neuer als `1.9`, `1.2` gleich `1.2.0`. Text hinter einer Zahl zählt nicht (`1.0-beta` = `1.0`).
-  Hat der benötigte Mod keine `version`, erfüllt er keine Mindestversion.
+  Hat die benötigte Mod keine `version`, erfüllt sie keine Mindestversion.
 - `api` ersetzt die Prüfung mit `GetApiVersion()` im Skript: Fehlt eine Funktion, scheitert sonst schon das Übersetzen, und der Spieler sieht nur einen
   Übersetzungsfehler. Mit `api` sieht er, dass das Modkit zu alt ist. Fassungen vor Version 40 kennen `api` und `requires` nicht und ignorieren sie.
 - Brauchen sich zwei Mods gegenseitig, meldet das Protokoll den Kreis; beide laden in der Reihenfolge von `load_order.txt`.
@@ -91,9 +91,9 @@ Stringtabelle. Das Protokoll nennt den Grund einmal, zum Beispiel:
 - Ändert sich `mod.ini` oder `load_order.txt` im laufenden Spiel, gilt das beim nächsten Scan (einmal je Sekunde, mit `hotreload=1`).
 - Im Skript: `IsModActive("name")` und `GetModVersion("name")` für optionale Zusammenarbeit mit anderen Mods, siehe [API-Referenz](api-reference.md).
 
-## Einstellungen eines Mods: `[settings]` (ab Version 44)
+## Einstellungen einer Mod: `[settings]` (ab Version 44)
 
-Vorgaben stehen in der `mod.ini` des Mods, Abschnitt `[settings]`:
+Vorgaben stehen in der `mod.ini` der Mod, Abschnitt `[settings]`:
 
 ```
 [mod]
@@ -106,8 +106,8 @@ Anzeige=ja
 ```
 
 Das Skript liest sie mit `GetModSetting("Faktor")`, `GetModSettingFloat(...)` usw. und kann eigene Werte mit `SetModSetting` speichern. Die landen in
-`<Spiel>\g3asm\settings\<Mod>.ini`, nie in der `mod.ini`; ein Update des Mods behält sie also. Wer eine Einstellung von Hand ändert, trägt sie dort ein
-(Abschnitt `[settings]`); sie gilt nach dem Neuladen des Mods (Hot-Reload) oder einem Neustart. Jeder Mod sieht nur seine eigenen Werte.
+`<Spiel>\g3asm\settings\<Mod>.ini`, nie in der `mod.ini`; ein Update der Mod behält sie also. Wer eine Einstellung von Hand ändert, trägt sie dort ein
+(Abschnitt `[settings]`); sie gilt nach dem Neuladen der Mod (Hot-Reload) oder einem Neustart. Jede Mod sieht nur ihre eigenen Werte.
 
 ## Einstellungen: `g3asm.ini`
 
@@ -142,29 +142,29 @@ Der Abschnitt hieß bis Version 46 `[patch]`; eine ini mit dem alten Namen wird 
 `<Spiel>\g3asm.log`, während des Spiels lesbar. Es enthält:
 
 - die Ausgaben deiner `print()`-Aufrufe mit `[Modname]` davor,
-- Übersetzungsfehler mit Datei, Zeile und Spalte (der Mod wird dann nicht geladen),
+- Übersetzungsfehler mit Datei, Zeile und Spalte (die Mod wird dann nicht geladen),
 - Laufzeitfehler (Funktion und Zeile), zum Beispiel Division durch 0,
-- Hinweise des Modkits (`Spielereignisse: 6 von 6 Hooks aktiv`, `Skript geladen: ...`).
+- Hinweise des Modkits (`Spielereignisse: 8 von 8 Hooks aktiv`, `Skript geladen: ...`).
 
 ## Hot-Reload
 
 Speicherst du `main.as` (oder legst einen neuen Mod-Ordner an), erkennt das Modkit das innerhalb einer Sekunde:
 
-1. Beim Neuladen eines Mods läuft sein `OnShutdown()`.
-2. Das neue Skript wird übersetzt. Bei Fehlern bleibt der Mod entladen, bis du die Datei wieder änderst.
+1. Beim Neuladen einer Mod läuft ihr `OnShutdown()`.
+2. Das neue Skript wird übersetzt. Bei Fehlern bleibt die Mod entladen, bis du die Datei wieder änderst.
 3. Danach läuft `main()` erneut.
 
-Ordner entfernen oder `-Name` eintragen entlädt den Mod (mit `OnShutdown()`).
+Ordner entfernen oder `-Name` eintragen entlädt die Mod (mit `OnShutdown()`).
 
 ## Fehlerisolation
 
-Ein Fehler in einem Mod (Syntaxfehler, Laufzeitfehler, Endlosschleife) beeinträchtigt die anderen Mods und das Spiel nicht.
+Ein Fehler in einer Mod (Syntaxfehler, Laufzeitfehler, Endlosschleife) beeinträchtigt die anderen Mods und das Spiel nicht.
 Ein Aufruf, der länger als **5 Sekunden** läuft, wird abgebrochen.
 
 ## Eigene Texte: `stringtable.ini`
 
-Ein Mod kann Texte des Spiels (Itemnamen, Beschreibungen, Quest- und Dialogtexte) mit einer eigenen Stringtabelle überschreiben oder ergänzen. Datei: `<Mod>\stringtable.ini` oder, wie beim Union Starter, `<Mod>\ModFiles\stringtable.ini` (liegen beide da, gilt die im Mod-Ordner).
-Der Mod braucht dafür kein Skript. Eigene Dateien des Spiels (Quests, Vorlagen, ...) packt [PackMod](archives.md) in ein Mod-Archiv.
+Eine Mod kann Texte des Spiels (Itemnamen, Beschreibungen, Quest- und Dialogtexte) mit einer eigenen Stringtabelle überschreiben oder ergänzen. Datei: `<Mod>\stringtable.ini` oder, wie beim Union Starter, `<Mod>\ModFiles\stringtable.ini` (liegen beide da, gilt die im Mod-Ordner).
+Die Mod braucht dafür kein Skript. Eigene Dateien des Spiels (Quests, Vorlagen, ...) packt [PackMod](archives.md) in ein Mod-Archiv.
 
 ```
 Languages=English;Italian;French;German;Spanish;Czech;Hungarian;Polish;Russian;TRC
@@ -177,4 +177,4 @@ FO_It_Wolf_Fur=Wolf skin (Mod);;Pelle di lupo (Mod);;Peau de loup (Mod);;Wolfsfe
 - Kodierung: UTF-16 (mit BOM), UTF-8 (mit BOM) oder ANSI (cp1252). Kommentarzeilen beginnen mit `;`, `#` oder `[`.
 - Spätere Mods überschreiben frühere. Das Skript-Gegenstück ist `RegisterText(id, text)`.
 - Änderungen an der Datei wirken per Hot-Reload nach etwa einer Sekunde; das Protokoll zeigt `Stringtabellen angewendet: N Eintraege, Sprache ...`.
-- Beispiel: `examples/mods/text_demo`.
+- Beispiel: `examples/mods/demo_text`.

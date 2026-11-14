@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Einstellungen je Mod (Skript-Schnittstelle ab Version 44). Jeder Mod liest und schreibt nur seine eigenen Werte (Mod = der gerade laufende Mod).
+// Einstellungen je Mod (Skript-Schnittstelle ab Version 44). Jede Mod liest und schreibt nur ihre eigenen Werte (Mod = die gerade laufende Mod).
 //   Vorgaben:  <Mod>\mod.ini, Abschnitt [settings] (liefert der Mod-Autor mit, wird nie geschrieben)
-//   Benutzer:  <Spiel>\g3asm\settings\<Mod>.ini, Abschnitt [settings] (schreibt SetModSetting; bleibt bei einem Update des Mods erhalten)
+//   Benutzer:  <Spiel>\g3asm\settings\<Mod>.ini, Abschnitt [settings] (schreibt SetModSetting; bleibt bei einem Update der Mod erhalten)
 // Lesen: Benutzerwert, sonst Vorgabe, sonst der Standard aus dem Aufruf. Schluessel ohne Beachtung von Gross-/Kleinschreibung.
-// Die Dateien werden einmal je Mod gelesen und zwischengespeichert; beim Neuladen des Mods (Hot-Reload) wird neu gelesen. Von Hand geaenderte
-// Dateien gelten also nach dem Neuladen des Mods oder einem Neustart. Ohne Mod-Ordner (Einzelskript) gibt es nur Vorgaben, Schreiben schlaegt fehl.
+// Die Dateien werden einmal je Mod gelesen und zwischengespeichert; beim Neuladen der Mod (Hot-Reload) wird neu gelesen. Von Hand geaenderte
+// Dateien gelten also nach dem Neuladen der Mod oder einem Neustart. Ohne Mod-Ordner (Einzelskript) gibt es nur Vorgaben, Schreiben schlaegt fehl.
 // Testprogramm: Umgebungsvariable G3ASM_SETTINGS_DIR ersetzt den Ordner fuer Benutzerwerte.
 #include <windows.h>
 
@@ -25,7 +25,7 @@ namespace g3asm {
 namespace {
 
 struct Entry {
-    std::string key, value;   // key in der Schreibweise des Mods
+    std::string key, value;   // key in der Schreibweise der Mod
 };
 struct ModSettings {
     bool loaded = false;
@@ -96,7 +96,7 @@ std::string UserFile(const std::string& mod) {
     return d.empty() ? std::string() : d + "\\" + mod + ".ini";
 }
 
-// Einstellungen des laufenden Mods (geladen bei Bedarf); nullptr ohne laufenden Mod. Aufrufer haelt g_mu.
+// Einstellungen der laufenden Mod (geladen bei Bedarf); nullptr ohne laufenden Mod. Aufrufer haelt g_mu.
 ModSettings* Current(std::string* modOut) {
     if (!ScriptHost::s_current) return nullptr;
     const std::string mod = ScriptHost::s_current->CurrentMod();
@@ -138,7 +138,7 @@ bool WriteUser(const std::string& mod, const ModSettings& s) {
     const std::string path = dir + "\\" + mod + ".ini", tmp = path + ".tmp";
     FILE* f = nullptr;
     if (fopen_s(&f, tmp.c_str(), "wb") != 0 || !f) return false;
-    std::fprintf(f, "; Einstellungen des Mods %s (von G3ASM geschrieben; Vorgaben stehen in der mod.ini des Mods)\r\n[settings]\r\n", mod.c_str());
+    std::fprintf(f, "; Einstellungen der Mod %s (von G3ASM geschrieben; Vorgaben stehen in der mod.ini der Mod)\r\n[settings]\r\n", mod.c_str());
     for (const auto& kv : s.user) std::fprintf(f, "%s=%s\r\n", kv.second.key.c_str(), kv.second.value.c_str());
     const bool ok = std::fflush(f) == 0;
     std::fclose(f);

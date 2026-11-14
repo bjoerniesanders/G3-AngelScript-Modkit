@@ -3,7 +3,7 @@
 Die Skripte sind AngelScript 2.38. Die Grundlagen der Sprache stehen in der offiziellen Dokumentation (https://www.angelcode.com/angelscript/).
 Diese Seite beschreibt, was in G3ASM anders oder besonders ist.
 
-## Eine Datei, ein Mod
+## Eine Datei, eine Mod
 
 ```angelscript
 // Globale Variablen und Konstanten
@@ -37,7 +37,7 @@ bCString links = s.Left(5);
 bool drin = s.Contains("Welt");
 ```
 
-Nicht vorhanden: implizite Umwandlung von `bCString` in `string` oder umgekehrt, `Format`-Funktionen. Zahlen in Text: `ToString(5)` oder `"" + 5`.
+Einen Typ `string` gibt es nicht, alle Texte sind `bCString`; `Format`-Funktionen fehlen ebenfalls. Zahlen in Text: `ToString(5)` oder `"" + 5`.
 
 ## Objekte prüfen
 
@@ -62,7 +62,7 @@ Rückgaben gehen über den Rückgabewert, notfalls über ein `array<T>` oder ein
 ## Zeit und Einheiten
 
 - `OnFrame(float dt)`: `dt` in Sekunden (Spielzeit, skaliert).
-- Entfernungen (`GetDistanceTo`, Positionen) sind in der Einheit der Spielwelt, vermutlich **Zentimeter** (400 ≈ 4 m; der Jens-Mod nutzt 400 als Reichweite).
+- Entfernungen (`GetDistanceTo`, Positionen) sind in der Einheit der Spielwelt, vermutlich **Zentimeter** (400 ≈ 4 m; die Jens-Mod nutzt 400 als Reichweite).
 - `GetTimeStamp()` liefert den Zeitstempel des Spiels (`uint`, `bCTimer`), Einheit nicht eigens geprüft.
 
 ## Tasten
@@ -75,8 +75,9 @@ Rückgaben gehen über den Rückgabewert, notfalls über ein `array<T>` oder ein
 | A-Z | 0x41-0x5A | Strg | 0x11 |
 | 0-9 (Reihe) | 0x30-0x39 | Leertaste | 0x20 |
 
-`IsKeyDown(code)` fragt den Zustand ab (nur wenn das Spiel im Vordergrund ist). Viele Tasten sind im Spiel belegt: F1-F3, F5-F9, F12 und weitere,
-siehe `ini\controls.ini`. Der Ziffernblock ist frei. Die Nachricht geht immer zusätzlich an das Spiel.
+`IsKeyDown(code)` fragt den Zustand ab (nur wenn das Spiel im Vordergrund ist). Viele Tasten sind im Spiel belegt, darunter die meisten F-Tasten
+(siehe `ini\controls.ini` und die Liste unter [Beispiele](examples.md#tastenbelegung-der-beispiel-mods)). Der Ziffernblock ist bis auf 7, 8, 9 und
+Strg + 1 bis 6 frei. Die Nachricht geht immer zusätzlich an das Spiel.
 
 ## Fehlersuche
 
@@ -88,7 +89,7 @@ siehe `ini\controls.ini`. Der Ziffernblock ist frei. Die Nachricht geht immer zu
 | Ereignisfunktion wird nicht aufgerufen | Die Signatur stimmt nicht exakt (siehe [Ereignisse](events.md)): Parametertypen und `const bCString &in` genau so schreiben |
 | `Entity` liefert leeren Namen / -1 | Die Entity ist ungültig (nicht geladen, anderer Name). Mit `IsValid()` prüfen |
 | `GetItemCount` liefert -1 | Entity hat kein lesbares Inventar |
-| Nach einer Änderung passiert nichts | Hot-Reload prüft einmal je Sekunde. Bei Syntaxfehlern bleibt der Mod entladen |
+| Nach einer Änderung passiert nichts | Hot-Reload prüft einmal je Sekunde. Bei Syntaxfehlern bleibt die Mod entladen |
 | Namen (NPC, Item) stimmen nicht | Namen stammen aus dem Spiel: im Protokoll von `OnNPCKilled`, `OnReceiveItem` ausgeben lassen (siehe [Beispiele](examples.md)) |
 
 Zum Ausprobieren von Namen und Werten ist `print(...)` das wichtigste Werkzeug: die Ausgabe steht im Protokoll.

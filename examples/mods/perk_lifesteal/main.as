@@ -78,7 +78,7 @@ void OnWorldActivate() {
     manuell = false;
 }
 
-// Die frueheren Qualitaetszeile "(20 %) Lebensraub" (Bit QUALITY_LIFESTEAL aus lifesteal_demo) steckt im Spielstand an der Waffe: hier einmal pro Sekunde entfernen,
+// Die frueheren Qualitaetszeile "(20 %) Lebensraub" (Bit QUALITY_LIFESTEAL aus demo_lifesteal) steckt im Spielstand an der Waffe: hier einmal pro Sekunde entfernen,
 // damit nur noch das Bonustalent an der Waffe steht.
 void Aufraeumen(Entity hero, int slot) {
     uint q = hero.GetSlotQuality(slot);

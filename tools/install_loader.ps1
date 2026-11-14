@@ -4,7 +4,7 @@
 #   powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner> [-BuildDir build32]      Einbau
 #   powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner> -Uninstall               Rueckbau aus der juengsten Sicherung
 # Einbau: die vorhandene dbghelp.dll des Spiels wird als dbghelp_orig.dll beiseitegelegt (der Loader leitet MiniDumpWriteDump dorthin weiter), der Loader
-# (build32\loader\dbghelp.dll) wird zu dbghelp.dll, g3asm.dll und eine g3asm.ini kommen dazu, ausserdem ein Mini-Mod und der Ordner g3asm\mods.
+# (build32\loader\dbghelp.dll) wird zu dbghelp.dll, g3asm.dll und eine g3asm.ini kommen dazu, ausserdem eine Mini-Mod und der Ordner g3asm\mods.
 # Sicherung nach <Spiel>\g3asm_backup\loader_<Zeit>\. Ist dbghelp.dll schon ein Proxy (z. B. der des Hauptrepos) und gibt es kein dbghelp_orig.dll, bricht das Skript ab.
 # Dateien werden geloescht und neu angelegt (Hardlinks zu anderen Spielkopien werden getrennt, nicht mitveraendert).
 # Voraussetzung (nur beim Einbau geprueft): Community Patch 1.75 (PE-Zeitstempel der Gothic3.exe 4F959F4F) und Parallel-Universe-Patch (paru_s1.dll,

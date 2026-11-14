@@ -1,6 +1,6 @@
 # Speichern und Laden
 
-Quests, Dialoge und Texte, die ein Mod zur Laufzeit anlegt, kennt das Spiel nicht von sich aus. Beim Laden eines Spielstands baut es Quests und Infos neu aus seinen
+Quests, Dialoge und Texte, die eine Mod zur Laufzeit anlegt, kennt das Spiel nicht von sich aus. Beim Laden eines Spielstands baut es Quests und Infos neu aus seinen
 Datendateien auf und liest danach die gespeicherten Laufzeitdaten dazu ein (Status, Questlog, "Info gegeben"). Eigene Objekte müssen deshalb **während des Aufbaus**
 angelegt werden, bevor das Spiel die Laufzeitdaten einliest. Dann stellt das Spiel Status und Questlog selbst wieder her.
 
@@ -34,8 +34,8 @@ Die Reihenfolge beim Laden (im Protokoll sichtbar): `LoadQuestsFromInis` → `On
 | `void OnAfterSave(const bCString &in name, int ok)` (ab Version 31) | direkt danach; `ok` 1 = Erfolg, 0 = Fehlschlag |
 
 Beide laufen genau einmal je Speichern (gemessen: Menü und Schnellspeichern, `gCWorld::SaveGameWorld`, derselbe Thread wie beim Laden). Sie dienen dazu, **dauerhafte
-Zustände aus dem Spielstand herauszuhalten**: Was ein Mod dem Helden dauerhaft hinzufügt (zum Beispiel ein eigenes Item), steht danach im Spielstand und fehlt, wenn der
-Mod nicht läuft oder sich ein anderer Mod daran stört. Der Mod nimmt es in `OnBeforeSave` heraus und legt es in `OnAfterSave` wieder an.
+Zustände aus dem Spielstand herauszuhalten**: Was eine Mod dem Helden dauerhaft hinzufügt (zum Beispiel ein eigenes Item), steht danach im Spielstand und fehlt, wenn der
+Mod nicht läuft oder sich eine andere Mod daran stört. Die Mod nimmt es in `OnBeforeSave` heraus und legt es in `OnAfterSave` wieder an.
 
 ```angelscript
 void OnBeforeSave(const bCString &in name) { /* Talent deaktivieren, Stapel loeschen */ }
@@ -46,14 +46,14 @@ Ein Beispiel ist `examples/mods/perk_lifesteal`. Entity-Handles nicht über das 
 ## Eigene Schalter im Spielstand
 
 `SetGameEvent(name)`, `ClearGameEvent(name)`, `IsGameEventSet(name)` speichern kleine Ja/Nein-Werte im Gedächtnis des Helden. Das Spiel schreibt sie in jeden Spielstand.
-Sie überstehen Speichern und Laden und gelten für den jeweiligen Spielstand, auch wenn der Mod nicht lief.
+Sie überstehen Speichern und Laden und gelten für den jeweiligen Spielstand, auch wenn die Mod nicht lief.
 
-Benutze sie für alles, was der Mod nach dem Laden wissen muss und das das Spiel nicht selbst speichert (zum Beispiel "Quest gescheitert"). Wähle Namen mit Präfix
+Benutze sie für alles, was die Mod nach dem Laden wissen muss und das das Spiel nicht selbst speichert (zum Beispiel "Quest gescheitert"). Wähle Namen mit Präfix
 (`MeinMod_...`), damit sie nicht mit Spielereignissen kollidieren.
 
 ## Notfall-Wiederherstellung
 
-Falls das Spiel Quest oder Dialoge nicht zurückbringt (zum Beispiel wenn der Mod erst nach einem Laden dazukam), prüft ein Mod am besten einmal pro Sekunde in
+Falls das Spiel Quest oder Dialoge nicht zurückbringt (zum Beispiel wenn die Mod erst nach einem Laden dazukam), prüft eine Mod am besten einmal pro Sekunde in
 `OnFrame`, ob `QuestExists` und `InfoExists` stimmen, legt sie sonst neu an und stellt den Stand aus den Schaltern her. Dafür gilt:
 
 - Den Status setzt du mit `SetQuestStatus(quest, QUEST_RUNNING)`, **nicht** mit `RunQuest`: Letzteres zeigt die Meldung "Quest angenommen" erneut.

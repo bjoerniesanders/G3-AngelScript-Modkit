@@ -57,14 +57,14 @@ public:
     // Spiel-Ereignis mit Argumenten an alle Mods, z. B. "void OnNPCKilled(Entity)" (Entity als Wert, Text als const bCString &in)
     void CallEvent(const char* decl, const EvArg* args, int n);
     void CallSimple(const char* decl);   // "void OnWorldActivate()" usw. in allen Mods, falls vorhanden
-    // Override-Hooks (ab Version 17): ersetzt ein Mod eine Spielfunktion (Skriptfunktion "bool Override_<Name>(...)"), laeuft sie statt des Originals; ueber Super()
-    // ruft der Mod das Original (bzw. den naechsten Mod der Kette) auf. HasHandler: definiert irgendein Mod diese Funktion?
+    // Override-Hooks (ab Version 17): ersetzt eine Mod eine Spielfunktion (Skriptfunktion "bool Override_<Name>(...)"), laeuft sie statt des Originals; ueber Super()
+    // ruft die Mod das Original (bzw. die naechste Mod der Kette) auf. HasHandler: definiert irgendein Mod diese Funktion?
     bool HasHandler(const char* decl);
-    // true = ein Mod hat uebernommen: *result ist das Ergebnis fuer das Spiel, *originalCalled sagt, ob das Original gelaufen ist; false = niemand hat die Funktion
-    // original(args): das Original der Spielfunktion; bekommt die Argumente der Kette (ein Mod kann sie mit SetOverrideArg veraendert haben)
+    // true = eine Mod hat uebernommen: *result ist das Ergebnis fuer das Spiel, *originalCalled sagt, ob das Original gelaufen ist; false = niemand hat die Funktion
+    // original(args): das Original der Spielfunktion; bekommt die Argumente der Kette (eine Mod kann sie mit SetOverrideArg veraendert haben)
     bool CallOverride(const char* decl, const EvArg* args, int n, std::function<bool(const EvArg*)> original, bool* result,
                       bool* originalCalled, EvArg* finalArgs = nullptr);   // finalArgs: Argumente nach der Kette (n Stueck)
-    // Argument der gerade laufenden Override-Kette setzen (nur Zahlen: Kind UInt); Super() reicht den neuen Wert an den naechsten Mod und das Original weiter
+    // Argument der gerade laufenden Override-Kette setzen (nur Zahlen: Kind UInt); Super() reicht den neuen Wert an die naechste Mod und das Original weiter
     bool SetOverrideArg(int index, unsigned value);
     bool GetOverrideArg(int index, unsigned* value) const;
     bool ChainSuper();   // fuer die Skriptfunktion Super()
@@ -76,10 +76,10 @@ public:
         if (log_) log_(s);
     }
     const char* CurrentMod() const { return curMod_.c_str(); }
-    // Mod-Ordner (leer im Einzelskript-Betrieb) und Ordner eines geladenen Mods (Verzeichnis seiner main.as; leer, wenn unbekannt)
+    // Mod-Ordner (leer im Einzelskript-Betrieb) und Ordner einer geladenen Mod (Verzeichnis ihrer main.as; leer, wenn unbekannt)
     const std::string& ModsDir() const { return modsDir_; }
     std::string ModDir(const std::string& mod) const;
-    // Zwischen Mods (ab Version 44): "bCString <func>(const bCString &in)" im Mod <mod> aufrufen. false, wenn Mod oder Funktion fehlt, bei Skriptfehler
+    // Zwischen Mods (ab Version 44): "bCString <func>(const bCString &in)" in der Mod <mod> aufrufen. false, wenn Mod oder Funktion fehlt, bei Skriptfehler
     // oder zu tiefer Verschachtelung (hoechstens 8). out (SStr*) bekommt den Rueckgabetext. HasModTextFunction: gibt es die Funktion dort?
     bool CallModText(const std::string& mod, const std::string& func, const void* arg, void* out);
     bool HasModTextFunction(const std::string& mod, const std::string& func);
@@ -104,7 +104,7 @@ private:
         const char* decl;
         EvArg args[8];
         int n = 0;
-        size_t next = 0;   // naechster Mod, der in der Kette dran ist
+        size_t next = 0;   // naechste Mod, die in der Kette dran ist
         std::function<bool(const EvArg*)> original;
         bool originalCalled = false;
     };
@@ -183,7 +183,7 @@ bool OnForeignThread();   // Spiel-Thread bekannt und der Aufrufer ist ein ander
 // Ereignisse 7.3 (more_events.cpp): Konsole, Quest-Status
 int InstallMoreEventHooks(ScriptHost& host);
 void MoreEventsFrame();
-// Einstellungen je Mod (mod_settings.cpp, ab Version 44): Bindings; ModSettingsForget beim Neuladen eines Mods (Zwischenspeicher verwerfen)
+// Einstellungen je Mod (mod_settings.cpp, ab Version 44): Bindings; ModSettingsForget beim Neuladen einer Mod (Zwischenspeicher verwerfen)
 bool RegisterModSettingsBindings(asIScriptEngine* e);
 void ModSettingsForget(const std::string& mod);
 // Abschnitt einer ini-Datei (Schluessel klein geschrieben, Werte getrimmt; UTF-8-BOM erlaubt); leer, wenn Datei/Abschnitt fehlt

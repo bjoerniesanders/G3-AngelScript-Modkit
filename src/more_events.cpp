@@ -2,7 +2,7 @@
 // Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 // Weitere Ereignisse aus exportierten Funktionen (Skript-Schnittstelle ab Version 35, Roadmap 7.3; Beruehrung, Haendlerware, Verwandlung ab 37).
 //   Konsole:      Engine.dll eCConsole::OnExecute(const bCString &eingabe, bCString &ausgabe) -> bool
-//                 Override_ConsoleCommand(zeile): true ohne Super() = Befehl gehoert dem Mod; Antwort mit SetConsoleReply(text)
+//                 Override_ConsoleCommand(zeile): true ohne Super() = Befehl gehoert der Mod; Antwort mit SetConsoleReply(text)
 //   Quest-Status: Game.dll gCQuest_PS::SetStatus(const gEQuestStatus &) -> bool
 //                 Override_QuestStatus(name, alt, neu): SetOverrideArg(2, x) aendert den neuen Status, ohne Super() bleibt er; danach OnQuestStatus(name, alt, neu)
 // Beide laufen nur im Spiel-Thread in die Skripte (OnGameThread). Messung: die ersten Aufrufe stehen im Protokoll.
@@ -160,7 +160,7 @@ void* SafePsEntity(void* ps) {
 }
 
 // ---- Beruehrung: Engine eCDynamicEntity::OnTouch(eCEntity *anderes, eCContactIterator &) auf dem beruehrten Entity -> OnTouch(self, other)
-// Sehr haeufig: gemeldet wird nur, wenn ein Mod OnTouch hat (einmal je Bild geprueft); gezaehlt wird immer.
+// Sehr haeufig: gemeldet wird nur, wenn eine Mod OnTouch hat (einmal je Bild geprueft); gezaehlt wird immer.
 typedef void(__thiscall* TouchFn)(void*, void*, void*);
 TouchFn o_touch = nullptr;
 const char* const kTouchDecl = "void OnTouch(Entity, Entity)";

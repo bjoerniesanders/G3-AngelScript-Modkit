@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-"""Erzeugt Abschnitt 8 von docs/modkit/reference.md aus dem Protokoll der Mod reference_dump.
+"""Erzeugt Abschnitt 8 von docs/modkit/reference.md aus dem Protokoll der Mod probe_reference.
 
 Aufruf:  python -I tools/reference_from_log.py [Protokoll] [reference.md]
   Protokoll   Standard G:\\Gothic3\\g3asm.log (der letzte Dump darin zaehlt)
@@ -15,7 +15,7 @@ import sys
 log_path = sys.argv[1] if len(sys.argv) > 1 else r'G:\Gothic3\g3asm.log'
 md_path = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'docs', 'modkit', 'reference.md')
 
-PREFIX = re.compile(r'^\d\d:\d\d:\d\d\.\d+ \[reference_dump\] ')
+PREFIX = re.compile(r'^\d\d:\d\d:\d\d\.\d+ \[probe_reference\] ')
 lines = io.open(log_path, encoding='cp1252', errors='replace').read().splitlines()
 
 starts_dump = [i for i, l in enumerate(lines) if '=== Referenz-Dump' in l]
@@ -56,7 +56,7 @@ for l in block:
         cur = None
 
 out = []
-out.append('Quelle: Dump der Mod `reference_dump` aus dem laufenden Spiel, erzeugt mit `tools/reference_from_log.py`. `FindTemplateNames` liefert die meisten Namen mehrfach; unten stehen eindeutige Namen.')
+out.append('Quelle: Dump der Mod `probe_reference` aus dem laufenden Spiel, erzeugt mit `tools/reference_from_log.py`. `FindTemplateNames` liefert die meisten Namen mehrfach; unten stehen eindeutige Namen.')
 out.append('')
 out.append('### Attribute')
 out.append('')

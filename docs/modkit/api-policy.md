@@ -9,7 +9,8 @@ Diese Seite legt fest, was sich an der Skript-Schnittstelle zwischen zwei Versio
   Schnittstelle ändert, erhöht sie um 1.
 - Releases heißen `v0.<API>.<Fix>`, zum Beispiel `v0.42.0-alpha.1`: die mittlere Zahl ist die Skript-Schnittstelle, die letzte zählt Fehlerbehebungen
   ohne Änderung an der Schnittstelle. `-alpha.N` und `-beta.N` sind Vorabversionen.
-- Solange die erste Zahl 0 ist, ist das Modkit eine **Alpha**: Die Regeln unten gelten, aber der Umfang dessen, was als stabil gilt, ist noch klein.
+- Solange die erste Zahl 0 ist, gilt das Modkit noch nicht als fertig (das wäre 1.0). `-alpha.N`: der Umfang wächst noch mit jeder Version.
+  `-beta.N`: die Skript-Schnittstelle ist eingefroren (siehe unten), es kommen nur Fehlerbehebungen.
 
 ## Was eine neue Version darf
 
@@ -29,9 +30,9 @@ Diese Seite legt fest, was sich an der Skript-Schnittstelle zwischen zwei Versio
 Mit **Version 46** ist die Skript-Schnittstelle für die Beta eingefroren (2026-11-13). Das heißt:
 
 - Alles, was in der [API-Referenz](api-reference.md), bei den [Ereignissen](events.md) und den [Hooks](hooks.md) **ohne Vermerk** steht, bleibt so, wie es
-  dort beschrieben ist. Ein Mod, der nur solche Funktionen benutzt und mit Version 46 läuft, läuft auch mit jeder späteren Version; die Tabelle oben
+  dort beschrieben ist. Eine Mod, die nur solche Funktionen benutzt und mit Version 46 läuft, läuft auch mit jeder späteren Version; die Tabelle oben
   gilt dafür ohne Ausnahme.
-- Bis zum Beta-Release kommen **keine neuen Funktionen** dazu. Es erscheinen nur Fehlerbehebungen (`v0.46.x`); die Zahl 46 bleibt.
+- Während der Beta kommen **keine neuen Funktionen** dazu. Es erscheinen nur Fehlerbehebungen (`v0.46.x-beta.N`); die Zahl 46 bleibt.
 - Ausgenommen sind allein die Funktionen mit Vermerk **Experimentell** (Liste unten). Sie dürfen sich noch ändern oder wegfallen, jeweils mit Hinweis in
   den Änderungen.
 - Nicht zur Schnittstelle gehören und dürfen sich jederzeit ändern: Wortlaut und Menge der Protokollzeilen, die Mess-Schalter der ini (`scriptlog`,
@@ -59,22 +60,22 @@ Text-IDs (`G3ASM_INFO_...`, `G3ASM_QTOPIC_...`, `G3ASM_QDESC_...`, vorher mit `O
 die Änderungen. Eine Funktion verliert den Vermerk, sobald ihr Verhalten im Spiel gemessen und in der Referenz beschrieben ist; das ist keine Änderung der
 Schnittstelle.
 
-Stand Version 46 (Freeze-Liste vor der Beta): experimentell `HurtHitPoints`, `SetProperty`, `GenerateTradeGoods`, `Override_CombatMove`.
+Stand Version 46: experimentell `HurtHitPoints`, `SetProperty`, `GenerateTradeGoods`, `Override_CombatMove`.
 Im Spiel bestätigt mit 46 (2026-11-11): `Entity::Kill`, `SetCrosshairVisible`, `SetGameTime`, `LoadQuestFile`, `OnTransformStart`/`OnTransformEnd`.
 Ohne Vermerk seit 46: `SetTemplateRef`, `SetEntityRef`, `CallScript`, `GetSpeechText` (Verhalten gemessen und beschrieben).
 Entfernt mit 46 (nie funktionsfähig, Alpha): `GetPickPosition` (Ersatz `PickCenter`/`GetPickPoint`), `ExecuteInfo`, `DumpQuest`.
 
-## In einem Mod auf die Version prüfen
+## In einer Mod auf die Version prüfen
 
 ```angelscript
 void main() {
     if (GetApiVersion() < 37) {
-        print("Dieser Mod braucht die Skript-Schnittstelle 37 (OnTouch). Bitte G3ASM aktualisieren.");
+        print("Diese Mod braucht die Skript-Schnittstelle 37 (OnTouch). Bitte G3ASM aktualisieren.");
         return;
     }
 }
 ```
 
-Eine Funktion, die es in der laufenden Version nicht gibt, ist ein **Übersetzungsfehler**: Der Mod wird dann gar nicht geladen und das Protokoll nennt die
+Eine Funktion, die es in der laufenden Version nicht gibt, ist ein **Übersetzungsfehler**: Die Mod wird dann gar nicht geladen und das Protokoll nennt die
 Zeile. Die Prüfung oben hilft deshalb nur bei Verhalten, das sich zwischen Versionen geändert hat. Besser ist ab Version 40 der Eintrag `api=37` in der
-`mod.ini`: Dann lädt das Modkit den Mod gar nicht erst und schreibt, dass er zu alt ist ([Mod-Paket](mod-package.md)).
+`mod.ini`: Dann lädt das Modkit die Mod gar nicht erst und meldet, dass das Modkit zu alt ist ([Mod-Paket](mod-package.md)).

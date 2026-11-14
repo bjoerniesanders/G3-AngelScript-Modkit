@@ -5,8 +5,8 @@ Bauen, Testen und Einbau stehen in der [README](README.md), die Regeln fuer die 
 [docs/modkit/api-policy.md](docs/modkit/api-policy.md).
 
 ## Vor jedem Commit
-1. Bauen (32 Bit) und die drei Testlaeufe aus der README: Selbsttest, `tests\mods`, Kompilierpruefung `examples\mods`
-   (dort ist genau der eine Fehler "Override-Kette ueber mehrere Mods" erwartet).
+1. Bauen (32 Bit) und die Testlaeufe aus der README: Selbsttest, `tests\mods`, Kompilierpruefung `examples\mods`
+   (dort ist genau der eine Fehler "Override-Kette ueber mehrere Mods" erwartet), Loader-Test und `tests\file_patches_overlay.py`.
 2. `powershell -NoProfile -File tools\check_no_fninit.ps1 -Dll <Build>\g3asm\g3asm.dll` (siehe Gleitkomma).
 3. `powershell -NoProfile -File tools\run_clang_tidy.ps1 -BuildDir <Build> -Changed -Strict` (siehe Statische Pruefung).
 4. Was das Verhalten im Spiel aendert, im Spiel pruefen und das Protokoll (`g3asm.log`) lesen. Ohne Spieldateien geht nur der Teil mit der
@@ -14,14 +14,16 @@ Bauen, Testen und Einbau stehen in der [README](README.md), die Regeln fuer die 
 
 ## Sprache
 - **Deutsch:** Doku (`docs/`), Kommentare im Code, Protokollmeldungen, Beispiel-Mods. README und diese Datei in reinem ASCII (ae, oe, ue, ss).
-- **Englisch:** Commit-Texte, `.github/workflows`, Skripte fuer CI und Release (`tools/package_release.ps1`, `tools/check_no_fninit.ps1`,
+- **Englisch:** `README.en.md` (die englische Fassung der README; bei Aenderungen an der README beide anpassen), Commit-Texte, `.github/workflows`, Skripte fuer CI und Release (`tools/package_release.ps1`, `tools/check_no_fninit.ps1`,
   `tools/run_clang_tidy.ps1`) und die erzeugte `INSTALL.txt`.
 - Commit-Texte nach dem Muster `feat: ...`, `fix: ...`, `docs: ...`, `ci: ...`, `refactor: ...`; `feat!:` wenn sich die Skript-Schnittstelle unvertraeglich aendert.
 
 ## Stil
 - `.clang-format` im Wurzelordner (LLVM-Basis, 4 Leerzeichen, 140 Spalten). Der Bestand ist nicht durchgehend danach formatiert: **nur neue und
   geaenderte Zeilen** formatieren, keine ganzen Dateien (sonst wird jede Aenderung unlesbar).
-- Quellen sind UTF-8 **ohne BOM**. PowerShell 5.1 schreibt mit `Set-Content -Encoding utf8` ein BOM; das AngelScript-Skript laedt dann nicht.
+- Quellen sind UTF-8 **ohne BOM** (das Modkit liest Dateien mit BOM, im Repo bleibt es einheitlich). PowerShell 5.1 schreibt mit
+  `Set-Content -Encoding utf8` ein BOM; zum Schreiben `[IO.File]::WriteAllText(..., (New-Object Text.UTF8Encoding($false)))` nehmen.
+  Ausnahme mit Absicht: `tests/mods/load_order.txt` und `tests/mods/alpha/mod.ini` beginnen mit BOM (Test).
 - Kommentare erklaeren das Warum und woher ein Wert stammt (gemessen am ..., Export ..., RVA ...), nicht das Was.
 - Kein Code aus dem Gothic-3-SDK oder aus GPL-Beispielen uebernehmen; nur Erkenntnisse (welche Funktion, welches Layout). Siehe `LICENSE-EXCEPTIONS.md`.
 - Keine Spieldateien ins Repository (DLLs, Archive, Spielstaende).
@@ -65,7 +67,7 @@ falsch (verwaschene Gebaeude-Texturen, gemessen 2026-11-06).
 - Skriptaufrufe laufen ueber `ScriptHost::Execute`; nur dort wird der Gleitkomma-Zustand gesichert und wiederhergestellt.
 
 ## Laufzeit
-- Hooks auf haeufigen Wegen (jedes Bild, jede Beruehrung, jeder Skriptaufruf) rufen Skripte nur, wenn ein Mod die Funktion hat, und reservieren
+- Hooks auf haeufigen Wegen (jedes Bild, jede Beruehrung, jeder Skriptaufruf) rufen Skripte nur, wenn eine Mod die Funktion hat, und reservieren
   dort keinen Speicher, wenn es sich vermeiden laesst.
 - Protokollzeilen aus solchen Hooks sind begrenzt (einmal je Stelle, erste N Zeilen oder eine Zusammenfassung je Zeitfenster). Ein Protokoll, das
   in Sekunden vollaeuft, verdeckt den Fehler, den man sucht.
@@ -76,9 +78,10 @@ falsch (verwaschene Gebaeude-Texturen, gemessen 2026-11-06).
 - **Erst messen, dann dokumentieren.** Eine neue Funktion steht erst ohne Vermerk in der Referenz, wenn ihre Wirkung im Spiel gemessen ist; bis
   dahin traegt sie den Vermerk *Experimentell* oder *Im Spiel nicht geprueft*.
 - Zu jeder neuen Funktion gehoeren: Eintrag in `docs/modkit/api-reference.md` (oder `events.md`/`hooks.md`), eine Pruefung im Selbsttest
-  (`tests/scripts/selftest.as`), soweit sie ohne Spiel laeuft, und bei Bedarf ein schlanker Mess-Mod unter `examples/mods` (`enabled=0`).
-- Beispiel-Mods sind standardmaessig aus (`mod.ini`: `enabled=0`) und stehen unter CC0.
-- Was ein Mod dauerhaft ins Spiel schreibt, steht im Spielstand. Beispiele, die das tun, raeumen in `OnBeforeSave` auf und stellen den Zustand in
+  (`tests/scripts/selftest.as`), soweit sie ohne Spiel laeuft, und bei Bedarf eine schlanke Mess-Mod unter `examples/mods` (`enabled=0`).
+- Beispiel-Mods sind standardmaessig aus (`mod.ini`: `enabled=0`) und stehen unter CC0. Namen: `demo_<thema>` fuer Lern-Beispiele,
+  `probe_<thema>` fuer Mess-Mods (englisch, klein, mit Unterstrich); Mods mit Spielinhalt duerfen einen eigenen Namen tragen.
+- Was eine Mod dauerhaft ins Spiel schreibt, steht im Spielstand. Beispiele, die das tun, raeumen in `OnBeforeSave` auf und stellen den Zustand in
   `OnAfterSave` und nach jedem Laden wieder her (Muster: `examples/mods/perk_lifesteal`).
 
 ## Lizenz

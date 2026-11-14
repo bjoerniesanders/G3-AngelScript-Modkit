@@ -42,8 +42,8 @@ Hinweise:
 - `SucceedQuest` auf eine schon erfolgreiche Quest und `FailQuest` auf eine beendete Quest werden abgelehnt (`false`).
 - **XP:** Die Quest-XP zahlt das Spiel beim Abschluss selbst aus, mit einer Meldung "Quest abgeschlossen". Setze `SetQuestXP` vor `SucceedQuest`.
   Mit 100 gesetzt zahlte das Spiel im Test 500 aus (vermutlich ein Faktor); steht 0 darin, gibt es nichts.
-- **Quests merken:** Ob eine per Skript angelegte Quest in Spielständen gespeichert wird, ist nicht geprüft. Sicherer ist, den Zustand aus
-  `GetQuestStatus` abzuleiten und die Quest bei Bedarf neu anzulegen (so macht es der Jens-Mod).
+- **Quests im Spielstand:** Eine Quest, die die Mod in `OnQuestsLoaded` anlegt, bekommt nach dem Laden Status und Questlog vom Spiel zurück
+  (im Spiel geprüft). Wird sie erst später angelegt (zum Beispiel in `OnFrame`), geht der Stand verloren. Siehe [Speichern und Laden](saving.md).
 
 ## Texte
 
@@ -58,8 +58,8 @@ Der Text wird als Windows-1252 gelesen (Umlaute funktionieren). Der Titel ersche
 ## Questlog und Dialoge
 
 Das Questlog von Gothic 3 besteht aus **Dialogen** (Infos): Die Einträge entstehen, wenn Gespräche geführt werden, nicht aus einer Liste, die ein Skript füllt.
-Eine per Skript angelegte Quest hat deshalb einen Titel, aber keine Logeinträge. Dafür fehlt noch eine Dialog-Schnittstelle (siehe [Grenzen und Stand](limitations.md)).
-Bis dahin zeigst du dem Spieler Hinweise mit `PrintScreen`.
+Eine per Skript angelegte Quest hat deshalb zunächst nur Titel und Beschreibung. Logeinträge entstehen über eigene Dialogzeilen, die mit der Quest
+verbunden sind (`SetInfoQuest`, siehe [Dialoge](dialogs.md)); direkt ins Log schreiben geht nicht.
 
 ## Alle Quests des Spiels
 
@@ -72,4 +72,4 @@ for (int i = 0; i < n; i++) {
 ```
 
 Bekannte Einschränkung: Die Aufzählung ist noch nicht vollständig geprüft. Im Spieltest meldete die Statusabfrage für die Namen der Liste keine laufenden Quests,
-obwohl eine lief; der Mod `quest_demo` (Bild hoch) gibt dafür die Einzelheiten ins Protokoll.
+obwohl eine lief; die Mod `demo_quest` (Bild hoch) gibt dafür die Einzelheiten ins Protokoll.

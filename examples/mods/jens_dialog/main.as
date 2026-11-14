@@ -2,9 +2,9 @@
 //   "Hast du Arbeit fuer mich?"  -> Jens bittet um ein Wolfsfell, die Quest startet (Titel/Beschreibung/Dialogtext im Questlog).
 //   "Ich habe das Wolfsfell."     -> erscheint, solange die Quest laeuft; nimmt das Fell, schliesst die Quest ab, Belohnung.
 // Speichern/Laden: Quest und Dialoge sind Laufzeit-Objekte und gehen beim Laden verloren. Der Fortschritt steht deshalb in zwei Schaltern, die das
-// Spiel im Spielstand mitspeichert (SetGameEvent). Nach jedem Laden legt der Mod Quest und Dialoge neu an und stellt den Stand wieder her.
+// Spiel im Spielstand mitspeichert (SetGameEvent). Nach jedem Laden legt die Mod Quest und Dialoge neu an und stellt den Stand wieder her.
 // Hinweis: Jens hat im Spiel schon eine eigene Wolfsfell-Quest (KapDun_Hunter_Fur); diese Mod-Quest ist davon unabhaengig.
-// Der Mod jens_quest (Naehe + Rollen-Taste) sollte abgeschaltet sein: in g3asm\mods\load_order.txt "-jens_quest" eintragen.
+// Die Mod jens_quest (Naehe + Rollen-Taste) sollte abgeschaltet sein: in g3asm\mods\load_order.txt "-jens_quest" eintragen.
 const bCString NPC = "Jens";
 const bCString QUEST = "G3ASM_Jens_Wolfsfell";
 const bCString ITEM = "It_Wolf_Fur";

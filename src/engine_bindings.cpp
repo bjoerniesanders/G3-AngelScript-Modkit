@@ -1472,7 +1472,7 @@ SStr GetPropertyText(const Entity& e, const SStr& set, const SStr& prop) {
     if (r.size() > 3000) r.resize(3000);
     return SStr(r);
 }
-// Eigenschaft aus Text setzen. Aendert Spieldaten: nur fuer Vorlagen und Entities verwenden, die der Mod selbst angelegt hat. Eine falsche Textform kann zu falschen Werten fuehren.
+// Eigenschaft aus Text setzen. Aendert Spieldaten: nur fuer Vorlagen und Entities verwenden, die die Mod selbst angelegt hat. Eine falsche Textform kann zu falschen Werten fuehren.
 bool SetPropertyText(const Entity& e, const SStr& set, const SStr& prop, const SStr& value) {
     if (!EntIsValid(e) || !ResolveProps() || !g_pa.convStr) return false;
     void* ps = PropSetFor(e, set);

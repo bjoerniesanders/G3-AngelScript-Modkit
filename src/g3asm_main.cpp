@@ -517,7 +517,7 @@ extern "C" __declspec(dllexport) int g3asm_run_file(const char* path) {
                 &res, &orig);
             g_host.Check(handled && !orig && res, "Override ohne Super(): Original uebersprungen, Ergebnis vom Skript");
         }
-        if (!dirMode) {   // Argument aendern: der Mod verdoppelt es (SetOverrideArg), Super() reicht es ans Original weiter
+        if (!dirMode) {   // Argument aendern: die Mod verdoppelt es (SetOverrideArg), Super() reicht es ans Original weiter
             EvArg b[] = {EvArg::U(5)};
             unsigned seen = 0;
             res = false;

@@ -1,5 +1,7 @@
 # G3 AngelScript Modkit (G3ASM)
 
+**Deutsch** | [English](README.en.md)
+
 AngelScript-Modding fuer das **Original-Gothic-3**: `g3asm.dll` wird von einer schlanken Ersatz-`dbghelp.dll` (dem Loader, `src/loader`) geladen, startet
 AngelScript 2.38 und bindet Spielereignisse, Quests, Inventar, Dialoge und Datei-Patches an Mod-Skripte.
 
@@ -7,6 +9,74 @@ AngelScript 2.38 und bindet Spielereignisse, Quests, Inventar, Dialoge und Datei
 ab, wenn etwas fehlt (`-Force` baut trotzdem ein, ungetestet); das Modkit schreibt das Ergebnis als Zeile `Voraussetzungen: ...` ins Protokoll.
 
 Wer am Code mitarbeitet: Hausregeln (Hooks, Gleitkomma, Stil, statische Pruefung mit clang-tidy) stehen in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Modden
+
+1. **Einbauen** (Spiel beendet), im entpackten Release-Ordner:
+
+       powershell -NoProfile -ExecutionPolicy Bypass -File tools\install_loader.ps1 -Game "<Spielordner>" -BuildDir bin
+
+2. **Mod anlegen:** ein Ordner je Mod, darin `main.as`, z. B. `<Spielordner>\g3asm\mods\hallo\main.as`:
+
+       void main() { print("Hallo aus meiner ersten Mod"); }
+       void OnNPCKilled(Entity opfer) { PrintScreen("Getoetet: " + opfer.GetName(), 3, 255, 120, 120); }
+
+3. **Spiel starten.** Ausgaben und Fehler (mit Zeile und Spalte) stehen in `<Spielordner>\g3asm.log`. Wird `main.as` im laufenden Spiel
+   gespeichert, ist die neue Fassung nach etwa einer Sekunde aktiv (Hot-Reload).
+4. **Reihenfolge und Schalter** in `g3asm\mods\load_order.txt`: `-name` schaltet eine Mod ab, `+name` eine standardmaessig abgeschaltete zu
+   (so sind alle Beispiel-Mods ausgeliefert). Version, Abhaengigkeiten und Einstellungen einer Mod stehen in ihrer `mod.ini`.
+
+Was eine Mod kann:
+- auf Spielereignisse reagieren (Kills, Items, Zauber, Schaden, Bereiche, Quest-Status, Speichern/Laden, gesprochene Saetze, Tasten, jedes Bild);
+- ausgewaehlte Spielfunktionen mit `Override_...` und `Super()` aendern oder abbrechen (Schaden, Dialogoptionen, Lernkosten, Monsterschaden,
+  Spielskripte und KI-Zustaende nach Namen, Konsole, Haendlerware);
+- Attribute, Inventar, Item-Qualitaet, Talente, Eigenschaften, Quests und Dialoge lesen und aendern, Vorlagen klonen, NPCs erzeugen;
+- ueber dem HUD Text und Bilder zeichnen;
+- Texte des Spiels per `stringtable.ini` ersetzen, Quest- und Info-Dateien per Unified-Diff patchen (`ScriptPatches`) und eigene Dateien als
+  Mod-Archiv packen (`PackMod`);
+- mit anderen Mods zusammenarbeiten (`IsModActive`, `CallMod`, `SendModMessage`).
+
+Anleitung und Referenz: [docs/modkit/index.md](docs/modkit/index.md) (Einstieg, Schnellstart), [Scripting-Guide](docs/modkit/scripting-guide.md),
+[Ereignisse](docs/modkit/events.md), [API-Referenz](docs/modkit/api-reference.md), [Beispiele](docs/modkit/examples.md). Die Beispiel-Mods unter
+`examples/mods` heissen `demo_*` (Lern-Beispiele), `probe_*` (Messmods) oder tragen einen eigenen Namen (kleine Mods mit Spielinhalt).
+
+## Grenzen
+
+Einzelheiten in [Grenzen und Stand](docs/modkit/limitations.md).
+
+**Grundsaetzlich:** Die Spiellogik von Gothic 3 liegt in nativen DLLs. Eine Mod greift nur an den Stellen ein, die das Modkit freilegt.
+
+**Geht nicht** (im Spiel gemessen oder im Spielcode untersucht):
+- Einfarbige Flaechen zeichnen: Die Rechteck-Funktionen von GUI und Renderer zeichnen im Spiel nichts; es gehen nur Text und Bilder.
+- Eigene Talente vom Spiel lernen lassen: `LearnSkill` liefert fuer ein geklontes Talent `false`; die Wirkung stellt die Mod selbst her.
+- Verweise auf andere Vorlagen per `SetProperty` als Text setzen (elf Schreibweisen probiert); dafuer gibt es `SetTemplateRef`/`SetEntityRef`.
+- Ein allgemeiner Treffer-Hook vor der Schadensberechnung: Die Game.dll exportiert dafuer keinen Einstiegspunkt.
+- Spielstaende ohne die Mod, wenn sie dauerhafte Zustaende enthalten (Items aus geklonten Vorlagen, Talente): Ein solcher Spielstand stuerzte ohne
+  die Mod beim Oeffnen des Charakterbogens ab. Mods raeumen das deshalb in `OnBeforeSave` weg und stellen es danach wieder her (Muster: `perk_lifesteal`).
+
+**Gibt es nicht** (nicht gebaut oder noch nicht untersucht, nicht als unmoeglich erwiesen):
+- Animationen: abspielen, abfangen, eigene einbinden.
+- Welt bearbeiten (Objekte setzen), eigene Modelle.
+- Eigene Bedienelemente mit Eingabe, ein Einstellungsmenue im Spiel.
+- Das Questlog direkt beschreiben (Eintraege entstehen ueber Dialogzeilen) und die Bedingungslisten eigener Infos (Items, Reputation) setzen;
+  Bedingungen prueft das Skript selbst.
+- Datei-Patches auf komprimierte Archiveintraege (`Strings.pak`) und Binaerdateien; Datei-Patches patchen immer die Fassung aus dem `.pak`, auch
+  wenn ein anderes Mod-Archiv dieselbe Datei ersetzt.
+- Die ausfuehrliche Doku auf Englisch (es gibt nur die [englische README](README.en.md)).
+
+**Experimentell** (laeuft, Wirkung nicht vollstaendig gemessen, darf sich noch aendern): `HurtHitPoints` (senkt Lebenspunkte, toetet nicht),
+`SetProperty` (nur Textwerte), `GenerateTradeGoods` (die Ware aendert sich im Test nicht), `Override_CombatMove`.
+
+**Nicht getestet** (Einzelheiten in [Kompatibilitaet](docs/compatibility.md)):
+- GOG- und CD/DVD-Version; ohne DXVK nur auf einer Installation. Ohne Community Patch 1.75 oder Parallel-Universe-Patch nicht unterstuetzt.
+- Zusammen mit anderen Script-Plugins, die eigene Hooks setzen (z. B. CombatFix). `Script_MonsterDamage.dll` und
+  `Script_LearningThresholdTweaks.dll` aendern dieselben Stellen wie das Modkit; sind sie installiert, bleiben `Override_MonsterDamage` bzw.
+  `Override_LearnCost` aus.
+- Auf einer Steam-Installation mit vielen Fremd-Mods stuerzte ein Spielstand mit `perk_lifesteal` beim Oeffnen des Charakterbogens ab, auch ohne
+  Mods; die Ursache ist offen. Auf einer sauberen Installation tritt das nicht auf.
+- Im Spiel nie ausgeloest: KI-Routinen (`AI_ROUTINE`), der Teiler 2 bei `Override_MonsterDamage` (beschworene Angreifer) und die verdoppelten
+  Lernkosten mit "Alternative Balance". Abhaengigkeiten in der `mod.ini` sind nur ohne Spiel getestet; Datei-Patches auf `.info`-Dateien
+  sind ungeprueft.
 
 ## Aufbau
 | Ordner | Inhalt |
@@ -27,7 +97,7 @@ Ausgabe: `build32/g3asm/` (g3asm.dll, Tests, g3asm_packmod) und `build32/loader/
     g3asm_test.exe <SharedBase.dll> tests\scripts\selftest.as
     g3asm_test.exe <SharedBase.dll> tests\mods
     powershell -NoProfile -File tests\run_loader_test.ps1 -SharedBase <SharedBase.dll> -DbghelpOrig <dbghelp_orig.dll>   (Loader in einem Wegwerf-Ordner)
-    python -I testsile_patches_overlay.py g3asm_test.exe <SharedBase.dll>   (Datei-Patches in einem Wegwerf-Ordner)
+    python -I tests\file_patches_overlay.py g3asm_test.exe <SharedBase.dll>   (Datei-Patches in einem Wegwerf-Ordner)
 Ohne Spieldateien: als `<SharedBase.dll>` die Ersatz-DLL `build32\sbstub\SharedBase.dll` nehmen (Ziel `g3asm_sb_stub`), als `<dbghelp_orig.dll>`
 die System-DLL `%WINDIR%\SysWOW64\dbghelp.dll`. Die Ersatz-DLL hat nur die Exporte, die das Modkit fuer bCString und die Mathe-Typen braucht,
 und rechnet nicht bitgenau wie das Original; Messungen am Verhalten des Originals nur mit der echten SharedBase.dll.
@@ -36,9 +106,10 @@ und rechnet nicht bitgenau wie das Original; Messungen am Verhalten des Original
 - `.github/workflows/ci.yml` (jeder Push auf `main`, Pull-Requests, von Hand): baut 32 Bit mit MSVC, prueft, dass `g3asm.dll` kein `fninit` enthaelt
   (`tools/check_no_fninit.ps1`, Schutz fuer den FPU-Fix), fuehrt Selbsttest, Test-Mods, Kompilierpruefung der Beispiel-Mods und Loader-Test mit der Ersatz-SharedBase aus, dazu `tests/packmod_generations.py` und `tests/file_patches_overlay.py`, und packt probeweise ein Zip (Artefakt, 7 Tage).
 - `.github/workflows/release.yml`: beim Push eines Tags `v*` dasselbe plus GitHub-Release mit dem Zip:
-      git tag v0.30.0
-      git push origin v0.30.0
-- Paket lokal: `powershell -NoProfile -File tools\package_release.ps1 -BuildDir build32 -Version v0.42.0` (Ergebnis in `dist\`). Inhalt: Loader, `g3asm.dll`,
+      git tag v0.46.1-beta.1
+      git push origin v0.46.1-beta.1
+  Tags mit Bindestrich (`-alpha.N`, `-beta.N`) werden als Vorabversion veroeffentlicht; Namensschema siehe [Versionsregeln](docs/modkit/api-policy.md).
+- Paket lokal: `powershell -NoProfile -File tools\package_release.ps1 -BuildDir build32 -Version v0.46.1` (Ergebnis in `dist\`). Inhalt: Loader, `g3asm.dll`,
   `g3asm_packmod.exe`, `tools\install_loader.ps1`, Beispiel-Mods (standardmaessig aus), Doku, `INSTALL.txt`; keine Spieldateien.
 - Nicht in der CI: alles, was das echte Spiel braucht (Messungen mit der Original-`SharedBase.dll`, Spieltests). Spieldateien gehoeren nicht ins Repo.
 
@@ -46,7 +117,7 @@ und rechnet nicht bitgenau wie das Original; Messungen am Verhalten des Original
     powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner> [-BuildDir build32]
     powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner> -Uninstall
 Der Installer legt die vorhandene `dbghelp.dll` des Spiels als `dbghelp_orig.dll` beiseite (der Loader leitet `MiniDumpWriteDump` dorthin weiter, die Absturzberichte
-des Spiels funktionieren weiter), stellt den Loader als `dbghelp.dll` hin und kopiert `g3asm.dll`, eine `g3asm.ini` und einen Mini-Mod. Sicherung unter
+des Spiels funktionieren weiter), stellt den Loader als `dbghelp.dll` hin und kopiert `g3asm.dll`, eine `g3asm.ini` und eine Mini-Mod. Sicherung unter
 `<Spiel>\g3asm_backup\loader_<Zeit>\`. Protokolle: `g3asm_loader.log` (Loader, Absturzkandidaten) und `g3asm.log` (Modkit). Einstellungen in `g3asm.ini`
 (`[g3asm] enable/script/hotreload/mods`, `[loader] crashlog`).
 

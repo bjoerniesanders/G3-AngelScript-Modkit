@@ -1,7 +1,7 @@
 # Kompatibilität
 
-G3ASM ist ein **Alpha**-Stand. Getestet ist es bisher auf wenigen Installationen. Diese Seite sammelt, was auf welcher Installation geprüft wurde. Wer es
-auf einer anderen Installation ausprobiert, kann das Ergebnis gern melden (Protokolle siehe unten).
+Getestet ist G3ASM bisher auf wenigen Installationen. Diese Seite sammelt, was auf welcher Installation geprüft wurde. Wer es auf einer anderen Installation
+ausprobiert, kann das Ergebnis gern melden (Protokolle siehe unten).
 
 ## Voraussetzungen
 
@@ -52,9 +52,9 @@ danach löschen.
 2. **Starten**, Spielstand laden, ein paar Minuten spielen, beenden. Dann `<Kopie>\g3asm.log` ansehen:
    - die Zeile `Voraussetzungen: Community Patch 1.75 ja, Parallel-Universe-Patch ja`;
    - sieben Zeilen `Modul ...: <Bytes> Bytes, PE-Zeitstempel ..., CRC32 ..., Spielordner ja/nein` (Gothic3.exe, Game, Engine, Script, Script_Game, SharedBase, d3d9);
-   - alle Hooks als `eingehaengt`, `Qualitaets-Tooltip (Lebensraub): eingehaengt`;
+   - die Hook-Zeilen vollständig (`Spielereignisse: 8 von 8 Hooks aktiv` und ähnliche, `Feste Stellen: 2 von 2 aktiv`), dazu `Qualitaets-Tooltip (Lebensraub): eingehaengt`;
    - das x87-Steuerwort steht bei jeder Zeile `FPU-Zustand ...` auf `007F`;
-   - keine Zeile mit `nicht eingehaengt`, `FEHLER` oder `WARNUNG`. Steht dort `nicht eingehaengt`, ist die Spielversion eine andere als erwartet: Der Patch
+   - keine Zeile mit `nicht eingehaengt`, `FEHLER` oder `WARNUNG`. Steht dort `nicht eingehaengt`, ist die Spielversion eine andere als erwartet: Das Modkit
      lässt diese Funktion aus und läuft weiter. Das ist kein Absturz, aber bitte melden.
 3. **Mods einschalten:** in `<Kopie>\g3asm\mods\load_order.txt` die Zeilen `+perk_lifesteal` und `+beliars_klaue` eintragen (Beispiel-Mods liegen im Zip unter
    `examples\mods`, in den Ordner `<Kopie>\g3asm\mods\` kopieren). Spiel starten, kämpfen, Charakterbogen öffnen.

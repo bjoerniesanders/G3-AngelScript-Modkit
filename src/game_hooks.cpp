@@ -111,7 +111,7 @@ bool __fastcall HItem(void* self, void*, const void* giver, const void* receiver
     SStr name(nm.empty() ? g_sb.strGetText(&text) : nm.c_str());   // ohne Namen: GUID-Text
     EvArg a[] = {EvArg::Ent(giver), EvArg::Ent(receiver), EvArg::Str(&name), EvArg::Str(&text), EvArg::U(count)};
     bool called;
-    // ar[4] = Menge: ein Mod kann sie mit SetOverrideArg(4, ..) aendern, das Original bekommt dann den neuen Wert
+    // ar[4] = Menge: eine Mod kann sie mit SetOverrideArg(4, ..) aendern, das Original bekommt dann den neuen Wert
     const bool r = RunHook(
         "bool Override_ReceiveItem(Entity, Entity, const bCString &in, const bCString &in, uint)", a, 5,
         [&](const EvArg* ar) {
@@ -531,7 +531,7 @@ void __fastcall HSetSE(void* self, void*, const unsigned long* v) {
 // oder 0 (Qualitaet bei +0x40), ein Stapelparameter = Tooltip-Objekt (ret 4), Rueckgabe eax = Zahl der Zeilen. Je gesetztem Bit holt sie den Text ueber eCLocString(Schluessel).GetString(), baut einen
 // Praefix ("(+10)") und ruft den Zeilen-Helfer bei Game.dll+0xA48B0 (eax = Art 5, ecx = Tooltip, Stapel: Symbol, &Praefix, &Text; ret 0xC). Danach folgt eine Trennzeile (Art 6), wenn Zeilen da waren.
 // Dieser Hook ruft zuerst unsere Zeile (falls das Bit gesetzt ist) und dann das Original; hatte das Original keine Zeilen, kommt die Trennzeile von uns. Text: Schluessel
-// HUD_Quality_Lifesteal aus der Stringtabelle eines Mods. Absicherung: Bytepruefung der Funktion vor dem Einhaengen, SEH um alle Aufrufe in die Engine.
+// HUD_Quality_Lifesteal aus der Stringtabelle einer Mod. Absicherung: Bytepruefung der Funktion vor dem Einhaengen, SEH um alle Aufrufe in die Engine.
 const unsigned kQualityLifesteal = 512;
 const DWORD kTipFuncRva = 0xA3DF0, kTipLineRva = 0xA48B0;
 typedef void*(__thiscall* FnUniCtor)(void*, const char*);

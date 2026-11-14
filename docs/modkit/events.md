@@ -1,19 +1,19 @@
 # Ereignisse
 
-Ein Mod definiert die Funktionen, auf die er reagieren will. Alle sind **optional**, die **Signatur muss genau stimmen**
+Eine Mod definiert die Funktionen, auf die sie reagieren will. Alle sind **optional**, die **Signatur muss genau stimmen**
 (Parametertypen und `const bCString &in` so schreiben). Jedes Ereignis geht der Reihe nach an alle geladenen Mods.
 
 ## Engine-Ereignisse
 
 | Funktion | Wann |
 |---|---|
-| `void main()` | Einmal, sobald die Engine initialisiert ist, bzw. nach jedem Neuladen des Mods (Hot-Reload) |
+| `void main()` | Einmal, sobald die Engine initialisiert ist, bzw. nach jedem Neuladen der Mod (Hot-Reload) |
 | `void OnFrame(float dt)` | Jeden Frame. `dt` in Sekunden. Nicht zu viel Arbeit hineinlegen (Abbruch nach 5 s) |
 | `void OnKey(int vk, bool down)` | Taste gedrückt (`down = true`) oder losgelassen. Tastenwiederholung wird nicht gemeldet |
 | `void OnWorldActivate()` | Eine Welt wurde geladen/aktiviert |
 | `void OnWorldDeactivate()` | Die Welt wird entladen. Entities danach nicht mehr verwenden |
-| `void OnModMessage(const bCString &in sender, const bCString &in topic, const bCString &in data)` (ab Version 44) | Ein anderer Mod hat `SendModMessage(topic, data)` aufgerufen; `sender` ist sein Name. Läuft sofort, mitten im Aufruf des Senders; der Sender selbst bekommt seine Nachricht nicht |
-| `void OnShutdown()` | Vor dem Beenden des Spiels bzw. vor dem Neuladen oder Entladen des Mods |
+| `void OnModMessage(const bCString &in sender, const bCString &in topic, const bCString &in data)` (ab Version 44) | Eine andere Mod hat `SendModMessage(topic, data)` aufgerufen; `sender` ist ihr Name. Läuft sofort, mitten im Aufruf des Senders; der Sender selbst bekommt seine Nachricht nicht |
+| `void OnShutdown()` | Vor dem Beenden des Spiels bzw. vor dem Neuladen oder Entladen der Mod |
 
 ## Spielereignisse
 
@@ -29,16 +29,16 @@ Die ersten sechs kommen aus dem Questsystem des Spiels (`gCQuestManager_PS` in `
 | `void OnLeave(Entity who, const bCString &in area)` | Jemand verlässt einen Bereich |
 | `void OnSpellCast(Entity caster, Entity target, const bCString &in spell)` | Ein Zauber wird gewirkt (`Spl_Fireball`, `Spl_HealOther`, ...) |
 | `void OnDamage(Entity victim, Entity inflictor, Entity owner, int amount, int type)` | Ein Treffer hat Lebenspunkte gekostet (nach dem Original). `inflictor` = Waffe/Geschoss (kann leer sein), `owner` = Verursacher, siehe `Override_Damage` (ab Version 25) |
-| `void OnStatusEffect(Entity npc, int effect, int enabled)` (ab Version 27) | Ein Statuseffekt hat sich geändert (`effect` = `STATUS_…`, `enabled` 1 = an, 0 = aus). Je geändertes Bit ein Aufruf, nur bei echter Änderung (das Spiel setzt Effekte auch ständig mit unverändertem Wert neu). Gilt für NPCs und den Helden, auch wenn ein Mod den Effekt selbst setzt |
+| `void OnStatusEffect(Entity npc, int effect, int enabled)` (ab Version 27) | Ein Statuseffekt hat sich geändert (`effect` = `STATUS_…`, `enabled` 1 = an, 0 = aus). Je geändertes Bit ein Aufruf, nur bei echter Änderung (das Spiel setzt Effekte auch ständig mit unverändertem Wert neu). Gilt für NPCs und den Helden, auch wenn eine Mod den Effekt selbst setzt |
 | `void OnBeforeSave(const bCString &in name)` (ab Version 31) | Das Spiel schreibt gleich einen Spielstand (`gCWorld::SaveGameWorld`; Menü und Schnellspeichern, `name` z. B. `G3_World_01_0029` oder `QuickSave`). Läuft einmal je Speichern im Spiel-Thread, vor dem Schreiben: hier dauerhafte Zustände entfernen. Siehe [Speichern und Laden](saving.md) |
 | `void OnAfterSave(const bCString &in name, int ok)` (ab Version 31) | Der Spielstand ist geschrieben (`ok` 1 = Erfolg, 0 = Fehlschlag); wird auch bei Fehlschlag gemeldet. Hier die Zustände wiederherstellen |
 | `void OnQuestStatus(const bCString &in name, int oldStatus, int newStatus)` (ab Version 35) | Der Status einer Quest hat sich geändert (`gCQuest_PS::SetStatus`; 0 Open, 1 Running, 2 Success, 3 Failed, 4 Obsolete, 5 Cancelled, 6 Lost, 7 Won). Nur bei echter Änderung, im Spiel-Thread. Gemessen: Annehmen eines Auftrags meldet 0 -> 1. Siehe `Override_QuestStatus` |
-| `void OnTouch(Entity self, Entity other)` (ab Version 37) | `other` berührt `self` (`eCDynamicEntity::OnTouch` der Engine.dll, im Spiel-Thread). Meist NPCs und Tiere gegen Navigationszonen. Gemessen: etwa 7500 Aufrufe in den ersten 10 s nach dem Laden, danach 2 bis 10 je Sekunde; Aufwand je Meldung etwa 2 µs ohne Ausgabe. Das Modkit ruft es nur, wenn ein Mod die Funktion hat; zuerst filtern (z. B. `self == GetHero() \|\| other == GetHero()`), dann arbeiten |
+| `void OnTouch(Entity self, Entity other)` (ab Version 37) | `other` berührt `self` (`eCDynamicEntity::OnTouch` der Engine.dll, im Spiel-Thread). Meist NPCs und Tiere gegen Navigationszonen. Gemessen: etwa 7500 Aufrufe in den ersten 10 s nach dem Laden, danach 2 bis 10 je Sekunde; Aufwand je Meldung etwa 2 µs ohne Ausgabe. Das Modkit ruft es nur, wenn eine Mod die Funktion hat; zuerst filtern (z. B. `self == GetHero() \|\| other == GetHero()`), dann arbeiten |
 | `void OnTradeGenerated(Entity trader, int ok)` (ab Version 37) | Das Spiel hat die Ware eines Händlers aus seinen Schatz-Sets erzeugt (`gCInventory_PS::GenerateTradeInvFromTreasureSets`); `ok` = Ergebnis (1/0). Siehe `Override_TradeGenerate` und `Entity::GenerateTradeGoods` |
 | `void OnTransformStart(Entity self, Entity target)`, `void OnTransformEnd(Entity self)` (ab Version 37) | Beginn und Ende einer Verwandlung (`Entity::StartTransform`/`EndTransform` der Script.dll). Im Spiel bestätigt (2026-11-11, Verwandlungsrolle Snapper): Start mit `self` = Held, `target` = Snapper; beim Ende ist `self` das verwandelte Wesen (Snapper), nicht der Held |
 | `void OnDraw()` (ab Version 34) | Einmal je Bild, am Ende des GUI-Bildes (ab Version 39 kurz vor `eCGUIRenderer::EndFrame` des Haupt-Renderers, Bildrate). Alles hier Gezeichnete liegt über allen Fenstern, auch über HUD und Inventar. Bis Version 38 lief es beim ersten GUI-Fenster und lag unter dem HUD; das bleibt der Rückfall, falls das Bildende einmal ausbleibt. Nur hier gehen `DrawText`/`TextWidth`/`DrawImage`. Läuft auch im Hauptmenü und in Menüseiten; wer nur im Spiel zeichnen will, prüft `GetHero().IsValid()` und `GetActivePage()`. Kurz halten: alles hier kostet Bildrate |
 | `void OnAI(const bCString &in name, int kind, Entity self, Entity target, int result)` (ab Version 41) | Ein mit `WatchScript(name)` angemeldeter KI-Zustand, eine KI-Funktion, ein Callback oder eine Routine ist gelaufen; `result` 1 = fertig, 0 = läuft im nächsten Bild weiter. Nur wenn das Original lief, siehe `Override_AI` in [Overrides](hooks.md). Ein Zustand mit Ergebnis 0 kommt im nächsten Bild wieder; `ZS_ObserveSuspect` war gemessen sofort fertig (Ergebnis 1) |
-| `void OnAIOutput(Entity speaker, const bCString &in id)` (ab Version 41) | Ein NPC oder der Held beginnt einen gesprochenen Satz (`gCScriptProcessingUnit::sAIOutputInstr`), einmal je Satz, im Gespräch wie beim Umgebungsgerede. `id` ist der Name der Sprachdatei ohne `.wav`, gemessen z. B. `INFO_Hum_Elite_Hard_Bufford_SKALVERAM3638_German` (Dialogzeile) und `SVM_Hum_Warrior_Dumb_Smalltalk_09_German` (Standardsatz); den Text liefert `GetSpeechText(id)`. Im Spiel bestätigt (2026-11-10). Für Untertitel siehe `ki_probe` |
+| `void OnAIOutput(Entity speaker, const bCString &in id)` (ab Version 41) | Ein NPC oder der Held beginnt einen gesprochenen Satz (`gCScriptProcessingUnit::sAIOutputInstr`), einmal je Satz, im Gespräch wie beim Umgebungsgerede. `id` ist der Name der Sprachdatei ohne `.wav`, gemessen z. B. `INFO_Hum_Elite_Hard_Bufford_SKALVERAM3638_German` (Dialogzeile) und `SVM_Hum_Warrior_Dumb_Smalltalk_09_German` (Standardsatz); den Text liefert `GetSpeechText(id)`. Im Spiel bestätigt (2026-11-10). Für Untertitel siehe `probe_ai` |
 | `void OnScript(const bCString &in name, Entity self, Entity other, int arg, int result)` (ab Version 32) | Ein mit `WatchScript(name)` angemeldetes Spielskript ist gelaufen (`result` = sein Rückgabewert). Nur wenn das Original lief, siehe `Override_Script` in [Overrides](hooks.md) |
 | `void OnDamage(Entity victim, Entity attacker, int amount, int type)` | Alte Form ohne `owner`, weiter unterstützt; `attacker` ist dasselbe wie `inflictor` |
 
@@ -79,6 +79,5 @@ void OnReceiveItem(Entity von, Entity an, const bCString &in item, const bCStrin
 - Feuert ein Spielereignis, während ein Skript läuft (zum Beispiel weil dein Skript ein Item entfernt), wird der Aufruf verschachtelt ausgeführt.
 - Skripte laufen nur im Spiel-Thread (dem Thread, der auch `OnFrame` ruft). Ruft das Spiel eine abgefangene Funktion aus einem anderen Thread, meldet
   das Modkit das Ereignis nicht an die Skripte, bei Overrides bekommt das Spiel sein Original; die ersten Fälle stehen als
-  `Aufruf aus fremdem Thread, nicht an Skripte gemeldet: ...` im Protokoll, auch wenn kein Mod das Ereignis behandelt (ab der Fassung nach
-  2026-11-13, im Spiel noch nicht beobachtet).
+  `Aufruf aus fremdem Thread, nicht an Skripte gemeldet: ...` im Protokoll, auch wenn keine Mod das Ereignis behandelt.
 - Mehrere Hooks können kurz nacheinander für denselben Vorgang feuern (ein Kill erzeugt `OnSpellCast`, `OnReceiveItem` und `OnNPCKilled`).

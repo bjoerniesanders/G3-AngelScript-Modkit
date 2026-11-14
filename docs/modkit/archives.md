@@ -1,6 +1,6 @@
 # Mod-Archive packen (PackMod)
 
-Neue Spieldaten (Quests, Infos, Vorlagen, Texturen, Töne) liefert das Spiel in Archiven aus (`Data\Quests.pak`, `Data\Templates.pak`, ...). Ein Mod bringt eigene Dateien als
+Neue Spieldaten (Quests, Infos, Vorlagen, Texturen, Töne) liefert das Spiel in Archiven aus (`Data\Quests.pak`, `Data\Templates.pak`, ...). Eine Mod bringt eigene Dateien als
 **Mod-Archiv** mit. `PackMod` schreibt dieses Archiv aus einem Ordner. Das Ergebnis liest die Engine wie ein `.pak`, und es entspricht dem, was `G3PakDir` (Union Starter)
 schreibt, sodass beide Werkzeuge einander ersetzen können.
 
@@ -89,6 +89,6 @@ Das Format entspricht `G3PakDir`: Kopf mit `G3V0` und `G3PD`, Pfade relativ mit 
 - **Lesen komprimierter Einträge** (`list` zeigt sie, den Inhalt nicht): nötig für `Strings.pak\stringtable.ini`, siehe [Patches](patches.md).
 - **Unsere Datei-Patches kennen die Mod-Schichten noch nicht:** Sie lesen als Basis nur das `.pak`. Hat ein anderes Mod-Archiv (`.mod`, `.m00`, ...) dieselbe Datei ersetzt, patcht der Diff die Fassung aus dem `.pak`.
 - **Im Spiel bestätigt (2026-11-05, wiederholt 2026-11-06 ohne physische Kopie):** Eine **neue** Datei aus einem von `g3asm_packmod` geschriebenen Archiv (`Quests.m00`: die Quest `G3ASM_Jens_Wolfsfell`) wird gelesen, die Quest kommt aus dem Archiv und läuft durch.
-- **Überschreiben vorhandener Dateien funktioniert (Stand 2026-11-06):** `Quests.mod` und `Quests.m01` mit der Datei `Agenak_ArenaDefeatDimitar` (4242 XP statt 300) setzen die Quest im Spiel auf 4242, sobald **keine physische Kopie** der Datei unter `Data\<Volume>\` liegt (im Spiel bestätigt, `packmod_demo`).
+- **Überschreiben vorhandener Dateien funktioniert (Stand 2026-11-06):** `Quests.mod` und `Quests.m01` mit der Datei `Agenak_ArenaDefeatDimitar` (4242 XP statt 300) setzen die Quest im Spiel auf 4242, sobald **keine physische Kopie** der Datei unter `Data\<Volume>\` liegt (im Spiel bestätigt, `demo_packmod`).
 - **Falle: physische Kopien verdecken Archive.** Das Dateisystem des Spiels bevorzugt Dateien im Ordner `Data\<Volume>\` (z. B. `Data\Quests\G3_World_01\…quest`) vor allen Archiven. Und das Spiel legt diese Dateien selbst an: Beim Laden hat es alle 571 Quest-Dateien dorthin geschrieben, ohne dass sie vorher da waren, mit den Werten, die gerade galten. Eine solche Kopie aus einem früheren Lauf überdeckt jedes später installierte Mod-Archiv; so ist der frühere Fehlschlag (Quest blieb bei 300 XP) entstanden. Folge: Ein Mod-Archiv, das Dateien eines Volumes ersetzt, wirkt erst, wenn der Ordner `Data\<Volume>\` (nur die vom Spiel erzeugten Kopien, nicht Overlay-Dateien eigener Datei-Patches) entfernt wird; das Spiel erzeugt ihn beim nächsten Laden aus den Archiven neu. Eine Änderung am Mod-Archiv wirkt ebenso erst nach dem Entfernen.
 - **Hauptmenü:** Beim ersten `OnQuestsLoaded` (im Hauptmenü) ist der Quest-Manager leer: `GetQuestCount()` meldet -1 und auch die Quests des Spiels fehlen. Das hat nichts mit dem Archiv zu tun. Skripte legen dann nichts an (Prüfung `GetQuestCount() < 0`); der echte Aufbau folgt beim Laden eines Spielstands.

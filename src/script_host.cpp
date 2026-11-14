@@ -917,7 +917,7 @@ asIScriptFunction* ScriptHost::FindFn(Mod& m, const char* decl) {
 static bool DropForeignThread(ScriptHost* host, const char* decl);   // weiter unten, bei CallEvent
 
 bool ScriptHost::HasHandler(const char* decl) {
-    if (DropForeignThread(this, decl)) return false;   // FindFn schreibt in den Cache des Mods: nur im Spiel-Thread
+    if (DropForeignThread(this, decl)) return false;   // FindFn schreibt in den Cache der Mod: nur im Spiel-Thread
     for (Mod& m : mods_)
         if (FindFn(m, decl)) return true;
     return false;
@@ -1002,8 +1002,8 @@ bool ScriptHost::GetOverrideArg(int index, unsigned* value) const {
 
 // Skripte laufen nur im Spiel-Thread: Es gibt einen einzigen AngelScript-Kontext und eine Override-Kette, beide ohne Sperre. Ruft das Spiel eine
 // eingehaengte Funktion aus einem anderen Thread, wird das Ereignis nicht an die Skripte gemeldet (Overrides: das Spiel bekommt sein Original).
-// Die ersten Faelle stehen im Protokoll; ob ein Mod das Ereignis ueberhaupt behandelt haette, wird dabei nicht geprueft (schon die Suche danach
-// schreibt in den Cache des Mods). Hooks auf haeufigen Wegen pruefen den Thread schon selbst (OnGameThread), bevor sie hier ankommen.
+// Die ersten Faelle stehen im Protokoll; ob eine Mod das Ereignis ueberhaupt behandelt haette, wird dabei nicht geprueft (schon die Suche danach
+// schreibt in den Cache der Mod). Hooks auf haeufigen Wegen pruefen den Thread schon selbst (OnGameThread), bevor sie hier ankommen.
 static bool DropForeignThread(ScriptHost* host, const char* decl) {
     if (!OnForeignThread()) return false;
     static volatile long logged = 0;
@@ -1122,7 +1122,7 @@ int ScriptHost::SendModMessage(const void* topic, const void* data) {
     return n;
 }
 
-// stringtable.ini eines Mods: im Mod-Ordner oder, wie beim Union Starter, unter ModFiles\ (leer, wenn keine vorhanden ist)
+// stringtable.ini einer Mod: im Mod-Ordner oder, wie beim Union Starter, unter ModFiles\ (leer, wenn keine vorhanden ist)
 static std::string ModStringTablePath(const std::string& modBase) {
     const std::string a = modBase + "\\stringtable.ini", b = modBase + "\\ModFiles\\stringtable.ini";
     if (GetFileAttributesA(a.c_str()) != INVALID_FILE_ATTRIBUTES) return a;

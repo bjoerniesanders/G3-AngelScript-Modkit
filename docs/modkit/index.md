@@ -10,9 +10,9 @@ Aktuelle Skript-Schnittstelle: **Version 46** (`GetApiVersion()`).
 
 | Seite | Inhalt |
 |---|---|
-| [Mod-Ordner und Installation](mod-package.md) | Wo ein Mod liegt, Ladereihenfolge, ini-Einstellungen, Protokoll, Hot-Reload |
+| [Mod-Ordner und Installation](mod-package.md) | Wo eine Mod liegt, Ladereihenfolge, ini-Einstellungen, Protokoll, Hot-Reload |
 | [Scripting-Guide](scripting-guide.md) | Die Sprache, Eigenheiten, Fallstricke, Fehlersuche |
-| [Ereignisse](events.md) | Alle Funktionen, die ein Mod definieren kann (Engine- und Spielereignisse) |
+| [Ereignisse](events.md) | Alle Funktionen, die eine Mod definieren kann (Engine- und Spielereignisse) |
 | [API-Referenz](api-reference.md) | Alle Typen und Funktionen, die ein Skript aufrufen kann, mit Vermerken (experimentell, veraltet, ...) |
 | [Versionsregeln](api-policy.md) | Was sich zwischen zwei Versionen der Skript-Schnittstelle ändern darf |
 | [Quests](quests.md) | Quests anlegen, steuern, mit Texten und Belohnung versehen |
@@ -32,7 +32,7 @@ Aktuelle Skript-Schnittstelle: **Version 46** (`GetApiVersion()`).
 2. Ordner `<Spielordner>\g3asm\mods\hallo\` anlegen, darin `main.as`:
    ```angelscript
    void main() {
-       print("Hallo aus meinem ersten Mod");
+       print("Hallo aus meiner ersten Mod");
    }
 
    void OnKey(int vk, bool down) {
@@ -40,7 +40,7 @@ Aktuelle Skript-Schnittstelle: **Version 46** (`GetApiVersion()`).
            PrintScreen("Hallo!", 3, 255, 255, 255);  // Text, Sekunden, R, G, B
    }
    ```
-3. Spiel starten, die Rollen-Taste (Scroll Lock) drücken: der Text erscheint auf dem Bildschirm. In `<Spielordner>\g3asm.log` steht `[hallo] Hallo aus meinem ersten Mod`.
+3. Spiel starten, die Rollen-Taste (Scroll Lock) drücken: der Text erscheint auf dem Bildschirm. In `<Spielordner>\g3asm.log` steht `[hallo] Hallo aus meiner ersten Mod`.
 4. Datei ändern und speichern: nach einer Sekunde ist die neue Fassung aktiv, ohne Neustart.
 
 ## Wie es funktioniert (Kurzfassung)

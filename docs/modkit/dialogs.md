@@ -84,7 +84,7 @@ void OnInfoFinished(const bCString &in info, const bCString &in owner, const bCS
 }
 ```
 
-Der vollständige Mod steht in `examples/mods/jens_dialog/main.as`.
+Die vollständige Mod steht in `examples/mods/jens_dialog/main.as`.
 
 ## Eigene Texte
 
