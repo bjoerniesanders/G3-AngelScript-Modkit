@@ -87,6 +87,7 @@ Stringtabelle. Das Protokoll nennt den Grund einmal, zum Beispiel:
 - `api` ersetzt die Prüfung mit `GetApiVersion()` im Skript: Fehlt eine Funktion, scheitert sonst schon das Übersetzen, und der Spieler sieht nur einen
   Übersetzungsfehler. Mit `api` sieht er, dass das Modkit zu alt ist. Fassungen vor Version 40 kennen `api` und `requires` nicht und ignorieren sie.
 - Brauchen sich zwei Mods gegenseitig, meldet das Protokoll den Kreis; beide laden in der Reihenfolge von `load_order.txt`.
+- Kodierung: `mod.ini`, `load_order.txt` und `g3asm.ini` dürfen ANSI oder UTF-8 sein, mit oder ohne BOM (Editor-Einstellung „UTF-8 mit BOM“, PowerShell 5 `-Encoding utf8`). Bei `g3asm.ini` mit BOM vermerkt das Protokoll einen Hinweis.
 - Ändert sich `mod.ini` oder `load_order.txt` im laufenden Spiel, gilt das beim nächsten Scan (einmal je Sekunde, mit `hotreload=1`).
 - Im Skript: `IsModActive("name")` und `GetModVersion("name")` für optionale Zusammenarbeit mit anderen Mods, siehe [API-Referenz](api-reference.md).
 

@@ -7,6 +7,7 @@
 // Die Skript-Schnittstelle (Typen, Funktionen, Ereignisse, Override-Hooks, Version G3ASM_SCRIPT_API_VERSION) ist in docs/modkit/
 // (api-reference.md, events.md, hooks.md) beschrieben; hier stehen nur die C++-Schnittstellen.
 #include <functional>
+#include <map>
 #include <unordered_map>
 #include <string>
 #include <vector>
@@ -178,12 +179,15 @@ int InstallDrawHooks(ScriptHost& host);
 void DrawFrameTick();
 // Laeuft der Aufrufer im Spiel-Thread (dem Thread von OnFrame)? false, solange noch kein Bild lief (script_calls.cpp)
 bool OnGameThread();
+bool OnForeignThread();   // Spiel-Thread bekannt und der Aufrufer ist ein anderer
 // Ereignisse 7.3 (more_events.cpp): Konsole, Quest-Status
 int InstallMoreEventHooks(ScriptHost& host);
 void MoreEventsFrame();
 // Einstellungen je Mod (mod_settings.cpp, ab Version 44): Bindings; ModSettingsForget beim Neuladen eines Mods (Zwischenspeicher verwerfen)
 bool RegisterModSettingsBindings(asIScriptEngine* e);
 void ModSettingsForget(const std::string& mod);
+// Abschnitt einer ini-Datei (Schluessel klein geschrieben, Werte getrimmt; UTF-8-BOM erlaubt); leer, wenn Datei/Abschnitt fehlt
+std::map<std::string, std::string> ReadIniSection(const std::string& path, const std::string& section);
 // KI-Tracer (ai_trace.cpp): nur Protokoll, ini [g3asm] aitrace/aitracefilter/aitracemax; InstallAiTrace haengt nur ein, wenn eingeschaltet
 void SetAiTraceOptions(bool enabled, const char* filter, int maxLines);
 void SetAniSpeedLog(bool enabled);   // ini [g3asm] anispeedlog: Messung SetPlaySpeed/GetPlaySpeed (Roadmap 6.3)

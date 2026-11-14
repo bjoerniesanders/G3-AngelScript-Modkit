@@ -363,7 +363,7 @@ bool SafeClockSet(ClockSetFn f, void* holder, int v) {
 typedef bool(__thiscall* EventFn)(void*, const void*);
 EventFn g_evSet = nullptr, g_evClear = nullptr, g_evIs = nullptr;
 bool ResolveEvents() {
-    if (g_evSet) return true;
+    if (g_evSet && g_evClear && g_evIs) return true;
     if (!ResolveStats()) return false;
     HMODULE script = GetModuleHandleA("Script.dll");
     g_evSet = reinterpret_cast<EventFn>(GetProcAddress(script, "?SetGameEvent@PSPlayerMemory@@QAE_NABVbCString@@@Z"));
@@ -646,7 +646,7 @@ struct SkillApi {
 } g_sk;
 
 bool ResolveSkills() {
-    if (g_sk.tried) return g_sk.learn != nullptr;
+    if (g_sk.tried) return g_sk.learn && g_sk.activate && g_sk.deactivate && g_sk.hasLearned && g_sk.isActive && g_sk.count;
     if (!ResolveInv()) return false;
     g_sk.tried = true;
     auto G = [](const char* n) { return reinterpret_cast<void*>(GetProcAddress(g_e.game, n)); };
@@ -688,7 +688,7 @@ bool EntHasLearnedSkill(const Entity& e, const SStr& s) { return SkillOp(e, s, 3
 bool EntIsSkillActive(const Entity& e, const SStr& s) { return SkillOp(e, s, 4) == 1; }
 int EntSkillActivationCount(const Entity& e, const SStr& s) { return SkillOp(e, s, 5); }
 // Globale Skriptfunktion: CloneTemplate("It_Wolf_Fur", "G3ASM_Fell") -> 0 angelegt, 1 vorhanden, <0 Fehler (Protokoll). Danach hero.AddItems("G3ASM_Fell", n).
-// Die Kopie lebt nur im Speicher (nicht im Spielstand, GUID wechselt bei jedem Start).
+// Die Kopie lebt nur im Speicher (nicht im Spielstand) und wird bei jedem Start neu angelegt; ihre ID ist fest (aus dem Namen, siehe unten).
 int CloneTemplate(const SStr& base, const SStr& newName) {
     int rc;
     if (!ResolveInv())
@@ -764,7 +764,7 @@ bool ResolveSpawn() {
     return g_sp.current && g_sp.createDyn && g_sp.fromTpl;
 }
 // Rueckgabe: 0 ok (*out = Entity), -2 Vorlage unbekannt, -3 Ausnahme, -5 keine Welt, -6 Entity nicht erzeugt, -7 CreateFromTemplate fehlgeschlagen
-int SafeSpawn(void* admin, const void* name, const char* wanted, const SVec3* pos, void** out) {
+int SafeSpawn(void* admin, const void* name, const char* wanted, const SVec3* pos, void** out, void** outWorld) {
     void* tpl = SafeFindTemplate(admin, name, wanted);
     if (!tpl) return -2;
     void* world = nullptr;
@@ -783,7 +783,7 @@ int SafeSpawn(void* admin, const void* name, const char* wanted, const SVec3* po
             reinterpret_cast<SetPosFn>(vt[g_e.setPosSlot])(ent, pos);
         }
         *out = ent;
-        g_spawned[ent] = world;
+        *outWorld = world;   // die Liste g_spawned fuehrt der Aufrufer (kein std::map-Zugriff unter __try)
         return 0;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return -3; }
 }
@@ -797,9 +797,12 @@ Entity SpawnNPC(const SStr& tplName, const SVec3& pos) {
             SStr mod("eCSceneAdmin");
             g_e.sceneAdmin = SafeSceneAdmin(&mod);
         }
-        void* ent = nullptr;
-        rc = g_e.sceneAdmin ? SafeSpawn(g_e.sceneAdmin, &tplName, tplName.c_str(), &pos, &ent) : -5;
-        if (rc == 0) result.p = ent;
+        void *ent = nullptr, *world = nullptr;
+        rc = g_e.sceneAdmin ? SafeSpawn(g_e.sceneAdmin, &tplName, tplName.c_str(), &pos, &ent, &world) : -5;
+        if (rc == 0) {
+            result.p = ent;
+            g_spawned[ent] = world;
+        }
     }
     if (ScriptHost::s_current) {
         char b[256];
@@ -1779,7 +1782,7 @@ bool DestroyNPC(const Entity& e) {
     const char* why = nullptr;
     bool ok = false;
     auto it = g_spawned.find(e.p);
-    if (!e.p)
+    if (!EntIsValid(e))   // auch ein schon entfernter Eintrag aus g_spawned (Zeiger zeigt nicht mehr auf ein Spielobjekt)
         why = "Entity ungueltig";
     else if (!ResolveSpawn() || !g_sp.destroyDyn)
         why = "Funktion fehlt";

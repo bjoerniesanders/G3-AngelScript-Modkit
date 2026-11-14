@@ -859,10 +859,12 @@ bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const boo
         } else
             ctx_->SetArgDWord(i, ev[i].value);
     }
+    // Der Zeit-Waechter gehoert zum Kontext, nicht zum gesicherten Zustand: ein verschachtelter Aufruf laesst den des aeusseren Aufrufs stehen
+    // (dessen 5 s laufen weiter). Frueher loeschte der innere Aufruf ihn, und das aeussere Skript lief danach ohne Schleifenschutz.
     Timeout t{GetTickCount()};
-    ctx_->SetLineCallback(asFUNCTION(LineCallback), &t, asCALL_CDECL);
+    if (!nested) ctx_->SetLineCallback(asFUNCTION(LineCallback), &t, asCALL_CDECL);
     const int r = ctx_->Execute();
-    ctx_->ClearLineCallback();
+    if (!nested) ctx_->ClearLineCallback();
     if (r == asEXECUTION_FINISHED) {
         if (retBool) *retBool = ctx_->GetReturnByte() != 0;
         if (retText)
@@ -912,7 +914,10 @@ asIScriptFunction* ScriptHost::FindFn(Mod& m, const char* decl) {
     return f;
 }
 
+static bool DropForeignThread(ScriptHost* host, const char* decl);   // weiter unten, bei CallEvent
+
 bool ScriptHost::HasHandler(const char* decl) {
+    if (DropForeignThread(this, decl)) return false;   // FindFn schreibt in den Cache des Mods: nur im Spiel-Thread
     for (Mod& m : mods_)
         if (FindFn(m, decl)) return true;
     return false;
@@ -920,7 +925,7 @@ bool ScriptHost::HasHandler(const char* decl) {
 
 bool ScriptHost::CallOverride(const char* decl, const EvArg* args, int n, std::function<bool(const EvArg*)> original, bool* result,
                               bool* originalCalled, EvArg* finalArgs) {
-    if (!HasHandler(decl)) return false;
+    if (!HasHandler(decl)) return false;   // auch aus einem fremden Thread: der Aufrufer nimmt dann sein Original
     chain_.emplace_back();
     const size_t idx = chain_.size() - 1;
     Chain& c0 = chain_[idx];
@@ -995,7 +1000,19 @@ bool ScriptHost::GetOverrideArg(int index, unsigned* value) const {
     return true;
 }
 
+// Skripte laufen nur im Spiel-Thread: Es gibt einen einzigen AngelScript-Kontext und eine Override-Kette, beide ohne Sperre. Ruft das Spiel eine
+// eingehaengte Funktion aus einem anderen Thread, wird das Ereignis nicht an die Skripte gemeldet (Overrides: das Spiel bekommt sein Original).
+// Die ersten Faelle stehen im Protokoll; ob ein Mod das Ereignis ueberhaupt behandelt haette, wird dabei nicht geprueft (schon die Suche danach
+// schreibt in den Cache des Mods). Hooks auf haeufigen Wegen pruefen den Thread schon selbst (OnGameThread), bevor sie hier ankommen.
+static bool DropForeignThread(ScriptHost* host, const char* decl) {
+    if (!OnForeignThread()) return false;
+    static volatile long logged = 0;
+    if (InterlockedIncrement(&logged) <= 10) host->Log(std::string("Aufruf aus fremdem Thread, nicht an Skripte gemeldet: ") + decl);
+    return true;
+}
+
 void ScriptHost::CallEvent(const char* decl, const EvArg* args, int n) {
+    if (DropForeignThread(this, decl)) return;
     for (size_t i = 0; i < mods_.size(); ++i) {
         Mod& m = mods_[i];
         if (!m.module) continue;
@@ -1007,6 +1024,7 @@ void ScriptHost::CallEvent(const char* decl, const EvArg* args, int n) {
 }
 
 void ScriptHost::CallSimple(const char* decl) {
+    if (DropForeignThread(this, decl)) return;
     for (size_t i = 0; i < mods_.size(); ++i) CallIn(mods_[i], decl);
 }
 
@@ -1130,7 +1148,8 @@ struct ModMeta {
     std::string version;
     int api = 0;
     std::vector<ModDep> deps;
-    unsigned kinds = 0;   // 1 Skript, 2 Datei-Patches, 4 Stringtabelle
+    unsigned kinds = 0;    // 1 Skript, 2 Datei-Patches, 4 Stringtabelle
+    bool enabled = true;   // [mod] enabled (Standard 1)
 };
 std::mutex g_modStateMu;
 std::map<std::string, std::string> g_modVersions;   // aktive Mods (alle Arten) -> Version, Schluessel klein geschrieben
@@ -1173,13 +1192,16 @@ int CompareVersions(const std::string& a, const std::string& b) {
 }
 ModMeta ReadModMeta(const std::string& base) {
     ModMeta m;
-    const std::string ini = base + "\\mod.ini";
-    char buf[1024];
-    GetPrivateProfileStringA("mod", "version", "", buf, sizeof buf, ini.c_str());
-    m.version = TrimText(buf);
-    m.api = int(GetPrivateProfileIntA("mod", "api", 0, ini.c_str()));
-    GetPrivateProfileStringA("mod", "requires", "", buf, sizeof buf, ini.c_str());
-    const std::string req(buf);
+    // eigener Leser statt GetPrivateProfile*: der uebersah [mod] in Dateien mit UTF-8-BOM (dann lud eine Mod mit enabled=0)
+    const std::map<std::string, std::string> sec = ReadIniSection(base + "\\mod.ini", "mod");
+    const auto get = [&sec](const char* key) {
+        const auto it = sec.find(key);
+        return it == sec.end() ? std::string() : it->second;
+    };
+    m.version = get("version");
+    m.api = int(std::strtol(get("api").c_str(), nullptr, 10));
+    m.enabled = sec.find("enabled") == sec.end() || std::strtol(get("enabled").c_str(), nullptr, 10) != 0;
+    const std::string req = get("requires");
     size_t pos = 0;
     while (pos < req.size()) {
         size_t c = req.find(',', pos);
@@ -1233,16 +1255,24 @@ static std::vector<std::string> DiscoverModsOfKind(const std::string& dir, unsig
             found.push_back(fd.cFileName);
             ModMeta m = ReadModMeta(base);
             m.kinds = k;
+            if (!m.enabled) defaultOff.push_back(fd.cFileName);
             meta[fd.cFileName] = m;
-            if (GetPrivateProfileIntA("mod", "enabled", 1, (base + "\\mod.ini").c_str()) == 0) defaultOff.push_back(fd.cFileName);
         } while (FindNextFileA(h, &fd));
         FindClose(h);
     }
     std::sort(found.begin(), found.end(), [](const std::string& a, const std::string& b) { return _stricmp(a.c_str(), b.c_str()) < 0; });
     if (FILE* f = std::fopen((dir + "\\load_order.txt").c_str(), "r")) {
         char line[512];
+        bool first = true;
+        auto name = [](const std::string& s) {   // Name hinter + oder -, Leerzeichen dazwischen erlaubt ("+ mein_mod")
+            const size_t b = s.find_first_not_of(" \t", 1);
+            return b == std::string::npos ? std::string() : s.substr(b);
+        };
         while (std::fgets(line, sizeof line, f)) {
             std::string t(line);
+            // UTF-8-Kennung am Dateianfang (Editor "UTF-8 mit BOM", PowerShell 5 Set-Content -Encoding utf8): sonst zaehlte die erste Zeile nicht
+            if (first && t.compare(0, 3, "\xEF\xBB\xBF") == 0) t.erase(0, 3);
+            first = false;
             size_t c = t.find('#');
             if (c != std::string::npos) t.erase(c);
             while (!t.empty() && (t.back() == '\n' || t.back() == '\r' || t.back() == ' ' || t.back() == '\t')) t.pop_back();
@@ -1250,10 +1280,10 @@ static std::vector<std::string> DiscoverModsOfKind(const std::string& dir, unsig
             if (b == std::string::npos) continue;
             t = t.substr(b);
             if (t[0] == '-')
-                off.push_back(t.substr(1));
+                off.push_back(name(t));
             else if (t[0] == '+') {
-                on.push_back(t.substr(1));
-                order.push_back(t.substr(1));
+                on.push_back(name(t));
+                order.push_back(name(t));
             } else
                 order.push_back(t);
         }

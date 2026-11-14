@@ -82,6 +82,10 @@ jobs:
       - name: PackMod numbering
         run: python -I tests/packmod_generations.py build/g3asm/g3asm_packmod.exe
 
+      # File patches: overlay files, backup and restore of a foreign loose file at the target path, rejected paths.
+      - name: File patches overlay (stub SharedBase)
+        run: python -I tests/file_patches_overlay.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll
+
       - name: Build a sample release package
         shell: pwsh
         run: ./tools/package_release.ps1 -BuildDir build -Version ci-${{ github.run_number }}

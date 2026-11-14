@@ -463,9 +463,20 @@ int CreateFontScript(const SStr& face, int height, bool bold, bool italic) {
     std::snprintf(key, sizeof key, "%s|%d|%d|%d", face.c_str(), height, bold ? 1 : 0, italic ? 1 : 0);
     auto it = g_fonts.find(key);
     if (it != g_fonts.end()) return int(it->second);
+    // Ein Fehlschlag (0, z. B. in main(), solange die GUI noch nicht bereit ist) wird nicht fuer immer gemerkt: neuer Versuch hoechstens alle 2 s,
+    // im Protokoll steht nur der erste Fehlschlag je Schrift.
+    static std::map<std::string, DWORD> retry;
+    const DWORD now = GetTickCount();
+    auto rt = retry.find(key);
+    const bool firstTry = rt == retry.end();
+    if (!firstTry && int(now - rt->second) < 0) return 0;
     const unsigned f = SafeCreateFont(face.c_str(), height, bold, italic);
-    g_fonts[key] = f;
-    if (ScriptHost::s_current) {
+    if (f) {
+        g_fonts[key] = f;
+        retry.erase(key);
+    } else
+        retry[key] = now + 2000u;
+    if (ScriptHost::s_current && (f || firstTry)) {
         char b[200];
         std::snprintf(b, sizeof b, "Zeichnen: Schrift '%s' %d%s%s -> Handle %u", face.c_str(), height, bold ? " fett" : "", italic ? " kursiv" : "", f);
         ScriptHost::s_current->Log(b);

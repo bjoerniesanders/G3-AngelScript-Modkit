@@ -1,3 +1,4 @@
-# zeta zuerst, aus abgeschaltet
-zeta
--aus
+﻿zeta
+# Die Datei beginnt absichtlich mit der UTF-8-Kennung (BOM): die erste Zeile muss trotzdem zaehlen (zeta zuerst).
+# aus ist abgeschaltet, mit Leerzeichen hinter dem Minus.
+- aus

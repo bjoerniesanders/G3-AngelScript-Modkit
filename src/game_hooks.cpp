@@ -320,7 +320,7 @@ void DamageDispatch(void* victim, void* inflictor, void* owner, int amount, int 
 }
 
 void __fastcall HSetHP(void* self, void*, const long* v) {
-    if (g_inDamage || !v || !self || !ReadableMem(self, 0x40)) {
+    if (g_inDamage || OnForeignThread() || !v || !self || !ReadableMem(self, 0x40)) {   // fremder Thread: g_inDamage gehoert dem Spiel-Thread
         o_setHP(self, v);
         return;
     }
@@ -400,7 +400,7 @@ bool IsScriptNested() {
 }
 bool __fastcall HPMSetBase(void* self, void*, const void* tag, int v) {
     int alt = 0;
-    if (g_inDamage || !g_pmGetBase || !g_psEntity || !SafeIsHpTag(tag) || !SafePMBase(self, tag, &alt) || v >= alt || alt <= 0) return o_pmSetBase(self, tag, v);
+    if (g_inDamage || OnForeignThread() || !g_pmGetBase || !g_psEntity || !SafeIsHpTag(tag) || !SafePMBase(self, tag, &alt) || v >= alt || alt <= 0) return o_pmSetBase(self, tag, v);
     void* hero = SafeCall0(g_psEntity, self);
     if (!hero || !IsPlayerEntity(hero)) return o_pmSetBase(self, tag, v);
     const int amount = alt - v;
@@ -430,7 +430,7 @@ bool __fastcall HPMSetBase(void* self, void*, const void* tag, int v) {
 typedef void(__thiscall* FnOnDmg)(void*, void*, void*, int, int, void*);
 FnOnDmg o_gOnDmg = nullptr;
 void HeroHit(void* hero, int amount, int type) {
-    if (g_inDamage || amount <= 0) return;
+    if (g_inDamage || amount <= 0 || OnForeignThread()) return;
     if (amount == g_baseHitAmount && GetTickCount() - g_baseHitTick < 150) {   // derselbe Treffer wurde schon ueber SetBaseValue gemeldet
         g_baseHitAmount = -1;
         return;

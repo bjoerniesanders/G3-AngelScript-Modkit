@@ -36,6 +36,12 @@ Das Dateisystem des Spiels bevorzugt **physische Dateien** vor Archiveinträgen.
 `<Spiel>\Data\<Archiv>\<Pfad>` ab. Das Archiv selbst bleibt unverändert. Bei jedem Start werden die zuletzt erzeugten Dateien (Liste `g3asm\patched_files.txt`) gelöscht und alles aus dem Original neu berechnet.
 Entfernst du einen Mod, ist beim nächsten Start der Originalzustand zurück.
 
+Liegt am Ziel schon eine **lose Datei** (von einem anderen Mod oder selbst geändert), ist sie die Basis des Patches. Das Modkit sichert sie vorher nach
+`g3asm\patch_backup\<Pfad>` und spielt sie beim nächsten Start zurück. Wird die gepatchte Datei zwischen zwei Starts ersetzt (etwa durch ein Update des anderen Mods),
+gehört sie nicht mehr dem Modkit: Sie bleibt, wie sie ist, und die Sicherung entfällt. Das Protokoll meldet das mit `wurde seit dem letzten Start geaendert`.
+
+Zielpfade sind relativ zum Spielordner. Pfade mit `..`, einem Laufwerk oder einem führenden Trenner lehnt das Modkit ab (`Zielpfad nicht erlaubt`).
+
 ## Fehler
 
 Ein Patch, der nicht passt (Datei hat sich geändert), wird **ganz übersprungen** und im Protokoll gemeldet; die anderen laufen weiter:

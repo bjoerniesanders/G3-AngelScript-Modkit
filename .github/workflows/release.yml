@@ -42,6 +42,9 @@ jobs:
       - name: PackMod numbering
         run: python -I tests/packmod_generations.py build/g3asm/g3asm_packmod.exe
 
+      - name: File patches overlay (stub SharedBase)
+        run: python -I tests/file_patches_overlay.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll
+
       - name: Determine version
         id: ver
         shell: pwsh

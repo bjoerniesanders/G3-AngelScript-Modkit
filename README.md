@@ -27,13 +27,14 @@ Ausgabe: `build32/g3asm/` (g3asm.dll, Tests, g3asm_packmod) und `build32/loader/
     g3asm_test.exe <SharedBase.dll> tests\scripts\selftest.as
     g3asm_test.exe <SharedBase.dll> tests\mods
     powershell -NoProfile -File tests\run_loader_test.ps1 -SharedBase <SharedBase.dll> -DbghelpOrig <dbghelp_orig.dll>   (Loader in einem Wegwerf-Ordner)
+    python -I testsile_patches_overlay.py g3asm_test.exe <SharedBase.dll>   (Datei-Patches in einem Wegwerf-Ordner)
 Ohne Spieldateien: als `<SharedBase.dll>` die Ersatz-DLL `build32\sbstub\SharedBase.dll` nehmen (Ziel `g3asm_sb_stub`), als `<dbghelp_orig.dll>`
 die System-DLL `%WINDIR%\SysWOW64\dbghelp.dll`. Die Ersatz-DLL hat nur die Exporte, die das Modkit fuer bCString und die Mathe-Typen braucht,
 und rechnet nicht bitgenau wie das Original; Messungen am Verhalten des Originals nur mit der echten SharedBase.dll.
 
 ## CI und Release (GitHub Actions)
 - `.github/workflows/ci.yml` (jeder Push auf `main`, Pull-Requests, von Hand): baut 32 Bit mit MSVC, prueft, dass `g3asm.dll` kein `fninit` enthaelt
-  (`tools/check_no_fninit.ps1`, Schutz fuer den FPU-Fix), fuehrt Selbsttest, Test-Mods, Kompilierpruefung der Beispiel-Mods und Loader-Test mit der Ersatz-SharedBase aus, dazu `tests/packmod_generations.py`, und packt probeweise ein Zip (Artefakt, 7 Tage).
+  (`tools/check_no_fninit.ps1`, Schutz fuer den FPU-Fix), fuehrt Selbsttest, Test-Mods, Kompilierpruefung der Beispiel-Mods und Loader-Test mit der Ersatz-SharedBase aus, dazu `tests/packmod_generations.py` und `tests/file_patches_overlay.py`, und packt probeweise ein Zip (Artefakt, 7 Tage).
 - `.github/workflows/release.yml`: beim Push eines Tags `v*` dasselbe plus GitHub-Release mit dem Zip:
       git tag v0.30.0
       git push origin v0.30.0

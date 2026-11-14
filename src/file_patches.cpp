@@ -5,6 +5,9 @@
 // physische Dateien Vorrang vor Archiveintraegen haben. Das Modkit erzeugt deshalb die gepatchte Fassung als physische Datei unter <Spiel>\Data\<Archiv>\<Pfad>
 // (Overlay); das Archiv selbst bleibt unveraendert. Bei jedem Start werden die zuletzt erzeugten Overlay-Dateien (Liste g3asm\patched_files.txt) entfernt und alles
 // neu aus dem Original berechnet - Mods lassen sich so ohne Spuren entfernen und mehrere Mods stapeln ihre Patches in Ladereihenfolge.
+// Liegt am Ziel schon eine fremde lose Datei (anderer Mod, eigene Aenderung), ist sie die Basis: sie wird nach g3asm\patch_backup\<Pfad> gesichert und beim
+// naechsten Start zurueckgespielt. Die Liste merkt je Datei Groesse und CRC32 des Geschriebenen; eine seitdem geaenderte Datei gehoert nicht mehr dem Modkit
+// und bleibt unangetastet.
 //
 // Pfade im Diff: a/Data/<Archiv>/<Pfad im Archiv> bzw. b/..., z. B. b/Data/Quests/G3_World_01/Abbas_Artefakt_quest_G3_World_01.quest. Ein Eintrag --- /dev/null legt eine neue Datei an.
 // Archive werden direkt gelesen (G3V0-Format, unkomprimierte Eintraege); komprimierte Eintraege (Strings.pak\stringtable.ini) sind noch nicht unterstuetzt.
@@ -68,6 +71,23 @@ bool WriteFileBinary(const std::string& path, const std::string& data) {
     return ok;
 }
 
+bool FileExists(const std::string& path) {
+    const DWORD a = GetFileAttributesA(path.c_str());
+    return a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY);
+}
+uint32_t Crc32(const std::string& d) {   // zlib-Polynom; die Dateien sind klein, darum ohne Tabelle
+    uint32_t c = 0xFFFFFFFFu;
+    for (const char ch : d) {
+        c ^= static_cast<unsigned char>(ch);
+        for (int k = 0; k < 8; ++k) c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u)));
+    }
+    return ~c;
+}
+// Zielpfad relativ zum Spielordner: kein Laufwerk, kein fuehrender Trenner, kein ".." (Patches und Liste duerfen den Spielordner nicht verlassen)
+bool SafeRelPath(const std::string& p) {
+    return !p.empty() && p[0] != '/' && p[0] != '\\' && p.find(':') == std::string::npos && p.find("..") == std::string::npos;
+}
+
 // ---------------------------------------------------------------- G3V0-Archiv lesen
 struct PakReader {
     std::string path;
@@ -97,7 +117,11 @@ struct PakReader {
     std::string Str() {
         const uint32_t n = U32();
         std::string s;
-        if (pos + n <= meta.size()) s.assign(&meta[pos], n);
+        if (pos > meta.size() || n > meta.size() - pos) {   // beschaedigtes Verzeichnis: ans Ende, damit alle Schleifen enden
+            pos = meta.size();
+            return s;
+        }
+        s.assign(meta.data() + pos, n);
         pos += n;
         if (n) pos += 1;
         return s;
@@ -134,7 +158,8 @@ struct PakReader {
         const uint64_t moff = uint64_t(h[6]) | (uint64_t(h[7]) << 32);
         _fseeki64(f, 0, SEEK_END);
         const int64_t size = _ftelli64(f);
-        if (int64_t(moff) >= size) return false;
+        // Verzeichnis vor dem Kopfende oder ueber 256 MB: kein gueltiges Archiv
+        if (int64_t(moff) < 0x30 || int64_t(moff) >= size || size - int64_t(moff) > (int64_t(1) << 28)) return false;
         meta.resize(size_t(size - int64_t(moff)));
         _fseeki64(f, int64_t(moff), SEEK_SET);
         if (std::fread(&meta[0], 1, meta.size(), f) != meta.size()) return false;
@@ -151,7 +176,7 @@ struct PakReader {
         const std::string want = Lower(Slash(inner));
         for (const Entry& e : entries) {
             if (Lower(Slash(e.name)) != want) continue;
-            if (e.type != 0) return -1;
+            if (e.type != 0 || e.a > (uint64_t(64) << 20)) return -1;   // komprimiert, oder keine Textdatei (ueber 64 MB)
             out->resize(size_t(e.a));
             _fseeki64(f, int64_t(e.off), SEEK_SET);
             return std::fread(out->empty() ? nullptr : &(*out)[0], 1, out->size(), f) == out->size() ? 1 : -1;
@@ -219,6 +244,10 @@ bool ParsePatch(const std::string& text, const std::string& source, std::vector<
         const std::string from = L[i].substr(4);
         fp.isNew = from.compare(0, 9, "/dev/null") == 0;
         fp.target = StripPrefix(L[i + 1].substr(4));
+        if (!SafeRelPath(fp.target)) {
+            *err = source + ": Zielpfad nicht erlaubt (relativ zum Spielordner, ohne '..'): '" + fp.target + "'";
+            return false;
+        }
         i += 2;
         while (i < L.size() && L[i].compare(0, 3, "@@ ") == 0) {
             Hunk h;
@@ -368,13 +397,36 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
     if (!gameDir.empty() && gameDir.back() != '\\' && gameDir.back() != '/') gameDir += '\\';
     gameDir = Win(gameDir);
     const std::string manifest = gameDir + "g3asm\\patched_files.txt";
+    const std::string backupDir = gameDir + "g3asm\\patch_backup\\";
 
-    // 1) Overlay-Dateien des letzten Laufs entfernen
+    // 1) Overlay-Dateien des letzten Laufs entfernen bzw. die gesicherte fremde Datei zurueckspielen. Zeile: Pfad [Tab Groesse Tab CRC32]; aeltere Listen haben
+    //    nur den Pfad. Eine Datei, die nicht mehr dem Geschriebenen entspricht, hat jemand anderes ersetzt: sie bleibt, ihre Sicherung entfaellt.
     std::string old;
     int removed = 0;
     if (ReadFile(manifest, &old)) {
-        for (const std::string& l : SplitLines(old, nullptr, nullptr))
-            if (!l.empty() && DeleteFileA((gameDir + Win(l)).c_str())) ++removed;
+        for (const std::string& l : SplitLines(old, nullptr, nullptr)) {
+            const size_t t1 = l.find('\t'), t2 = t1 == std::string::npos ? t1 : l.find('\t', t1 + 1);
+            const std::string rel = l.substr(0, t1);
+            if (!SafeRelPath(rel)) continue;
+            const std::string path = gameDir + Win(rel), backup = backupDir + Win(rel);
+            if (t2 != std::string::npos) {
+                std::string now;
+                const bool ours = ReadFile(path, &now) && now.size() == std::strtoull(l.c_str() + t1 + 1, nullptr, 10) &&
+                                  Crc32(now) == std::strtoul(l.c_str() + t2 + 1, nullptr, 16);
+                if (!ours) {
+                    if (FileExists(path)) log("Datei-Patches: " + rel + " wurde seit dem letzten Start geaendert und bleibt, wie sie ist");
+                    DeleteFileA(backup.c_str());
+                    continue;
+                }
+            }
+            if (FileExists(backup)) {
+                if (MoveFileExA(backup.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED))
+                    ++removed;
+                else
+                    log("Datei-Patches: Sicherung von " + rel + " liess sich nicht zurueckspielen (g3asm\\patch_backup)");
+            } else if (DeleteFileA(path.c_str()))
+                ++removed;
+        }
         DeleteFileA(manifest.c_str());
     }
 
@@ -410,7 +462,7 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
         }
     }
     if (patches.empty()) {
-        if (removed) log("Datei-Patches: keine Patches mehr, " + std::to_string(removed) + " alte Overlay-Dateien entfernt");
+        if (removed) log("Datei-Patches: keine Patches mehr, " + std::to_string(removed) + " alte Overlay-Dateien entfernt oder zurueckgespielt");
         return 0;
     }
 
@@ -469,13 +521,25 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
                 break;
             }
         const std::string data = Join(w.lines, w.crlf, w.finalNewline);
-        if (!WriteFileBinary(gameDir + Win(target), data)) {
+        const std::string path = gameDir + Win(target), backup = backupDir + Win(target);
+        const bool foreign = FileExists(path);   // eigene Dateien sind in Schritt 1 entfernt: was jetzt da liegt, gehoert jemand anderem
+        if (foreign) {
+            MakeDirs(backup.substr(0, backup.find_last_of('\\')));
+            if (!CopyFileA(path.c_str(), backup.c_str(), FALSE)) {
+                log("Datei-Patch uebersprungen: vorhandene Datei laesst sich nicht sichern: " + target);
+                continue;
+            }
+        }
+        if (!WriteFileBinary(path, data)) {
             log("Datei nicht schreibbar: " + target);
+            if (foreign) MoveFileExA(backup.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED);
             continue;
         }
-        newManifest += target + "\n";
+        char stamp[48];
+        std::snprintf(stamp, sizeof stamp, "\t%llu\t%08lX", static_cast<unsigned long long>(data.size()), static_cast<unsigned long>(Crc32(data)));
+        newManifest += target + stamp + "\n";
         ++written;
-        log("Datei-Patch angewendet: " + target + " (Basis: " + w.how + ", " + std::to_string(w.applied) + " Patch(es))");
+        log("Datei-Patch angewendet: " + target + " (Basis: " + w.how + (foreign ? ", gesichert" : "") + ", " + std::to_string(w.applied) + " Patch(es))");
     }
     if (written) WriteFileBinary(manifest, newManifest);
     log("Datei-Patches: " + std::to_string(patchFiles) + " Patchdatei(en), " + std::to_string(written) + " Datei(en) gepatcht");

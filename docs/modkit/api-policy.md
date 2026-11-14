@@ -24,6 +24,24 @@ Diese Seite legt fest, was sich an der Skript-Schnittstelle zwischen zwei Versio
 | Reihenfolge oder Bedeutung von Override-Argumenten (`SetOverrideArg(index, ...)`) ändern | nein |
 | Zahlenwerte von Konstanten (`QUEST_*`, `STATUS_*`, `QUALITY_*`, `SLOT_*`) ändern | nein |
 
+## Eingefroren ab Version 46
+
+Mit **Version 46** ist die Skript-Schnittstelle für die Beta eingefroren (2026-11-13). Das heißt:
+
+- Alles, was in der [API-Referenz](api-reference.md), bei den [Ereignissen](events.md) und den [Hooks](hooks.md) **ohne Vermerk** steht, bleibt so, wie es
+  dort beschrieben ist. Ein Mod, der nur solche Funktionen benutzt und mit Version 46 läuft, läuft auch mit jeder späteren Version; die Tabelle oben
+  gilt dafür ohne Ausnahme.
+- Bis zum Beta-Release kommen **keine neuen Funktionen** dazu. Es erscheinen nur Fehlerbehebungen (`v0.46.x`); die Zahl 46 bleibt.
+- Ausgenommen sind allein die Funktionen mit Vermerk **Experimentell** (Liste unten). Sie dürfen sich noch ändern oder wegfallen, jeweils mit Hinweis in
+  den Änderungen.
+- Nicht zur Schnittstelle gehören und dürfen sich jederzeit ändern: Wortlaut und Menge der Protokollzeilen, die Mess-Schalter der ini (`scriptlog`,
+  `aitrace`, `anispeedlog`, `memlog` und ähnliche) und die Mess-Mods unter `examples/mods`.
+- Nach der Beta geht es mit Version 47 weiter; neue Funktionen kommen dann wieder nach der Tabelle oben dazu.
+
+Die Umbenennung des Projekts (vorher OG3-Patch, jetzt G3 AngelScript Modkit) hat an der Skript-Schnittstelle nichts geändert: Dateinamen, Ordner und
+ini-Abschnitt heißen anders, alle Funktionen, Ereignisse und Konstanten sind gleich geblieben. Geändert haben sich nur die automatisch vergebenen
+Text-IDs (`G3ASM_INFO_...`, `G3ASM_QTOPIC_...`, `G3ASM_QDESC_...`, vorher mit `OG3_`); Mods legen sie nicht selbst an und brauchen sie normalerweise nicht.
+
 ## Veraltete Funktionen
 
 1. Die Funktion bekommt in der Referenz den Vermerk **Veraltet** mit dem Ersatz (oder dem Hinweis, dass es noch keinen gibt).

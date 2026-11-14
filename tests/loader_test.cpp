@@ -3,7 +3,9 @@
 // Test des G3ASM-Loaders (src/loader): laedt SharedBase.dll mit angepasstem Suchpfad (die dbghelp.dll aus demselben Ordner ist der Loader), prueft
 //   1. der Loader ist geladen und hat g3asm.dll gestartet (g3asm_loader.log: "G3ASM gestartet", g3asm.log entsteht),
 //   2. MiniDumpWriteDump wird an dbghelp_orig.dll weitergereicht (Aufruf mit ungueltigen Argumenten liefert FALSE, ohne Absturz).
-// Aufruf: loader_test <Ordner>   (Ordner enthaelt SharedBase.dll, dbghelp.dll = Loader, dbghelp_orig.dll, g3asm.dll, g3asm.ini); tests/run_loader_test.ps1 richtet ihn ein.
+//   3. je nach Fall (zweites Argument): "expect=<Text>" verlangt den Text zusaetzlich im Loader-Protokoll (z. B. den Skriptpfad aus der ini),
+//      "disabled" verlangt, dass der Loader g3asm.dll wegen enable=0 NICHT laedt. Damit prueft run_loader_test.ps1 auch den frueheren ini-Abschnitt [patch].
+// Aufruf: loader_test <Ordner> [expect=<Text>|disabled]   (Ordner enthaelt SharedBase.dll, dbghelp.dll = Loader, dbghelp_orig.dll, g3asm.dll, g3asm.ini); tests/run_loader_test.ps1 richtet ihn ein.
 #include <windows.h>
 
 #include <cstdio>
@@ -23,11 +25,13 @@ static std::string ReadAll(const std::string& p) {
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::printf("Aufruf: loader_test <Ordner>\n");
+        std::printf("Aufruf: loader_test <Ordner> [expect=<Text>|disabled]\n");
         return 2;
     }
     std::string dir = argv[1];
     if (!dir.empty() && dir.back() != '\\') dir += '\\';
+    const std::string mode = argc > 2 ? argv[2] : "";
+    const bool disabled = mode == "disabled";
     int fails = 0;
     auto check = [&](bool ok, const char* what) {
         std::printf("%s: %s\n", ok ? "OK      " : "FEHLER  ", what);
@@ -46,9 +50,18 @@ int main(int argc, char** argv) {
 
     const std::string log = ReadAll(dir + "g3asm_loader.log");
     check(log.find("G3ASM-Loader gestartet") != std::string::npos, "g3asm_loader.log: Loader gestartet");
-    check(log.find("G3ASM gestartet") != std::string::npos, "g3asm_loader.log: G3ASM gestartet");
-    check(Exists(dir + "g3asm.log"), "g3asm.log angelegt");
-    check(GetModuleHandleA("g3asm.dll") != nullptr, "g3asm.dll im Prozess");
+    if (disabled) {
+        check(log.find("G3ASM per ini abgeschaltet") != std::string::npos, "g3asm_loader.log: per ini abgeschaltet");
+        check(GetModuleHandleA("g3asm.dll") == nullptr, "g3asm.dll NICHT im Prozess");
+    } else {
+        check(log.find("G3ASM gestartet") != std::string::npos, "g3asm_loader.log: G3ASM gestartet");
+        check(Exists(dir + "g3asm.log"), "g3asm.log angelegt");
+        check(GetModuleHandleA("g3asm.dll") != nullptr, "g3asm.dll im Prozess");
+    }
+    if (mode.rfind("expect=", 0) == 0) {
+        const std::string want = mode.substr(7);
+        check(log.find(want) != std::string::npos, ("g3asm_loader.log enthaelt: " + want).c_str());
+    }
 
     typedef BOOL(__stdcall * Dump)(HANDLE, DWORD, HANDLE, int, void*, void*, void*);
     Dump fn = dbg ? reinterpret_cast<Dump>(GetProcAddress(dbg, "MiniDumpWriteDump")) : nullptr;

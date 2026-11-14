@@ -529,6 +529,8 @@ bool RegisterScriptCallBindings(asIScriptEngine* e) {
 void SetScriptCallOptions(bool stats) { g_stats = stats; }
 
 bool OnGameThread() { return g_gameThread != 0 && GetCurrentThreadId() == g_gameThread; }
+// Anders als !OnGameThread(): solange der Spiel-Thread noch nicht bekannt ist (vor dem ersten Bild, Testprogramm), gilt kein Thread als fremd
+bool OnForeignThread() { return g_gameThread != 0 && GetCurrentThreadId() != g_gameThread; }
 
 void ScriptCallsReport() {
     if (g_stats && g_stat && g_hookCalls) LogStats();

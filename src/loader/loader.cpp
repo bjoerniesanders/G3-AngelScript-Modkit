@@ -16,6 +16,8 @@
 #include <cstdio>
 #include <cstring>
 
+#include "../ini_file.h"
+
 namespace {
 char g_dir[MAX_PATH];
 bool g_logStarted = false;
@@ -113,10 +115,12 @@ BOOL APIENTRY DllMain(HMODULE self, DWORD reason, LPVOID) {
     if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES) _snprintf_s(ini, sizeof ini, _TRUNCATE, "%sog3_hooks.ini", g_dir);   // Hauptrepo-Datei
 
     Log("G3ASM-Loader gestartet (Einstellungen: %s)", GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ? "keine ini, Standardwerte" : ini);
-    if (GetPrivateProfileIntA("loader", "crashlog", 1, ini) != 0) AddVectoredExceptionHandler(1, CrashLogger);
-    char probe[8];   // Abschnitt [g3asm]; fehlt er, gilt der fruehere Name [g3asm]
-    const char* sec = GetPrivateProfileSectionA("g3asm", probe, sizeof probe, ini) > 0 ? "g3asm" : "patch";
-    if (GetPrivateProfileIntA(sec, "enable", 1, ini) == 0) {
+    const g3asm::IniFile cfg(ini);
+    if (cfg.Bom()) Log("Hinweis: %s beginnt mit UTF-8-BOM (wird beruecksichtigt)", ini);
+    if (cfg.Int("loader", "crashlog", 1) != 0) AddVectoredExceptionHandler(1, CrashLogger);
+    // Abschnitt [g3asm]; fehlt er, gilt der fruehere Name [patch]
+    const char* sec = cfg.HasSection("g3asm") ? "g3asm" : "patch";
+    if (cfg.Int(sec, "enable", 1) == 0) {
         Log("G3ASM per ini abgeschaltet");
         return TRUE;
     }

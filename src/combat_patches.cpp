@@ -114,7 +114,10 @@ bool PatchAt(unsigned char* at, const unsigned char* orig, size_t n, void* stub,
         return false;
     }
     DWORD old = 0;
-    if (!VirtualProtect(at, n, PAGE_EXECUTE_READWRITE, &old)) return false;
+    if (!VirtualProtect(at, n, PAGE_EXECUTE_READWRITE, &old)) {
+        g_host->Log(std::string(what) + ": Speicherschutz der Stelle nicht aenderbar; Hook aus");
+        return false;
+    }
     at[0] = 0xE9;
     const long rel = static_cast<long>(reinterpret_cast<const char*>(stub) - reinterpret_cast<const char*>(at + 5));
     std::memcpy(at + 1, &rel, 4);
@@ -122,6 +125,14 @@ bool PatchAt(unsigned char* at, const unsigned char* orig, size_t n, void* stub,
     VirtualProtect(at, n, old, &old);
     FlushInstructionCache(GetCurrentProcess(), at, n);
     return true;
+}
+// Stelle wieder auf die Originalbytes setzen (wenn von mehreren zusammengehoerenden Stellen eine nicht umleitbar war)
+void UnpatchAt(unsigned char* at, const unsigned char* orig, size_t n) {
+    DWORD old = 0;
+    if (!VirtualProtect(at, n, PAGE_EXECUTE_READWRITE, &old)) return;
+    std::memcpy(at, orig, n);
+    VirtualProtect(at, n, old, &old);
+    FlushInstructionCache(GetCurrentProcess(), at, n);
 }
 
 // ---------------------------------------------------------------- Lernkosten (Game.dll, gCInfo_PS, gemessen am Assembler 2026-11-10)
@@ -358,12 +369,14 @@ int InstallLearnCost(ScriptHost& host) {
         host.Log("Lernkosten: eCTemplateEntityProxy::IsEntityIDValid fehlt; Hook aus");
         return 0;
     }
-    int ok = 0;
+    for (unsigned i = 0; i < kLcCount; ++i) g_lcBack[i] = base + kLc[i].rva + kLc[i].len;
     for (unsigned i = 0; i < kLcCount; ++i) {
-        g_lcBack[i] = base + kLc[i].rva + kLc[i].len;
-        if (PatchAt(base + kLc[i].rva, kLc[i].orig, kLc[i].len, kLcStubs[i], "Lernkosten")) ++ok;
+        if (PatchAt(base + kLc[i].rva, kLc[i].orig, kLc[i].len, kLcStubs[i], "Lernkosten")) continue;
+        // alle oder keine: eine halb umgeleitete Kette zeigte im Dialog einen anderen Preis, als bezahlt wird
+        for (unsigned j = 0; j < i; ++j) UnpatchAt(base + kLc[j].rva, kLc[j].orig, kLc[j].len);
+        return 0;
     }
-    return ok == int(kLcCount) ? 1 : 0;
+    return 1;
 }
 
 }   // namespace

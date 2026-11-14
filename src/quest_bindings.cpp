@@ -353,6 +353,8 @@ LocGet0Fn o_locGet0 = nullptr, o_locConv = nullptr;
 LocGet1Fn o_locGet1 = nullptr;
 UniCtorFn g_uniCtor = nullptr;
 std::map<std::string, std::wstring> g_texts;
+// Die Hooks laufen in jedem Thread, der einen Text der Stringtabelle holt; geschrieben wird nur aus Skripten. Leser teilen sich die Sperre.
+SRWLOCK g_textsLock = SRWLOCK_INIT;
 bool g_textHooks = false;
 
 const char* SafeLocId(const void* self) {
@@ -360,34 +362,25 @@ const char* SafeLocId(const void* self) {
         return g_sb.strGetText(self);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }   // eCLocString = ein bCString (4 Byte)
 }
-const wchar_t* FindText(const void* self) {
-    if (g_texts.empty() || !self) return nullptr;
-    const char* id = SafeLocId(self);
-    if (!id || !*id) return nullptr;
-    auto it = g_texts.find(id);
-    return it == g_texts.end() ? nullptr : it->second.c_str();
-}
-void* __fastcall HLocGet0(const void* self, void*, void* ret) {
-    if (const wchar_t* w = FindText(self)) {
-        g_uniCtor(ret, w);
-        return ret;
+// Eigener Text zur ID in self: baut ihn in ret (bCUnicodeString) und liefert true. Der Text wird unter der Lesesperre kopiert.
+bool BuildOwnText(const void* self, void* ret) {
+    if (!self) return false;
+    bool found = false;
+    AcquireSRWLockShared(&g_textsLock);
+    const char* id = g_texts.empty() ? nullptr : SafeLocId(self);   // ohne eigene Texte kostet der Hook nur die Sperre
+    if (id && *id) {
+        auto it = g_texts.find(id);
+        if (it != g_texts.end()) {
+            g_uniCtor(ret, it->second.c_str());
+            found = true;
+        }
     }
-    return o_locGet0(self, ret);
+    ReleaseSRWLockShared(&g_textsLock);
+    return found;
 }
-void* __fastcall HLocConv(const void* self, void*, void* ret) {
-    if (const wchar_t* w = FindText(self)) {
-        g_uniCtor(ret, w);
-        return ret;
-    }
-    return o_locConv(self, ret);
-}
-void* __fastcall HLocGet1(const void* self, void*, void* ret, const void* arg) {
-    if (const wchar_t* w = FindText(self)) {
-        g_uniCtor(ret, w);
-        return ret;
-    }
-    return o_locGet1(self, ret, arg);
-}
+void* __fastcall HLocGet0(const void* self, void*, void* ret) { return BuildOwnText(self, ret) ? ret : o_locGet0(self, ret); }
+void* __fastcall HLocConv(const void* self, void*, void* ret) { return BuildOwnText(self, ret) ? ret : o_locConv(self, ret); }
+void* __fastcall HLocGet1(const void* self, void*, void* ret, const void* arg) { return BuildOwnText(self, ret) ? ret : o_locGet1(self, ret, arg); }
 
 bool InstallTextHooks() {
     if (g_textHooks) return true;
@@ -425,12 +418,16 @@ void RegisterText(const SStr& id, const SStr& text) {
     const int len = MultiByteToWideChar(1252, 0, t, -1, nullptr, 0);
     std::wstring w(len > 0 ? len - 1 : 0, L'\0');
     if (len > 1) MultiByteToWideChar(1252, 0, t, -1, &w[0], len);
+    AcquireSRWLockExclusive(&g_textsLock);
     g_texts[id.c_str()] = w;
+    ReleaseSRWLockExclusive(&g_textsLock);
     InstallTextHooks();   // ohne Spiel (Test) bleibt der Text gespeichert, wirkt aber nicht
 }
 // Unicode-Fassung fuer mod-eigene Stringtabellen. Speichert immer; die Hooks werden bei Bedarf spaeter nachgeholt (EnsureTextHooks).
 void RegisterTextWideImpl(const std::string& id, const std::wstring& text) {
+    AcquireSRWLockExclusive(&g_textsLock);
     g_texts[id] = text;
+    ReleaseSRWLockExclusive(&g_textsLock);
     InstallTextHooks();
 }
 bool EnsureTextHooksImpl() { return g_textHooks || InstallTextHooks(); }

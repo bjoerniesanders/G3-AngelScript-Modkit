@@ -77,4 +77,8 @@ void OnReceiveItem(Entity von, Entity an, const bCString &in item, const bCStrin
 
 - Mods werden in Ladereihenfolge aufgerufen, siehe [Mod-Ordner](mod-package.md).
 - Feuert ein Spielereignis, während ein Skript läuft (zum Beispiel weil dein Skript ein Item entfernt), wird der Aufruf verschachtelt ausgeführt.
+- Skripte laufen nur im Spiel-Thread (dem Thread, der auch `OnFrame` ruft). Ruft das Spiel eine abgefangene Funktion aus einem anderen Thread, meldet
+  das Modkit das Ereignis nicht an die Skripte, bei Overrides bekommt das Spiel sein Original; die ersten Fälle stehen als
+  `Aufruf aus fremdem Thread, nicht an Skripte gemeldet: ...` im Protokoll, auch wenn kein Mod das Ereignis behandelt (ab der Fassung nach
+  2026-11-13, im Spiel noch nicht beobachtet).
 - Mehrere Hooks können kurz nacheinander für denselben Vorgang feuern (ein Kill erzeugt `OnSpellCast`, `OnReceiveItem` und `OnNPCKilled`).

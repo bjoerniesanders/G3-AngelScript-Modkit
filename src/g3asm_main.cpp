@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "ini_file.h"
 #include "sb_api.h"
 #include "script_host.h"
 
@@ -551,25 +552,27 @@ extern "C" __declspec(dllexport) int g3asm_start(HMODULE sharedBase, const char*
     if (!InitCommon(sharedBase, gameDir, hostLog)) return 0;
     char script[MAX_PATH] = "g3asm\\scripts\\main.as", modsRel[MAX_PATH] = "g3asm\\mods";
     if (ini && *ini) {
-        // Abschnitt [g3asm]; fehlt er, gilt der fruehere Name [g3asm] (aeltere ini, og3_hooks.ini des Hauptrepos)
-        char probe[8];
-        const char* sec = GetPrivateProfileSectionA("g3asm", probe, sizeof probe, ini) > 0 ? "g3asm" : "patch";
-        GetPrivateProfileStringA(sec, "script", script, script, MAX_PATH, ini);
-        g_hotReload = GetPrivateProfileIntA(sec, "hotreload", 1, ini) != 0;
-        g_gameHooks = GetPrivateProfileIntA(sec, "hooks", 1, ini) != 0;
-        SetGameHookOptions(GetPrivateProfileIntA(sec, "navevents", 0, ini) != 0);
-        g_filePatches = GetPrivateProfileIntA(sec, "filepatches", 1, ini) != 0;
-        SetPrintToGameLog(GetPrivateProfileIntA(sec, "printgame", 1, ini) != 0);
-        g_asyncLog = GetPrivateProfileIntA(sec, "asynclog", 0, ini) != 0;
-        g_logWrite = GetPrivateProfileIntA(sec, "logwrite", 1, ini) != 0;
-        g_loadPauseMs = unsigned(GetPrivateProfileIntA(sec, "loadpause", 0, ini)) * 1000u;
-        g_memLog = GetPrivateProfileIntA(sec, "memlog", 0, ini) != 0;
-        SetScriptCallOptions(GetPrivateProfileIntA(sec, "scriptlog", 0, ini) != 0);
+        // Abschnitt [g3asm]; fehlt er, gilt der fruehere Name [patch] (aeltere ini, og3_hooks.ini des Hauptrepos)
+        // IniFile: wie GetPrivateProfile*, liest aber auch Dateien mit UTF-8-BOM (ini_file.h)
+        const IniFile cfg(ini);
+        if (cfg.Bom()) Log(std::string("Hinweis: ") + ini + " beginnt mit UTF-8-BOM (wird beruecksichtigt)");
+        const char* sec = cfg.HasSection("g3asm") ? "g3asm" : "patch";
+        cfg.Str(sec, "script", script, script, MAX_PATH);
+        g_hotReload = cfg.Int(sec, "hotreload", 1) != 0;
+        g_gameHooks = cfg.Int(sec, "hooks", 1) != 0;
+        SetGameHookOptions(cfg.Int(sec, "navevents", 0) != 0);
+        g_filePatches = cfg.Int(sec, "filepatches", 1) != 0;
+        SetPrintToGameLog(cfg.Int(sec, "printgame", 1) != 0);
+        g_asyncLog = cfg.Int(sec, "asynclog", 0) != 0;
+        g_logWrite = cfg.Int(sec, "logwrite", 1) != 0;
+        g_loadPauseMs = unsigned(cfg.Int(sec, "loadpause", 0)) * 1000u;
+        g_memLog = cfg.Int(sec, "memlog", 0) != 0;
+        SetScriptCallOptions(cfg.Int(sec, "scriptlog", 0) != 0);
         char aiFilter[128] = "";
-        GetPrivateProfileStringA(sec, "aitracefilter", "", aiFilter, sizeof aiFilter, ini);
-        SetAiTraceOptions(GetPrivateProfileIntA(sec, "aitrace", 0, ini) != 0, aiFilter, GetPrivateProfileIntA(sec, "aitracemax", 2000, ini));
-        SetAniSpeedLog(GetPrivateProfileIntA(sec, "anispeedlog", 0, ini) != 0);
-        GetPrivateProfileStringA(sec, "mods", modsRel, modsRel, MAX_PATH, ini);
+        cfg.Str(sec, "aitracefilter", "", aiFilter, sizeof aiFilter);
+        SetAiTraceOptions(cfg.Int(sec, "aitrace", 0) != 0, aiFilter, cfg.Int(sec, "aitracemax", 2000));
+        SetAniSpeedLog(cfg.Int(sec, "anispeedlog", 0) != 0);
+        cfg.Str(sec, "mods", modsRel, modsRel, MAX_PATH);
     }
     g_modsDir = (modsRel[1] == ':' || modsRel[0] == '\\') ? std::string(modsRel) : g_gameDir + modsRel;
     while (!g_modsDir.empty() && (g_modsDir.back() == '\\' || g_modsDir.back() == '/')) g_modsDir.pop_back();

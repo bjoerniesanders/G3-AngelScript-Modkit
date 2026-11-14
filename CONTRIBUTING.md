@@ -51,7 +51,9 @@ Das Spiel ist fremder, nicht geaenderter Code. Jeder Fehler hier ist ein Absturz
   Nullzeiger wird mit `NoteNull("<Stelle>")` einmal gemeldet, nicht verschluckt und nicht jedes Bild.
 - **SEH klein halten.** `__try` nur in Funktionen ohne C++-Objekte mit Destruktor (auch kein lokales `std::string`), nicht verschachtelt;
   Texte vorher in Puffer kopieren.
-- **Thread.** Skripte laufen nur im Spiel-Thread. Ein Hook, der auch aus anderen Threads kommt, prueft das, bevor er Skripte ruft.
+- **Thread.** Skripte laufen nur im Spiel-Thread. `HasHandler`, `CallEvent`, `CallSimple` und `CallOverride` verwerfen Aufrufe aus anderen Threads und melden die
+  ersten im Protokoll; ein Hook auf einem haeufigen Weg prueft trotzdem selbst mit `OnGameThread()`, bevor er Argumente aufbereitet. `CallKey`
+  (Fensterprozedur) hat diesen Schutz nicht.
 - **Nichts aufbewahren, was dem Spiel gehoert.** Entity-Zeiger nicht ueber einen Weltwechsel halten; Namen, die auf Spielspeicher zeigen, kopieren.
 
 ## Gleitkomma

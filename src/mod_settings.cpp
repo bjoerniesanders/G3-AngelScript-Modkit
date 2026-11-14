@@ -45,8 +45,9 @@ std::string Trim(const std::string& s) {
     return s.substr(a, b - a);
 }
 
-// Abschnitt [settings] einer ini-Datei lesen (eigener Leser: ohne die 64-KB-Grenze und Eigenheiten von GetPrivateProfileString)
-void ReadSection(const std::string& path, std::map<std::string, Entry>& out) {
+// Einen Abschnitt einer ini-Datei lesen (eigener Leser: ohne die 64-KB-Grenze und Eigenheiten von GetPrivateProfileString,
+// UTF-8-BOM am Anfang wird uebersprungen - GetPrivateProfile* fand dann den ersten Abschnitt nicht). Doppelte Schluessel: der letzte gilt.
+void ReadSection(const std::string& path, const std::string& sectionLower, std::map<std::string, Entry>& out) {
     FILE* f = nullptr;
     if (path.empty() || fopen_s(&f, path.c_str(), "rb") != 0 || !f) return;
     std::string data;
@@ -66,7 +67,7 @@ void ReadSection(const std::string& path, std::map<std::string, Entry>& out) {
         pos = end + 1;
         if (line.empty() || line[0] == ';' || line[0] == '#') continue;
         if (line[0] == '[') {
-            inSection = Lower(line) == "[settings]";
+            inSection = Lower(line) == "[" + sectionLower + "]";
             continue;
         }
         if (!inSection) continue;
@@ -104,8 +105,8 @@ ModSettings* Current(std::string* modOut) {
     if (!s.loaded) {
         s.loaded = true;
         const std::string dir = ScriptHost::s_current->ModDir(mod);
-        if (!dir.empty()) ReadSection(dir + "\\mod.ini", s.defaults);
-        ReadSection(UserFile(mod), s.user);
+        if (!dir.empty()) ReadSection(dir + "\\mod.ini", "settings", s.defaults);
+        ReadSection(UserFile(mod), "settings", s.user);
     }
     if (modOut) *modOut = mod;
     return &s;
@@ -204,6 +205,14 @@ bool ResetSetting(const SStr& key) {
 }
 
 }   // namespace
+
+std::map<std::string, std::string> ReadIniSection(const std::string& path, const std::string& section) {
+    std::map<std::string, Entry> raw;
+    ReadSection(path, Lower(section), raw);
+    std::map<std::string, std::string> out;
+    for (const auto& kv : raw) out[kv.first] = kv.second.value;
+    return out;
+}
 
 void ModSettingsForget(const std::string& mod) {
     std::lock_guard<std::mutex> lock(g_mu);
