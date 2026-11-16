@@ -36,6 +36,7 @@ bin\g3asm\g3asm_packmod.exe release <Spielordner>\g3asm\mods\meine_mod <Zielordn
   ScriptFiles\scripts\Script_G3ASM_046.dll   Laufzeit; das Spiel lädt jede scripts\Script_*.dll selbst
   ModFiles\G3ASM.m0x                   Skripte, mod.ini, Texte der Mod, im Archiv unter meine_mod/
   ModFiles\Quests.m0x ...              Spieldaten-Archive der Mod (aus meine_mod\ModFiles\), unverändert
+  G3ASM-LICENSE.txt                    Lizenz der Laufzeit und Adresse ihres Quellcodes
 ```
 
 - **Nicht im Skript-Archiv:** `ModFiles\*.m0x`/`*.n0x` (eigene Spieldaten-Archive, die liegen daneben), `Source\` (Quellen dieser Archive),
@@ -44,6 +45,9 @@ bin\g3asm\g3asm_packmod.exe release <Spielordner>\g3asm\mods\meine_mod <Zielordn
 - **Laufzeit:** die `Script_G3ASM_<n>.dll` mit der höchsten Nummer neben `g3asm_packmod.exe` (im Release-Zip `bin\g3asm\`), oder ausdrücklich
   mit `--runtime <Datei>`. Die Nummer ist die Skript-Schnittstelle.
 - Ein vorhandener Zielordner wird nicht überschrieben.
+- **Lizenz:** Deine Mod darf unter jeder Lizenz stehen (`LICENSE-EXCEPTIONS.md`). Die mitgelieferte Laufzeit steht aber unter der GPL: Wer ein
+  Paket weitergibt, gibt auch sie weiter und muss sagen, wo ihr Quellcode liegt. Das erledigt `G3ASM-LICENSE.txt`; lass die Datei im Paket.
+  Nimm die Laufzeit aus einem veröffentlichten Release, denn auf dessen Quellcode verweist die Datei.
 
 **Beim Spieler** legt der Union Starter `ScriptFiles\*` in den Spielordner und jede `ModFiles\<Name>.m0x` als nächste freie Generation nach
 `Data\` (`G3ASM.mod`, `G3ASM.m00`, ...). Ohne Starter geht dasselbe von Hand oder mit `g3asm_packmod copy <Datei> <Spielordner> <Name>`.
@@ -77,12 +81,12 @@ geänderte Spieldateien gehören deshalb als Archiv in `meine_mod\ModFiles\` (si
     scripts\main.as             Einzelskript (läuft als Mod "main", wenn vorhanden)
     mods\
       load_order.txt            optional
-      mein_mod\main.as          eine Mod = ein Ordner mit main.as
-      anderer_mod\main.as
-      mein_mod\ScriptPatches\   optional: *.patch (Unified Diff auf Spieldateien, siehe Datei-Patches)
+      meine_mod\main.as         eine Mod = ein Ordner mit main.as
+      andere_mod\main.as
+      meine_mod\ScriptPatches\  optional: *.patch (Unified Diff auf Spieldateien, siehe Datei-Patches)
 ```
 
-Jeder Ordner unter `g3asm\mods\`, der eine `main.as`, einen Ordner `ScriptPatches` oder eine `stringtable.ini` (siehe unten) enthält, ist eine Mod. Der Ordnername ist der Modname und steht im Protokoll in eckigen Klammern (`[mein_mod] ...`).
+Jeder Ordner unter `g3asm\mods\`, der eine `main.as`, einen Ordner `ScriptPatches` oder eine `stringtable.ini` (siehe unten) enthält, ist eine Mod. Der Ordnername ist der Modname und steht im Protokoll in eckigen Klammern (`[meine_mod] ...`).
 Der Name `main` ist für das Einzelskript reserviert.
 
 Jede Mod ist ein **eigenes AngelScript-Modul**: globale Variablen und Funktionen sind von anderen Mods getrennt, Namen können doppelt vorkommen.
@@ -93,8 +97,8 @@ Jede Mod ist ein **eigenes AngelScript-Modul**: globale Variablen und Funktionen
 ```
 # Kommentar
 basis_mod
-mein_mod
--kaputter_mod        # Minuszeichen davor schaltet eine Mod ab
+meine_mod
+-kaputte_mod         # Minuszeichen davor schaltet eine Mod ab
 +demo_lifesteal      # Pluszeichen schaltet eine standardmaessig abgeschaltete Mod zu
 ```
 
@@ -122,9 +126,9 @@ Alle Einträge sind freiwillig. Eine Mod, deren Bedingungen nicht erfüllt sind,
 Stringtabelle. Das Protokoll nennt den Grund einmal, zum Beispiel:
 
 ```
-[mein_mod] wird nicht geladen: braucht die Mod 'basis_mod' ab Version 1.1, vorhanden ist Version 1.0
-[mein_mod] wird nicht geladen: braucht die Mod 'andere_mod', die abgeschaltet ist (in load_order.txt mit +andere_mod zuschalten)
-[mein_mod] wird nicht geladen: braucht Skript-Schnittstelle 41, vorhanden ist 40 (G3ASM aktualisieren)
+[meine_mod] wird nicht geladen: braucht die Mod 'basis_mod' ab Version 1.1, vorhanden ist Version 1.0
+[meine_mod] wird nicht geladen: braucht die Mod 'andere_mod', die abgeschaltet ist (in load_order.txt mit +andere_mod zuschalten)
+[meine_mod] wird nicht geladen: braucht Skript-Schnittstelle 41, vorhanden ist 40 (G3ASM aktualisieren)
 ```
 
 - Fehlt eine benötigte Mod, ist sie abgeschaltet oder wird sie selbst nicht geladen, wird auch die Mod nicht geladen, die sie braucht.

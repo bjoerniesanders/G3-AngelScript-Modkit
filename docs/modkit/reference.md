@@ -3,11 +3,20 @@
 Alle Angaben hier sind **geprüft**. Jede Tabelle nennt ihre Quelle:
 
 - **SDK**: Aufzählung aus dem Gothic-3-SDK (`GameEnum.h`), von uns übernommen.
-- **gemessen**: im Spiel beobachtet (Protokolle von G3ASM, Stand 2026-11-06).
+- **gemessen**: im Spiel beobachtet (Protokolle von G3ASM).
 - **Dump**: mit der Mod `probe_reference` aus dem laufenden Spiel gelesen (Abschnitt 9).
 
-Was hier nicht steht, ist nicht belegt. Im Umlauf befindliche Listen mit Namen wie `Spell_Fireball`, `DamageType_Edge` oder `Strength` stimmen nicht mit dem Spiel überein
-(gemessen sind `Spl_Fireball`, `Mis_Fireball`, Schadensart 2 = Klinge und die Attribut-Kennung `"STR"`). Amulette heißen `It_Am_*` (21 Vorlagen), Artefakte `It_Artefact_*`, gewöhnliche Ringe `It_Ring*`; `It_Belt` und `It_Ri_` gibt es nicht. Talente heißen im Spiel `Perk_*` (nicht `It_Perk_*`), Zauber gibt es als `Spl_*`, als Zauber-Item `It_Spell_*` und als Geschoss `Mis_*`; Munition heißt `Arrow` und `Bolt` (nicht `It_Arrow`/`It_Bolt`).
+Was hier nicht steht, ist nicht belegt. Listen aus dem Netz mit Namen wie `Spell_Fireball`, `DamageType_Edge` oder `Strength` stimmen nicht mit dem
+Spiel überein. Die richtigen Namen:
+
+| Gesucht | So heißt es im Spiel | Nicht |
+|---|---|---|
+| Zauber | `Spl_*` (Zauber), `It_Spell_*` (Zauber-Item), `Mis_*` (Geschoss), z. B. `Spl_Fireball`, `Mis_Fireball` | `Spell_Fireball` |
+| Talente | `Perk_*` | `It_Perk_*` |
+| Amulette, Ringe, Artefakte | `It_Am_*`, `It_Ring*`, `It_Artefact_*` | `It_Ri_*`, `It_Belt` |
+| Munition | `Arrow`, `Bolt` | `It_Arrow`, `It_Bolt` |
+| Attribute | `"STR"`, `"DEX"`, ... | `Strength` |
+| Schadensart „Klinge“ | `type` 2 | `DamageType_Edge` |
 
 ## 1. Schadensarten (`type` in `Override_Damage` und `OnDamage`)
 
@@ -155,7 +164,9 @@ Im Spiel sind `ReqAttrib2…4Op` in den Eigenschaftsdaten fälschlich als `ReqAt
 
 ## 9. Namen aus dem Spiel (Dump)
 
-**Wichtig zur Suche:** `FindTemplateNames` findet Namen, die mit dem Suchtext **beginnen**. Die Suche ignoriert außerdem die Groß-/Kleinschreibung. Eine Gruppe wie `Teleport` enthält deshalb `Teleport_Ardea`, aber nicht `Spl_Teleport_Ardea`. Bis Version 28 war die Trefferzahl auf 200 begrenzt (die Gruppe `Spl_` hatte genau 200 Einträge und kann abgeschnitten sein, bis zum nächsten Dump).
+**Wichtig zur Suche:** `FindTemplateNames` findet Namen, die mit dem Suchtext **beginnen**; Groß- und Kleinschreibung zählt nicht. Die Gruppe
+`Teleport` enthält deshalb `Teleport_Ardea`, aber nicht `Spl_Teleport_Ardea`. Die Gruppe `Spl_` stammt aus einem älteren Dump mit höchstens 200
+Treffern und kann unvollständig sein.
 
 Die Mod `probe_reference` (Ziffernblock `/`) schreibt Attribute und Vorlagen-Gruppen ins Protokoll (`g3asm.log`, Zeilen `[probe_reference] …`). Der Text zwischen den Markierungen
 wird von `tools/reference_from_log.py` aus dem Protokoll erzeugt und nicht von Hand gepflegt.
@@ -326,7 +337,7 @@ Werte des Helden zum Zeitpunkt des Dumps (Wert / Grundwert / Maximum). Das ist *
 `It_Gold`, `It_GoldChalice_Lares`, `It_GoldNugget`, `It_GoldRing`, `It_Gold_Stack_01`, `It_Gold_Stack_02`, `It_Gold_Stack_03`
 <!-- DUMP-ENDE -->
 
-### Gemessene Namen (Protokolle bis 2026-11-06)
+### Gemessene Namen (aus Protokollen)
 
 | Gruppe | Namen |
 |---|---|

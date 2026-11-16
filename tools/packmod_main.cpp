@@ -38,6 +38,7 @@ static int Usage() {
 //   <Ziel>\<Mod>\ScriptFiles\scripts\Script_G3ASM_NNN.dll  Laufzeit (das Spiel laedt sie selbst; kein Modkit beim Spieler noetig)
 //   <Ziel>\<Mod>\ModFiles\G3ASM.m0x                       Skripte, mod.ini, Texte unter <Mod>/ (das Modkit entpackt sie beim Start)
 //   <Ziel>\<Mod>\ModFiles\<Volume>.m0x / .n0x            Spieldaten-Archive der Mod (aus <Mod>\ModFiles\), unveraendert
+//   <Ziel>\<Mod>\G3ASM-LICENSE.txt                        Lizenz und Quellcode-Adresse der Laufzeit (GPL-Objektcode im Paket)
 // Nicht ins Skript-Archiv: ModFiles\*.m0x/.n0x (eigene Archive), Source\ (Quellen der Archive), ScriptPatches\ (Datei-Patches wirken nur mit dem Loader),
 // Dateien/Ordner mit Punkt am Anfang. enabled=0 in mod.ini wird im Paket zu enabled=1 (Spieler haben kein load_order.txt).
 namespace {
@@ -200,6 +201,32 @@ std::string FindRuntime() {
     return best;
 }
 
+// Lizenzhinweis fuer die mitgelieferte Laufzeit (liegt im Paketordner, der Union Starter kopiert ihn nicht ins Spiel)
+const char* const kLicenseFile = "G3ASM-LICENSE.txt";
+const char* const kSourceUrl = "https://github.com/bjoerniesanders/G3-AngelScript-Modkit";
+std::string LicenseNotice(const std::string& rtFile) {
+    std::string api = rtFile.substr(13);   // Script_G3ASM_046.dll -> 46
+    api = api.substr(0, api.find('.'));
+    while (api.size() > 1 && api[0] == '0') api.erase(0, 1);
+    const std::string url = kSourceUrl;
+    return "ScriptFiles\\scripts\\" + rtFile + "\r\n"
+           "\r\n"
+           "This file is the runtime of the G3 AngelScript Modkit (G3ASM), script interface " + api + ".\r\n"
+           "It is free software under the GNU General Public License, version 3 or later, with the additional\r\n"
+           "permissions in LICENSE-EXCEPTIONS.md. There is NO WARRANTY.\r\n"
+           "Source code and license texts: " + url + "\r\n"
+           "(the release v0." + api + ".x this file was taken from: " + url + "/releases)\r\n"
+           "\r\n"
+           "The other files of this package belong to the mod and may be under a different license chosen by its author.\r\n"
+           "Keep this file in the package when you pass the package on.\r\n"
+           "\r\n"
+           "Diese Datei ist die Laufzeit des G3 AngelScript Modkit (G3ASM), Skript-Schnittstelle " + api + ".\r\n"
+           "Freie Software unter der GNU General Public License, Version 3 oder spaeter, mit den Zusatzerlaubnissen aus\r\n"
+           "LICENSE-EXCEPTIONS.md, OHNE GEWAEHRLEISTUNG. Quellcode und Lizenztexte: " + url + "\r\n"
+           "Die uebrigen Dateien des Pakets gehoeren zur Mod und koennen unter einer anderen Lizenz ihres Autors stehen.\r\n"
+           "Diese Datei beim Weitergeben im Paket lassen.\r\n";
+}
+
 int Release(std::string modDir, const std::string& outRoot, std::string runtime, const PackOptions& opt) {
     while (!modDir.empty() && (modDir.back() == '\\' || modDir.back() == '/')) modDir.pop_back();
     char full[MAX_PATH];
@@ -318,6 +345,12 @@ int Release(std::string modDir, const std::string& outRoot, std::string runtime,
         RemoveTree(pkg);
         return 1;
     }
+    // Die Laufzeit ist GPL-Objektcode: wer das Paket weitergibt, gibt sie weiter und muss sagen, wo ihr Quellcode liegt (GPL-3.0 Abschnitt 6)
+    if (!WriteText(pkg + "\\" + kLicenseFile, LicenseNotice(rtFile))) {
+        std::printf("Fehler: %s nicht schreibbar\n", kLicenseFile);
+        RemoveTree(pkg);
+        return 1;
+    }
 
     std::printf("Paket: %s\n", pkg.c_str());
     std::printf("  Mod.ini                 Name=%s, Category=%s%s%s\n", title.c_str(), category.c_str(),
@@ -325,6 +358,7 @@ int Release(std::string modDir, const std::string& outRoot, std::string runtime,
     std::printf("  ModFiles\\G3ASM.m0x      %d Datei(en) unter %s/\n", copied.files, name.c_str());
     if (archives) std::printf("  ModFiles\\               %d Spieldaten-Archiv(e) uebernommen\n", archives);
     std::printf("  ScriptFiles\\scripts\\    %s\n", rtFile.c_str());
+    std::printf("  %s       Lizenz und Quellcode der Laufzeit (GPL); im Paket lassen\n", kLicenseFile);
     if (enabledChanged) std::printf("Hinweis: enabled=0 in mod.ini steht im Paket als enabled=1 (Spieler haben kein load_order.txt)\n");
     for (const std::string& s : copied.skipped)
         std::printf("Hinweis: nicht im Skript-Archiv: %s%s\n", s.c_str(),

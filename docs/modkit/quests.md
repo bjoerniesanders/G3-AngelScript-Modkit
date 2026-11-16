@@ -1,7 +1,7 @@
 # Quests
 
-Das Questsystem des Spiels steuerst du über `gCQuestManager_PS` und `gCQuest_PS`. Alle Quests des Spiels (571 in der Grundversion) sind ini-ähnliche Dateien
-unter `Data/Quests/G3_World_01/<Name>_quest_G3_World_01.quest` (in `Data\Quests.pak`). Eigene Quests legst du zur Laufzeit an.
+Die 571 Quests des Spiels sind Textdateien im Archiv `Data\Quests.pak` (`G3_World_01/<Name>_quest_G3_World_01.quest`). Eigene Quests legt deine Mod
+beim Laden an; das Spiel behandelt sie dann wie seine eigenen.
 
 ## Status
 
@@ -47,13 +47,13 @@ Hinweise:
 
 ## Texte
 
-Die Namen im Questlog sind Text-IDs (`eCLocString`), die das Spiel in seiner Stringtabelle nachschlägt. Eine unbekannte ID liefert einen leeren Text.
+Die Namen im Questlog sind Text-IDs, die das Spiel in seiner Stringtabelle nachschlägt. Eine unbekannte ID liefert einen leeren Text.
 Das Modkit fängt die Nachschlagefunktionen ab:
 
 - `RegisterText(id, text)` merkt sich einen Text für eine ID. Überall, wo das Spiel diese ID anzeigt, erscheint dein Text.
 - `SetQuestTopic(name, text)` und `SetQuestDescription(name, text)` legen dafür die IDs `G3ASM_QTOPIC_<Quest>` und `G3ASM_QDESC_<Quest>` an und tragen sie in die Quest ein.
 
-Der Text wird als Windows-1252 gelesen (Umlaute funktionieren). Der Titel erscheint im Questlog (im Spieltest bestätigt).
+Der Titel erscheint im Questlog. Umlaute gehen, wenn die `.as`-Datei als ANSI (Windows-1252) gespeichert ist ([Scripting-Guide](scripting-guide.md#strings-bcstring)).
 
 ## Questlog und Dialoge
 

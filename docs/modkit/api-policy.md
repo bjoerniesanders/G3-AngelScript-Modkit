@@ -27,7 +27,7 @@ Diese Seite legt fest, was sich an der Skript-Schnittstelle zwischen zwei Versio
 
 ## Eingefroren ab Version 46
 
-Mit **Version 46** ist die Skript-Schnittstelle für die Beta eingefroren (2026-11-13). Das heißt:
+Mit **Version 46** ist die Skript-Schnittstelle für die Beta eingefroren. Das heißt:
 
 - Alles, was in der [API-Referenz](api-reference.md), bei den [Ereignissen](events.md) und den [Hooks](hooks.md) **ohne Vermerk** steht, bleibt so, wie es
   dort beschrieben ist. Eine Mod, die nur solche Funktionen benutzt und mit Version 46 läuft, läuft auch mit jeder späteren Version; die Tabelle oben
@@ -56,10 +56,9 @@ Mit **Version 46** ist die Skript-Schnittstelle für die Beta eingefroren (2026-
 die Änderungen. Eine Funktion verliert den Vermerk, sobald ihr Verhalten im Spiel gemessen und in der Referenz beschrieben ist; das ist keine Änderung der
 Schnittstelle.
 
-Stand Version 46: experimentell `HurtHitPoints`, `SetProperty`, `GenerateTradeGoods`, `Override_CombatMove`.
-Im Spiel bestätigt mit 46 (2026-11-11): `Entity::Kill`, `SetCrosshairVisible`, `SetGameTime`, `LoadQuestFile`, `OnTransformStart`/`OnTransformEnd`.
-Ohne Vermerk seit 46: `SetTemplateRef`, `SetEntityRef`, `CallScript`, `GetSpeechText` (Verhalten gemessen und beschrieben).
-Entfernt mit 46 (nie funktionsfähig, Alpha): `GetPickPosition` (Ersatz `PickCenter`/`GetPickPoint`), `ExecuteInfo`, `DumpQuest`.
+Experimentell in Version 46: `HurtHitPoints`, `SetProperty`, `GenerateTradeGoods`, `Override_CombatMove`.
+
+Mit Version 46 entfernt, weil sie nie funktionierten: `GetPickPosition` (Ersatz `PickCenter`/`GetPickPoint`), `ExecuteInfo`, `DumpQuest`.
 
 ## In einer Mod auf die Version prüfen
 

@@ -12,7 +12,12 @@
 param([Parameter(Mandatory)][string]$Game, [switch]$Uninstall, [string]$BuildDir = "", [switch]$Force)
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot   # G3-AngelScript-Modkit
-if (-not $BuildDir) { $BuildDir = Join-Path (Split-Path -Parent $root) "build32" }
+# ohne -BuildDir: build32 im Repo (wie in der README gebaut), sonst build32 neben dem Repo (Build als Unterprojekt eines uebergeordneten CMake-Baums)
+if (-not $BuildDir) {
+    $BuildDir = Join-Path $root "build32"
+    $outer = Join-Path (Split-Path -Parent $root) "build32"
+    if (-not (Test-Path (Join-Path $BuildDir "g3asm\g3asm.dll")) -and (Test-Path (Join-Path $outer "g3asm\g3asm.dll"))) { $BuildDir = $outer }
+}
 $dbg = Join-Path $Game "dbghelp.dll"
 $dbgOrig = Join-Path $Game "dbghelp_orig.dll"
 $backupRoot = Join-Path $Game "g3asm_backup"

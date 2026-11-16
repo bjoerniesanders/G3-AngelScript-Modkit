@@ -37,8 +37,8 @@ g3asm_packmod release <Mod-Ordner> <Zielordner>                    Paket für Sp
 `install` wählt die erste freie Datei der Reihe `Volume.mod`, `Volume.m00`, `Volume.m01`, ... (mit `n`: `.nod`, `.n00`, ...). Eine Lücke wird zuerst gefüllt. Beispiel:
 
 ```
-mods\mein_mod\ModFiles\Quests\G3_World_01\Meine_quest_G3_World_01.quest
-g3asm_packmod install mods\mein_mod\ModFiles\Quests G:\Gothic3 Quests      ->  G:\Gothic3\Data\Quests.mod
+mods\meine_mod\ModFiles\Quests\G3_World_01\Meine_quest_G3_World_01.quest
+g3asm_packmod install mods\meine_mod\ModFiles\Quests G:\Gothic3 Quests      ->  G:\Gothic3\Data\Quests.mod
 ```
 
 Optionen: `--comments` speichert den Quellpfad je Datei (wie `G3PakDir`; verrät lokale Pfade, deshalb standardmäßig aus), `--no-deleted` packt `.deleted`-Dateien als normale Dateien.
@@ -51,7 +51,7 @@ Installation macht: Er nummeriert `ModFiles\<Volume>.m0x` / `.n0x` selbst als `.
 Ein Mod-Ordner kann dieselbe Aufteilung wie beim Union Starter haben. G3ASM ignoriert, was er nicht braucht, und der Union Starter ignoriert `main.as`:
 
 ```
-mein_mod\
+meine_mod\
   Mod.ini                 [Main] Name=..., Category=...   (Union Starter)
   main.as                 Skript (G3ASM)
   ModFiles\
@@ -92,7 +92,16 @@ Das Format entspricht `G3PakDir`: Kopf mit `G3V0` und `G3PD`, Pfade relativ mit 
 - **Keine Komprimierung:** Dateien werden gespeichert. Das Archiv ist größer als ein gepacktes (Vorlagenarchive bis etwa Faktor 3), die Engine liest es trotzdem. Der Union Starter packt beim „Neu verpacken“ ebenfalls ohne Komprimierung.
 - **Lesen komprimierter Einträge** (`list` zeigt sie, den Inhalt nicht): nötig für `Strings.pak\stringtable.ini`, siehe [Patches](patches.md).
 - **Unsere Datei-Patches kennen die Mod-Schichten noch nicht:** Sie lesen als Basis nur das `.pak`. Hat ein anderes Mod-Archiv (`.mod`, `.m00`, ...) dieselbe Datei ersetzt, patcht der Diff die Fassung aus dem `.pak`.
-- **Im Spiel bestätigt (2026-11-05, wiederholt 2026-11-06 ohne physische Kopie):** Eine **neue** Datei aus einem von `g3asm_packmod` geschriebenen Archiv (`Quests.m00`: die Quest `G3ASM_Jens_Wolfsfell`) wird gelesen, die Quest kommt aus dem Archiv und läuft durch.
-- **Überschreiben vorhandener Dateien funktioniert (Stand 2026-11-06):** `Quests.mod` und `Quests.m01` mit der Datei `Agenak_ArenaDefeatDimitar` (4242 XP statt 300) setzen die Quest im Spiel auf 4242, sobald **keine physische Kopie** der Datei unter `Data\<Volume>\` liegt (im Spiel bestätigt, `demo_packmod`).
-- **Falle: physische Kopien verdecken Archive.** Das Dateisystem des Spiels bevorzugt Dateien im Ordner `Data\<Volume>\` (z. B. `Data\Quests\G3_World_01\…quest`) vor allen Archiven. Und das Spiel legt diese Dateien selbst an: Beim Laden hat es alle 571 Quest-Dateien dorthin geschrieben, ohne dass sie vorher da waren, mit den Werten, die gerade galten. Eine solche Kopie aus einem früheren Lauf überdeckt jedes später installierte Mod-Archiv; so ist der frühere Fehlschlag (Quest blieb bei 300 XP) entstanden. Folge: Ein Mod-Archiv, das Dateien eines Volumes ersetzt, wirkt erst, wenn der Ordner `Data\<Volume>\` (nur die vom Spiel erzeugten Kopien, nicht Overlay-Dateien eigener Datei-Patches) entfernt wird; das Spiel erzeugt ihn beim nächsten Laden aus den Archiven neu. Eine Änderung am Mod-Archiv wirkt ebenso erst nach dem Entfernen.
-- **Hauptmenü:** Beim ersten `OnQuestsLoaded` (im Hauptmenü) ist der Quest-Manager leer: `GetQuestCount()` meldet -1 und auch die Quests des Spiels fehlen. Das hat nichts mit dem Archiv zu tun. Skripte legen dann nichts an (Prüfung `GetQuestCount() < 0`); der echte Aufbau folgt beim Laden eines Spielstands.
+- **Neue Dateien** aus einem Archiv von `g3asm_packmod` liest das Spiel (geprüft mit der Quest `G3ASM_Jens_Wolfsfell` in `Quests.m00`).
+- **Vorhandene Dateien überschreiben** funktioniert ebenfalls, solange **keine lose Kopie** der Datei unter `Data\<Volume>\` liegt (siehe nächster Punkt; Beispiel `demo_packmod`).
+- **Achtung: lose Kopien verdecken Archive.** Liegt eine Datei lose im Ordner `Data\<Volume>\` (z. B. `Data\Quests\G3_World_01\…quest`), nimmt das
+  Spiel diese und nicht die aus einem Archiv. Das Spiel legt solche Kopien beim Laden selbst an, für alle 571 Quest-Dateien. Eine Kopie aus einem
+  früheren Lauf verdeckt also jedes später installierte Mod-Archiv. Abhilfe:
+  1. Spiel beenden.
+  2. Den Ordner `Data\<Volume>\` löschen (z. B. `Data\Quests\`). Dateien, die eigene Datei-Patches dort angelegt haben, legt das Modkit beim nächsten
+     Start neu an.
+  3. Spiel starten und laden. Das Spiel legt den Ordner aus den Archiven neu an, jetzt mit den Dateien deiner Mod.
+
+  Dasselbe gilt, wenn du ein schon installiertes Mod-Archiv änderst.
+- **Hauptmenü:** Beim ersten `OnQuestsLoaded` im Hauptmenü gibt es noch keine Quests (`GetQuestCount()` liefert -1), auch nicht die des Spiels.
+  Lege dann nichts an (`if (GetQuestCount() < 0) return;`); der richtige Aufbau folgt beim Laden eines Spielstands.

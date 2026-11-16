@@ -1,14 +1,15 @@
 # Hooks: Spielfunktionen ändern (Override und Super)
 
-Mit einem **Override** ersetzt eine Mod eine Funktion des Spiels. Die Mod definiert eine Funktion `bool Override_<Name>(...)`. Das Spiel ruft dann sie statt der
-ursprünglichen Funktion auf. Diese Mechanik entspricht dem `override` mit `Super::` des G1R-Modkits.
+Mit einem **Override** ersetzt eine Mod eine Funktion des Spiels. Sie definiert eine Funktion `bool Override_<Name>(...)`; das Spiel ruft dann diese statt
+des Originals auf. Mit `Super()` läuft das Original doch noch, an der Stelle, die du bestimmst. Das entspricht `override` und `Super::` im Modkit des
+Gothic-1-Remakes.
 
 ```angelscript
 // Jens' Arbeit nur zwischen 8 und 20 Uhr Spielzeit anbieten
 bool Override_InfoAvailable(const bCString &in info, const bCString &in owner, const bCString &in quest) {
     if (info == "G3ASM_Jens_Job") {
         int h = GetGameHour();
-        if (h >= 0 && (h < 8 || h >= 20)) return false;   // Option verborgen, Original wird gar nicht gefragt
+        if (h >= 0 && (h < 8 || h >= 20)) return false;   // Option verborgen, das Spiel wird gar nicht gefragt
     }
     return Super();                                       // sonst entscheidet das Spiel
 }
@@ -18,70 +19,210 @@ bool Override_InfoAvailable(const bCString &in info, const bCString &in owner, c
 
 | Was du tust | Wirkung |
 |---|---|
-| `return Super();` | das Original läuft unverändert, sein Ergebnis geht ans Spiel |
-| `bool r = Super(); return !r;` | das Original läuft, du änderst das Ergebnis |
-| `return true;` ohne `Super()` | das Original wird **übersprungen** (abgebrochen), dein Wert geht ans Spiel |
-| mehrere Mods mit demselben Override | sie bilden eine Kette in Ladereihenfolge: `Super()` ruft die nächste Mod, am Ende das Original |
-| Skriptfehler im Override | das Spiel bekommt sein Original |
+| `return Super();` | Das Original läuft unverändert, sein Ergebnis geht ans Spiel |
+| `bool r = Super(); return !r;` | Das Original läuft, du änderst das Ergebnis |
+| `return true;` ohne `Super()` | Das Original wird **übersprungen**, dein Wert geht ans Spiel |
+| Mehrere Mods mit demselben Override | Sie bilden eine Kette in Ladereihenfolge: `Super()` ruft die nächste Mod, am Ende das Original |
+| Skriptfehler im Override | Das Spiel bekommt sein Original |
 
-Die Nachereignisse (`OnNPCKilled`, `OnReceiveItem`, ...) laufen nur, wenn das Original tatsächlich gelaufen ist.
-
-## Verfügbare Overrides
-
-| Funktion | Spielfunktion | Bedeutung des Rückgabewerts |
-|---|---|---|
-| `Override_NPCKilled(Entity victim)` | `gCQuestManager_PS::OnNPCKilled` | Ergebnis des Quest-Managers (true = verarbeitet) |
-| `Override_NPCDefeated(Entity npc)` | `OnNPCDefeated` | wie oben |
-| `Override_ReceiveItem(Entity giver, Entity receiver, const bCString &in name, const bCString &in id, uint count)` | `OnReceiveItem` | wie oben |
-| `Override_Enter(Entity who, const bCString &in area)` / `Override_Leave(...)` | `OnEnter` / `OnLeave` | wie oben |
-| `Override_SpellCast(Entity caster, Entity target, const bCString &in spell)` | `OnSpellCast` | wie oben |
-| `Override_InfoAvailable(const bCString &in info, const bCString &in owner, const bCString &in quest)` | `gCInfo_PS::AreConditionsFulfilled` | **true = Option wählbar**, false = verborgen |
-| `Override_Damage(Entity victim, Entity inflictor, Entity owner, int amount, int type)` (ab Version 25) | NPCs: `gCDamageReceiver_PS::SetHitPoints` (sinkender Wert); Held: `gCPlayerMemory_PS::SetBaseValue` (Attribut `HP` sinkt) | **Eingriff wirkt:** `SetOverrideArg(3, ..)` ändert den Lebenspunkte-Verlust, ohne `Super()` entfällt der Treffer. Menge = Verlust, bei Tod auf die verbleibenden Lebenspunkte begrenzt (nicht der wahre Schaden). `inflictor` = Waffe oder Geschoss (`Arrow`, `Mis_Fireball`, `It_1H_…`; bei Tieren das Item `Fist`; bei Schaden über Zeit leer), beim Helden die vom Angreifer geführte Waffe (rechte Hand; bei einem Bogen in der linken Hand das Munitions-Item `Arrow` des Schützen, damit Fernkampf wie bei NPC-Opfern als Pfeil ankommt, ohne Munitions-Item der Bogen; das Munitions-Item ist der Pfeil im Köcher, nicht das fliegende Geschoss, hat aber denselben Namen). **`owner`** = Verursacher: ist `inflictor` selbst ein NPC, dieser; sonst der aktuelle Gegner des Opfers (`CurrentAttackerEntity`). Kann leer sein. Im Gruppenkampf eine Näherung: bei zwei Wölfen wechselte `owner` im Spieltest mit den Angreifern, ob er bei jedem Biss stimmt, ist nicht belegt. `type` = Art des Treffers, gelesen aus dem angreifenden Item (`gEDamageType`: 1 Impact, 2 Blade, 3 Missile, 4 Fire, 5 Ice, 6 Lightning, 7 Physics; gemessen: Keule 1, Schwert/Hellebarde/Speer 2, Pfeil 3, `Mis_Fireball` 4); gilt für NPCs und den Helden gleich. Ist der Wert nicht lesbar (kein `inflictor`, oder das Zauber-Item `It_Spell_*` in der Hand eines Zaubernden), gilt bei NPC-Opfern der Wert des Schadensempfängers (immer 2, **keine** Trefferart), beim Helden 0 |
-| `Override_ConsoleCommand(const bCString &in line)` (ab Version 35) | `eCConsole::OnExecute` (jede eingegebene Konsolenzeile) | **true ohne `Super()` = der Befehl gehört der Mod**; die Antwort in der Konsole setzt `SetConsoleReply(text)`. Fremde Befehle mit `return Super();` durchreichen. Die Konsole erscheint nur im Marvin-Modus (Taste über Tab). Gemessen: eigener Befehl beantwortet, `help` lief unverändert weiter |
-| `Override_TradeGenerate(Entity trader)` (ab Version 37) | `gCInventory_PS::GenerateTradeInvFromTreasureSets` | Ohne `Super()` erzeugt das Spiel keine Ware (Rückgabe = Ergebnis); danach `OnTradeGenerated`, wenn das Original lief |
-| `Override_QuestStatus(const bCString &in name, int oldStatus, int newStatus)` (ab Version 35) | `gCQuest_PS::SetStatus` | `SetOverrideArg(2, x)` setzt einen anderen neuen Status, ohne `Super()` bleibt der alte. Danach `OnQuestStatus`, wenn sich etwas geändert hat |
-| `Override_LearnCost(const bCString &in info, const bCString &in attrib, int amount, int lp, int gold)` (ab Version 42) | Preis eines Lehrers für ein Attribut (Lehr-Info mit `TeachAttrib`, z. B. `STR`): Prüfung und Bezahlung (`gCInfo_PS::Execute`, `OnEndInfo`) und die Anzeige im Dialog (`GetDialogDescription`) | `info` ist der Name der Lehr-Info, `amount` der Zuwachs, `lp` und `gold` der Preis des Spiels. Im Spiel kostet ein Punkt einen Lernpunkt (`lp` = `amount`); mit „Alternative Balance“ der Community-Patches verdoppelt das Spiel `lp` und `gold`, sobald STR, DEX oder INT 250 erreicht haben (dann `lp` = 2 × `amount`). `SetOverrideArg(3, ..)` ändert die Lernpunkte, `SetOverrideArg(4, ..)` das Gold, mit und ohne `Super()`; negative Werte zählen als 0. Der Zuwachs selbst bleibt. **Wird mehrfach je Lehrvorgang gefragt** (Anzeige, Prüfung, Bezahlung, die Anzeige bei jedem Aufbau des Dialogs): dieselben Eingaben müssen dasselbe Ergebnis geben. Gilt für alle Attribut-Lehrer, auch `ALC`. Talente (`TeachSkill`) laufen nicht durch den Hook. Hängt an sieben festen Stellen der Game.dll, deren Originalbytes vorher verglichen werden; passt eine nicht (andere Version, oder `Script_LearningThresholdTweaks.dll` ist installiert), bleiben alle sieben aus. Beispiel `probe_learn_cost` |
-| `Override_CombatMove(Entity self, const bCString &in move, uint speedPercent)` (ab Version 45) | **Experimentell.** Start einer Kampfbewegung (Angriff, Schlag) eines NPCs oder des Helden (`gCScriptProcessingUnit::sAICombatMoveStart`) | `speedPercent` ist die Abspielgeschwindigkeit der Bewegung in Prozent (100 = normal; gemessen hat ein NPC mit 130 angegriffen). `SetOverrideArg(2, p)` setzt sie für diesen Angriff, mit und ohne `Super()`. `move` ist die Phase der Bewegung: `Begin`, `Raise`, `Hit`, `Recover`. Die Laufbewegung und das Drehen laufen nicht hierüber (`SetPlaySpeed`). Im Spiel bestätigt (2026-11-11, Faktor 2 für den Helden): Schläge sichtbar schneller, Treffer und Schaden wie sonst. Gemessene Werte des Helden (Einhänder): `Begin` 230, `Raise` 140 bis 150, `Hit` 50 bis 200; NPC Gamal `Hit` 60 und 130. Bei `Recover` kam als `self` einmal die Waffe (`It_1H_OrcSlayer_01`) statt des Kämpfers; wer die Erholung mitändern will, prüft das Item. Beispiel `probe_attack_speed` |
-| `Override_MonsterDamage(Entity victim, Entity attacker, int damage, int divisor)` (ab Version 42) | Die Schadensgrenze des Spielskripts `AssessHit` (seit Patch 1.12): Trifft ein Nicht-Humanoider (Monster, Tier) einen Humanoiden und ist keiner der beiden der Held, teilt das Spiel den Schaden durch 10, bei beschworenen Angreifern durch 2 | `damage` ist der Schaden vor der Teilung, `divisor` 10 oder 2. `Super()` teilt `damage` durch `divisor` (beide mit `SetOverrideArg(2/3, ..)` änderbar, `divisor` 1 = keine Teilung); **ohne `Super()` bekommt das Spiel `damage` ungeteilt**. Danach rechnet `AssessHit` weiter (Verdopplung, Rüstung), der Wert ist also nicht der endgültige Verlust; den zeigt `Override_Damage`. Wie `Override_LearnCost` hängt dieser an einer festen Stelle, hier in der Script_Game.dll (RVA `0x2C05F`): Die Originalbytes werden vorher verglichen; passen sie nicht (andere Version, oder die Script-DLL `Script_MonsterDamage.dll` ist installiert), bleibt der Hook aus und das Protokoll sagt es. Im Spiel gemessen (2026-11-10, Wolf gegen den NPC Jens, Faktor 0,2): `damage` 23, Original 2, an das Spiel 4, der endgültige Verlust laut `Override_Damage` 3 bzw. 6 bei Doppeltreffern. Treffer am Helden (auch verwandelt) und von oder an einem beschworenen Skelett gegen Wölfe kamen nicht durch den Hook, wie es die Bedingung erwartet; der Teiler 2 (beschworener Angreifer gegen humanoiden NPC) ist nicht ausgelöst. Beispiel `probe_monster_damage` |
-| `Override_AI(const bCString &in name, int kind, Entity self, Entity target)` (ab Version 41) | KI-Zustände (`ZS_...`), KI-Funktionen (`_AI_...`), Callbacks und Routinen der NPCs nach Namen (`gCScriptAdmin::RunScriptState`, `RunScriptFunction`, `RunScriptCallback`, `RunScriptRoutine`); `kind` ist `AI_STATE` (1), `AI_FUNCTION` (2), `AI_CALLBACK` (3) oder `AI_ROUTINE` (4) | Dieselbe Anmeldung wie bei `Override_Script`: **nur Namen aus `WatchScript(name)`**, nur im Spiel-Thread. `self` ist der NPC, `target` sein Ziel (beide können leer sein). Die Rückgabe geht ans Spiel, mit und ohne `Super()`. Zustände und KI-Funktionen laufen in Abschnitten über mehrere Bilder: `false` heißt „noch nicht fertig, nächstes Bild weiter“, `true` „fertig“; ein Zustand, der `false` liefert, wird im nächsten Bild erneut gerufen. Ohne `Super()` läuft das Original in diesem Bild nicht. Laut SDK wird eine fertige KI-Funktion vom Stapel genommen, ein Zustand dagegen beginnt von vorn; wie das Spiel auf ein ausgelassenes Original reagiert, ist nicht gemessen. Die Argumente einer KI-Funktion (z. B. welches Item `_AI_UseInventoryItem` benutzt) sind nicht zugänglich. Im Spiel gemessen (2026-11-10): Callback `OnFollowPlayer` etwa einmal je Sekunde je Begleiter, KI-Funktion `_AI_UseInventoryItem` beim Benutzen eines Items durch den Helden (Ergebnis 0, läuft über mehrere Bilder), Zustand `ZS_ObserveSuspect` bei den Zuschauern eines Arenakampfs: einmal je Zuschauer (sieben NPCs innerhalb von 0,4 s), jeweils Ergebnis 1, also nicht jedes Bild. `name` ist eine Kopie: Das Spiel übergibt einen Zeiger in den Zustandsstapel des NPCs, den der Zustand beim Laufen umbaut |
-| `Override_Script(const bCString &in name, Entity self, Entity other, int arg)` (ab Version 32) | jedes Spielskript nach Namen (`gCScriptAdmin::RunScript` und `RunScriptFromScript`, z. B. `AssessHit`, `MagicTeleport`, `IsDeadlyDamage`) | **Nur für Namen, die eine Mod vorher mit `WatchScript(name)` angemeldet hat** (sonst würde jeder der vielen Skriptaufrufe Skriptzeit kosten), und nur im Spiel-Thread. Alle Mods mit `Override_Script` sehen alle angemeldeten Namen: zuerst `name` prüfen und sonst `return Super();`. `SetOverrideArg(3, ..)` ändert `arg`. Ohne `Super()` bekommt das Spiel den Wert aus `SetScriptResult(int)`, sonst 1 bei `true` und 0 bei `false`. `self`/`other` können leer sein. Gemessen: rund 860 Skriptaufrufe je Sekunde, alle im Spiel-Thread; abfangbar sind nur Skripte, die über ihren Namen laufen (z. B. `MagicTeleport`, `OnHit`, `GetAttitude`), nicht `AssessHit` |
-| `Override_Damage(Entity victim, Entity attacker, int amount, int type)` (alte Form, weiter unterstützt; läuft nach der neuen Form derselben Kette) | wie oben | wie oben, `SetOverrideArg(2, ..)` ändert die Menge; `attacker` ist derselbe Wert wie `inflictor` der neuen Form |
-
-**Schaden am Helden:** Der Held hat seine Lebenspunkte im Attribut `HP`, sein Schadensempfänger steht immer auf 1. Treffer von Menschen und Tieren senken das Attribut über `gCPlayerMemory_PS::SetBaseValue` (Spielskript, nicht über `gCEntity::OnDamage`). Der Hook greift **vor** dem Schreiben: eine geänderte Menge wird direkt geschrieben, ohne `Super()` entfällt der Verlust. Bei einem tödlichen Treffer schreibt das Spiel `HP = 0`; die gemeldete Menge ist dann nur der Rest der Lebenspunkte. Der Schadenstyp kommt wie bei NPCs aus dem angreifenden Item (siehe `type` oben); ohne lesbaren Wert ist er 0. Kommt zum selben Treffer innerhalb von 150 ms noch `gCEntity::OnDamage` mit derselben Menge, wird er nicht doppelt gemeldet. Ein schon toter Held wird nicht wiederbelebt.
-
-**Fallschaden** läuft ebenfalls über `SetBaseValue` (gemessen 2026-11-06) und kommt durch dieselbe Kette. Er hat keinen Angreifer: `owner` und `inflictor` sind leer. Erkannt wird das daran, dass die Schadensroutine des Spielskripts bei Kampfschaden (Biss, Schlag, Zauber) direkt von der Engine aufgerufen wird, beim Sturz aber von einer anderen Skriptroutine; das ist eine Heuristik und gilt wahrscheinlich auch für anderen Umgebungsschaden (Gift u. ä., nicht geprüft). Zauber werden dagegen richtig zugeordnet (`owner` der Zaubernde, `inflictor` der Zauber, z. B. `It_Spell_Fireball`). Ältere Hinweise, ein Sturz bleibe ohne Meldung, gelten nicht mehr; `demo_hooks` zeigt trotzdem, wie ein Skript jedes Bild (`OnFrame`) das Attribut `HP` vergleicht und Verluste ohne Meldung ausgleicht.
-
-`Override_InfoAvailable` ist der nützlichste Hook: du entscheidest damit zu jeder Zeit, ob eine Dialogoption (auch die des Spiels selbst) im Menü erscheint.
-Dort ist der Rückgabewert auch wirklich ein Ja/Nein für das Spiel. Bei den Quest-Ereignissen ist er nur das Ergebnis der Verarbeitung.
+- Die Nachereignisse (`OnNPCKilled`, `OnReceiveItem`, ...) laufen nur, wenn das Original tatsächlich gelaufen ist.
+- Die Rückgabe ist immer `bool`. Was `true` und `false` bedeuten, steht beim jeweiligen Override.
+- Ein Override sollte schnell sein; manche laufen sehr oft (siehe unten). Definiert keine Mod die Funktion, kostet der Hook nichts.
 
 ## Argumente ändern
 
-Zahlenargumente (Ganzzahlen, `uint`) lassen sich verändern, bevor `Super()` das Original aufruft:
+Zahlenargumente (`int`, `uint`) lassen sich ändern, bevor `Super()` das Original aufruft:
 
 ```angelscript
 bool Override_ReceiveItem(Entity giver, Entity receiver, const bCString &in name, const bCString &in id, uint count) {
-    if (name == "It_Wolf_Fur") SetOverrideArg(4, count * 2);   // Argument 4 = Menge, doppelt so viele Felle
-    return Super();                                            // das Original bekommt die doppelte Menge
+    if (name == "It_Wolf_Fur") SetOverrideArg(4, count * 2);   // Argument 4 = Menge
+    return Super();
 }
 ```
 
 | Funktion | Bedeutung |
 |---|---|
-| `bool SetOverrideArg(int index, uint wert)` | Setzt das Argument mit diesem Index (0 = erstes) der laufenden Kette. `false` (Hinweis im Protokoll) bei falschem Index, bei Entity-/Text-Argumenten oder außerhalb eines Overrides |
+| `bool SetOverrideArg(int index, uint wert)` | Setzt das Argument Nummer `index` (0 = erstes). `false` bei falschem Index, bei `Entity`- und Text-Argumenten und außerhalb eines Overrides |
 | `uint GetOverrideArg(int index)` | Liest den aktuellen Wert (0, wenn es das Argument nicht gibt) |
 
-- Der neue Wert gilt für alle weiteren Mods der Kette und am Ende für das Original. Er wirkt nur für diesen einen Aufruf.
-- **Warum nicht `int &inout`?** AngelScript erlaubt `&inout` nur für Objekttypen mit Handles (`uint &inout` und `Entity &inout` werden mit „Only object types that support object handles can use &inout“ abgelehnt). Ginge es mit der Einstellung für unsichere Referenzen, hätten alle Mods ungeprüfte Referenzen. `SetOverrideArg` ist stattdessen eine ausdrückliche, geprüfte Schnittstelle.
-- **Was die Änderung bewirkt, hängt vom Hook ab.** Die Overrides der Quest-Ereignisse (`Override_ReceiveItem` und die anderen fünf) hängen am Questsystem (`gCQuestManager_PS`), das **nach** dem eigentlichen Vorgang benachrichtigt wird. Im Spiel geprüft: `SetOverrideArg(4, count * 2)` kommt dort an (Meldung „Menge verdoppelt: 1 -> 2“), das Inventar bleibt aber unverändert, der Held erhält nur ein Stück. Die geänderte Menge zählt nur für Quest-Bedingungen („bring 5 Felle“). Um wirklich mehr Gegenstände zu geben, `receiver.AddItems(name, n)` nach `Super()` benutzen (Beispiel `demo_hooks`). Bei einem Hook auf die eigentliche Spielfunktion (Schaden, Inventar) hat dieselbe Schnittstelle echte Wirkung.
-- **Entities und Texte** (`Entity`, `const bCString &in`) sind nicht änderbar.
+- Der neue Wert gilt für alle weiteren Mods der Kette und für das Original, nur für diesen einen Aufruf.
+- `Entity`- und Text-Argumente sind nicht änderbar.
+- **Was die Änderung bewirkt, hängt vom Hook ab.** Bei den Quest-Ereignissen (`Override_ReceiveItem` und die anderen fünf) erfährt das Questsystem
+  vom Vorgang erst danach: Die verdoppelte Menge zählt nur für Quest-Bedingungen („bring 5 Felle“), im Inventar landet weiterhin ein Fell. Für mehr
+  Items nach `Super()` `receiver.AddItems(name, n)` aufrufen (Beispiel `demo_hooks`). Bei Schaden, Lernkosten oder Monsterschaden wirkt die
+  Änderung wirklich.
+- Warum nicht `int &inout`? AngelScript erlaubt `&inout` nur bei Objekttypen mit Handles. `SetOverrideArg` ist dafür eine geprüfte Schnittstelle.
 
-## Grenzen
+## Übersicht
 
-- **Rückgabe** ist immer `bool`.
-- Kein allgemeiner Treffer-Hook vor der Schadensberechnung: in der Game.dll fehlt dafür ein exportierter Einstiegspunkt. `Override_Script("AssessHit")` ersetzt die ganze Berechnung, `Override_MonsterDamage` greift an einer Stelle mittendrin.
-- Ein Override sollte schnell sein. `Override_InfoAvailable` wird für jede Option jedes NPCs beim Aufbau des Menüs aufgerufen.
-  Das Modkit ruft sie nur auf, wenn irgendein Mod die Funktion definiert, sonst kostet es nichts.
+| Override | Wann | Rückgabe |
+|---|---|---|
+| `Override_NPCKilled(Entity victim)` | Ein NPC wurde getötet | Ergebnis des Questsystems |
+| `Override_NPCDefeated(Entity npc)` | Ein NPC wurde besiegt | Ergebnis des Questsystems |
+| `Override_ReceiveItem(Entity giver, Entity receiver, const bCString &in name, const bCString &in id, uint count)` | Items wechseln den Besitzer | Ergebnis des Questsystems |
+| `Override_Enter(Entity who, const bCString &in area)`, `Override_Leave(Entity who, const bCString &in area)` | Jemand betritt oder verlässt einen Bereich | Ergebnis des Questsystems |
+| `Override_SpellCast(Entity caster, Entity target, const bCString &in spell)` | Ein Zauber wird gewirkt | Ergebnis des Questsystems |
+| `Override_InfoAvailable(const bCString &in info, const bCString &in owner, const bCString &in quest)` | Das Spiel fragt, ob eine Dialogoption erscheint | **`true` = Option wählbar** |
+| [`Override_Damage(...)`](#override_damage) (ab Version 25) | Ein Treffer kostet Lebenspunkte | ohne `Super()` entfällt der Treffer |
+| [`Override_MonsterDamage(...)`](#override_monsterdamage) (ab Version 42) | Ein Monster trifft einen humanoiden NPC | ohne `Super()` ungeteilter Schaden |
+| [`Override_LearnCost(...)`](#override_learncost) (ab Version 42) | Ein Lehrer nennt oder kassiert den Preis für ein Attribut | – |
+| [`Override_CombatMove(...)`](#override_combatmove) (ab Version 45) | **Experimentell.** Eine Kampfbewegung beginnt | – |
+| [`Override_QuestStatus(...)`](#override_queststatus) (ab Version 35) | Der Status einer Quest ändert sich | ohne `Super()` bleibt der alte |
+| [`Override_ConsoleCommand(...)`](#override_consolecommand) (ab Version 35) | Eine Zeile wird in die Konsole eingegeben | **`true` ohne `Super()` = Befehl erledigt** |
+| [`Override_TradeGenerate(...)`](#override_tradegenerate) (ab Version 37) | Das Spiel erzeugt die Ware eines Händlers | ohne `Super()` keine Ware |
+| [`Override_Script(...)`](#override_script) (ab Version 32) | Ein angemeldetes Spielskript läuft | Ergebnis fürs Spiel |
+| [`Override_AI(...)`](#override_ai) (ab Version 41) | Ein angemeldetes KI-Skript läuft | `true` = fertig |
+
+Die ersten sechs hängen am Questsystem des Spiels. Es wird **nach** dem eigentlichen Vorgang benachrichtigt; ihr Rückgabewert ist nur das Ergebnis dieser
+Benachrichtigung. Bei `Override_InfoAvailable` dagegen ist er wirklich das Ja oder Nein für das Spiel. Damit entscheidest du jederzeit, ob eine
+Dialogoption erscheint, auch eine des Spiels. Es wird für jede Option jedes NPCs gefragt, sobald das Gesprächsmenü aufgebaut wird.
+
+## Override_Damage
+
+```angelscript
+bool Override_Damage(Entity victim, Entity inflictor, Entity owner, int amount, int type)
+```
+
+Läuft, bevor ein Treffer Lebenspunkte abzieht, bei NPCs und beim Helden, für Waffen, Tiere, Zauber und Stürze.
+
+- `amount` ist der Verlust an Lebenspunkten. Bei einem tödlichen Treffer ist es nur der Rest der Lebenspunkte, nicht der volle Schaden.
+- `SetOverrideArg(3, n)` ändert den Verlust. Ohne `Super()` entfällt der Treffer.
+- `inflictor` ist die Waffe oder das Geschoss (`It_1H_…`, `Arrow`, `Mis_Fireball`; bei Tieren `Fist`). Bei Schaden über Zeit und beim Sturz ist er
+  leer. Trifft ein Bogenschütze den Helden, kommt wie bei NPCs der Pfeil an.
+- `owner` ist der Verursacher: der `inflictor` selbst, wenn er ein NPC ist, sonst der aktuelle Gegner des Opfers. Kämpfen mehrere gegen einen, ist
+  das eine Näherung. Bei Zaubern ist `owner` der Zaubernde, beim Sturz leer.
+- `type` ist die Trefferart aus dem angreifenden Item: 1 Schlag (Keule), 2 Klinge, 3 Geschoss, 4 Feuer, 5 Eis, 6 Blitz, 7 Physik
+  ([Referenz](reference.md#1-schadensarten-type-in-override_damage-und-ondamage)). Ist sie nicht lesbar (kein Item, oder ein Zauber-Item in der
+  Hand), ist sie bei NPCs 2 und beim Helden 0.
+- Ein schon toter Held wird nicht wiederbelebt.
+- Die alte Form `Override_Damage(Entity victim, Entity attacker, int amount, int type)` läuft weiter, nach der neuen in derselben Kette.
+  `attacker` ist dort der `inflictor`, `SetOverrideArg(2, n)` ändert die Menge.
+
+Danach meldet `OnDamage` den Treffer ([Ereignisse](events.md)). Beispiele: `demo_lifesteal`, `perk_lifesteal`, `demo_hooks`.
+
+## Override_MonsterDamage
+
+```angelscript
+bool Override_MonsterDamage(Entity victim, Entity attacker, int damage, int divisor)
+```
+
+Trifft ein Monster oder Tier einen humanoiden NPC und ist keiner der beiden der Held, teilt das Spiel den Schaden durch 10, bei beschworenen Angreifern
+durch 2. Dieser Override entscheidet über die Teilung.
+
+- `damage` ist der Schaden vor der Teilung, `divisor` 10 oder 2. Beide lassen sich ändern (`SetOverrideArg(2, ..)`, `SetOverrideArg(3, ..)`;
+  `divisor` 1 = keine Teilung).
+- `Super()` teilt. **Ohne `Super()` bekommt das Spiel `damage` ungeteilt.**
+- Danach rechnet das Spiel weiter (Rüstung und anderes); den endgültigen Verlust zeigt `Override_Damage`.
+- Ist das Plugin `Script_MonsterDamage.dll` installiert oder weicht die Spielversion ab, bleibt der Override aus; das Protokoll sagt es.
+- Der Fall „beschworener Angreifer“ (Teiler 2) ist im Spiel noch nicht ausgelöst worden.
+
+Beispiel `probe_monster_damage`.
+
+## Override_LearnCost
+
+```angelscript
+bool Override_LearnCost(const bCString &in info, const bCString &in attrib, int amount, int lp, int gold)
+```
+
+Der Preis eines Lehrers für ein Attribut (`STR`, `DEX`, `ALC`, ...).
+
+- `info` ist die Lehr-Info, `attrib` das Attribut, `amount` der Zuwachs, `lp` und `gold` der Preis des Spiels.
+- `SetOverrideArg(3, ..)` ändert die Lernpunkte, `SetOverrideArg(4, ..)` das Gold, mit und ohne `Super()`. Negative Werte zählen als 0. Den Zuwachs
+  ändert der Override nicht.
+- Ein Punkt kostet normal einen Lernpunkt. Mit „Alternative Balance“ der Community-Patches verdoppelt das Spiel Lernpunkte und Gold, sobald STR, DEX
+  oder INT 250 erreicht haben.
+- **Wird je Lehrvorgang mehrfach gefragt** (Anzeige im Dialog, Prüfung, Bezahlung). Gleiche Eingaben müssen dasselbe Ergebnis liefern.
+- Talente laufen nicht über diesen Override.
+- Ist das Plugin `Script_LearningThresholdTweaks.dll` installiert oder weicht die Spielversion ab, bleibt der Override aus; das Protokoll sagt es.
+
+Beispiel `probe_learn_cost`.
+
+## Override_CombatMove
+
+```angelscript
+bool Override_CombatMove(Entity self, const bCString &in move, uint speedPercent)
+```
+
+**Experimentell.** Beginn einer Kampfbewegung eines NPCs oder des Helden.
+
+- `move` ist die Phase: `Begin`, `Raise`, `Hit`, `Recover`.
+- `speedPercent` ist die Abspielgeschwindigkeit in Prozent (100 = normal; das Spiel selbst setzt oft andere Werte). `SetOverrideArg(2, p)` ändert sie
+  für diese Bewegung, mit und ohne `Super()`. Treffer und Schaden bleiben gleich.
+- Laufen und Drehen gehören nicht dazu.
+- Bei `Recover` kann `self` die Waffe statt des Kämpfers sein; wer die Erholung mitändert, prüft das.
+
+Beispiel `probe_attack_speed`.
+
+## Override_QuestStatus
+
+```angelscript
+bool Override_QuestStatus(const bCString &in name, int oldStatus, int newStatus)
+```
+
+Der Status einer Quest soll sich ändern. `SetOverrideArg(2, x)` setzt einen anderen neuen Status; ohne `Super()` bleibt der alte. Danach kommt
+`OnQuestStatus`, wenn sich wirklich etwas geändert hat. Statuswerte: `QUEST_*` ([Quests](quests.md)).
+
+## Override_ConsoleCommand
+
+```angelscript
+bool Override_ConsoleCommand(const bCString &in line)
+```
+
+Jede Zeile, die in die Konsole eingegeben wird. `true` ohne `Super()` heißt: Der Befehl gehört der Mod; die Antwort setzt `SetConsoleReply(text)`.
+Fremde Befehle mit `return Super();` durchreichen. Die Konsole gibt es nur im Marvin-Modus (Taste über Tab). Beispiel `probe_events`.
+
+## Override_TradeGenerate
+
+```angelscript
+bool Override_TradeGenerate(Entity trader)
+```
+
+Das Spiel erzeugt die Ware eines Händlers aus seinen Schatz-Sets. Ohne `Super()` erzeugt es keine. Danach kommt `OnTradeGenerated`, wenn das Original lief.
+
+## Override_Script
+
+```angelscript
+bool Override_Script(const bCString &in name, Entity self, Entity other, int arg)
+```
+
+Ein Spielskript der `Script_*.dll` läuft über seinen Namen (`MagicTeleport`, `OnHit`, `GetAttitude`, ...).
+
+- **Nur für Namen, die eine Mod vorher mit `WatchScript(name)` angemeldet hat.** Das Spiel ruft hunderte Skripte je Sekunde; ohne Anmeldung würde
+  jeder Aufruf Zeit kosten.
+- Jede Mod mit `Override_Script` sieht alle angemeldeten Namen: zuerst `name` prüfen, sonst `return Super();`.
+- `SetOverrideArg(3, ..)` ändert `arg`. Ohne `Super()` bekommt das Spiel den Wert aus `SetScriptResult(int)`, sonst 1 bei `true` und 0 bei `false`.
+- `self` und `other` können ungültig sein.
+- Skripte, die das Spiel intern direkt aufruft (`AssessHit`, `IsDeadlyDamage`, `CanBurn`), laufen nicht über ihren Namen und kommen hier nicht an.
+
+Danach kommt `OnScript`. Beispiele: `teleport_party` (`MagicTeleport`), `probe_script`.
+
+## Override_AI
+
+```angelscript
+bool Override_AI(const bCString &in name, int kind, Entity self, Entity target)
+```
+
+Ein KI-Skript eines NPCs läuft: ein Zustand (`ZS_...`, `kind` = `AI_STATE`), eine KI-Funktion (`_AI_...`, `AI_FUNCTION`), ein Callback
+(`AI_CALLBACK`) oder eine Routine (`AI_ROUTINE`).
+
+- Wie bei `Override_Script` nur für Namen aus `WatchScript(name)`.
+- `self` ist der NPC, `target` sein Ziel; beide können ungültig sein.
+- Die Rückgabe geht ans Spiel, mit und ohne `Super()`. Zustände und KI-Funktionen laufen über mehrere Bilder: `false` heißt „noch nicht fertig“, das
+  Spiel ruft sie im nächsten Bild wieder; `true` heißt „fertig“.
+- Ohne `Super()` läuft das Original in diesem Bild nicht. Wie das Spiel darauf reagiert, ist nicht geprüft.
+- Die Argumente einer KI-Funktion (etwa welches Item `_AI_UseInventoryItem` benutzt) sind nicht zugänglich.
+- Routinen (`AI_ROUTINE`) sind im Spiel noch nie ausgelöst worden.
+
+Danach kommt `OnAI`. Beispiel `probe_ai`.
+
+## Schaden ohne Treffer-Hook
+
+Einen allgemeinen Hook **vor** der Schadensberechnung gibt es nicht; die Spiel-DLLs bieten dafür keinen Einstieg. Eingreifen lässt sich an diesen Stellen:
+
+- das Spielskript `OnHit` über `WatchScript` und `Override_Script`,
+- `Override_MonsterDamage` an der Teilung des Monsterschadens,
+- `Override_Damage` am Ende, wenn die Lebenspunkte sinken.
 
 ## Beispiel-Mod
 
-`examples/mods/demo_hooks/main.as`: verbirgt Jens' Mod-Arbeit nachts und schreibt Item-Übergaben an den Helden mit.
+`examples/mods/demo_hooks/main.as` verbirgt Jens' Arbeit nachts und schreibt Item-Übergaben an den Helden mit.

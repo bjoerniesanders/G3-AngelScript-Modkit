@@ -25,7 +25,7 @@ Copy-Item (Join-Path $root "tools\install_loader.ps1"), (Join-Path $root "tools\
 Copy-Item (Join-Path $root "examples") $stage -Recurse
 Copy-Item (Join-Path $root "docs\modkit") (Join-Path $stage "docs") -Recurse
 # Private planning files live next to the public docs on the maintainer's machine only (git-excluded); never ship them in a package.
-foreach ($p in "roadmap.md", "plugin-analyse.md") { Remove-Item (Join-Path $stage "docs\modkit\$p") -Force -ErrorAction SilentlyContinue }
+foreach ($p in "roadmap.md", "plugin-analyse.md", "messnotizen.md") { Remove-Item (Join-Path $stage "docs\modkit\$p") -Force -ErrorAction SilentlyContinue }
 foreach ($f in "README.md", "README.en.md", "LICENSE", "LICENSE-EXCEPTIONS.md") { if (Test-Path (Join-Path $root $f)) { Copy-Item (Join-Path $root $f) $stage } }
 # Both READMEs link docs/compatibility.md
 Copy-Item (Join-Path $root "docs\compatibility.md") (Join-Path $stage "docs\")

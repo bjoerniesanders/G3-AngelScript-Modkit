@@ -1,6 +1,7 @@
 # Dialoge (Infos)
 
-Gespräche in Gothic 3 sind **Infos** (`gCInfo_PS`), verwaltet vom `gCInfoManager_PS`. Das Modkit kann sie lesen und eigene anlegen.
+Gespräche in Gothic 3 bestehen aus **Infos**: Eine Info ist eine Option im Gesprächsmenü eines NPCs samt den Zeilen, die danach gesprochen werden.
+Das Modkit kann Infos lesen und eigene anlegen. Eine Schritt-für-Schritt-Anleitung steht in [Erste Mod](erste-mod.md#5-ein-gespräch-bei-jens).
 Im Spiel gibt es 4593 Infos. Jede gehört einem NPC und läuft als kleines Skript aus Befehlszeilen.
 
 ## Aufbau einer Info
@@ -52,12 +53,19 @@ Die erste Zeile `Say` des Spielers ist der Text, der im Gesprächsmenü steht.
 | `bCString DescribeInfo(name)` | alles zu einer Info als Text (Besitzer, Quest, Bedingung, alle Zeilen) |
 | `bCString DescribeCommands()` | Befehlsvokabular aller Infos |
 | `bool InfoExists(name)` | gibt es die Info? |
-| `bool CreateInfo(name, owner)` | legt eine Info an (Typ `INFO`, Bedingung `GENERAL`). **Gibt es die Info schon, ändert die Funktion nichts und liefert `true`.** Ein folgendes `AddInfoLine` hängt dann weitere Zeilen an, jede Zeile würde doppelt gesprochen. Deshalb vor dem Anlegen mit `InfoExists` prüfen, vor allem wenn du Infos in `OnInfosLoaded` und später noch einmal anlegst |
+| `bool CreateInfo(name, owner)` | Legt eine Info an (Typ `INFO`, Bedingung `GENERAL`); siehe unten |
 | `bool SetInfoQuest(name, quest)`, `SetInfoParent(name, parent)`, `SetInfoType(name, typ)`, `SetInfoCondition(name, art)` | Eigenschaften setzen |
 | `bool AddInfoLine(info, befehl, entity1, entity2, id1, id2, text)` | Skriptzeile anhängen. Ein nicht leerer `text` wird als eigene Text-ID registriert |
 | `bool RebuildInfos()` | Besitzerverzeichnis des Spiels neu aufbauen: **nach dem Anlegen aufrufen**, sonst erscheinen die Optionen nicht |
 | `bool RemoveInfo(name)` | Info entfernen |
 | `bool SetInfoGiven(name, bool)`, `bool IsInfoGiven(name)` | "Info wurde schon gegeben": blendet die Option aus |
+
+**`CreateInfo`, bitte genau lesen:**
+- Gibt es die Info schon, ändert `CreateInfo` nichts und liefert `true`. Ein folgendes `AddInfoLine` hängt die Zeilen dann ein zweites Mal an, und
+  der NPC spricht alles doppelt. Prüfe deshalb vorher mit `InfoExists`, vor allem wenn du Infos in `OnInfosLoaded` und später noch einmal anlegst.
+- `false` heißt: Das Spiel ist noch nicht bereit, oder es hält den Namen intern noch belegt und hätte die neue Info umbenannt. Dann legt die
+  Funktion nichts an und meldet das einmal im Protokoll (`CreateInfo('...'): Name im Info-Manager noch belegt`).
+- Nach dem Anlegen `RebuildInfos()` aufrufen, sonst erscheinen die Optionen nicht.
 
 Ereignis: `void OnInfoFinished(const bCString &in info, const bCString &in owner, const bCString &in quest)` kommt, wenn ein Gespräch zu Ende gesprochen ist.
 Daran hängst du Folgen, die das Spiel nicht selbst kann (Inventar prüfen, Quest beenden, Belohnungen).
@@ -89,4 +97,4 @@ Die vollständige Mod steht in `examples/mods/jens_dialog/main.as`.
 ## Eigene Texte
 
 Texte in `AddInfoLine` und Quests sind Text-IDs der Stringtabelle des Spiels. Das Modkit fängt die Textsuche ab: ein Text, den du übergibst, wird unter einer eigenen ID
-(`G3ASM_INFO_<Info>_<n>`, `G3ASM_QTOPIC_<Quest>`) registriert und überall angezeigt, wo das Spiel diese ID auflöst. Umlaute funktionieren (Windows-1252).
+(`G3ASM_INFO_<Info>_<n>`, `G3ASM_QTOPIC_<Quest>`) registriert und überall angezeigt, wo das Spiel diese ID auflöst. Umlaute gehen, wenn die `.as`-Datei als ANSI (Windows-1252) gespeichert ist ([Scripting-Guide](scripting-guide.md#strings-bcstring)).

@@ -28,7 +28,7 @@ Contributing: house rules (hooks, floating point, style, static analysis with cl
 4. **Order and switches** in `g3asm\mods\load_order.txt`: `-name` disables a mod, `+name` enables a mod that is off by default (all example mods
    ship that way). A mod's version, dependencies and settings go into its `mod.ini`.
 5. **Share it:** `bin\g3asm\g3asm_packmod.exe release <game folder>\g3asm\mods\my_mod <target folder>` builds a package for players (Union Starter
-   layout, runtime included). Details (German): [sharing mods](docs/modkit/mod-package.md#mods-weitergeben).
+   layout, runtime included, with `G3ASM-LICENSE.txt` for the GPL runtime). Details (German): [sharing mods](docs/modkit/mod-package.md#mods-weitergeben).
 
 ## Using mods (for players)
 
@@ -53,48 +53,38 @@ What a mod can do:
   archive (`PackMod`);
 - work together with other mods (`IsModActive`, `CallMod`, `SendModMessage`).
 
-Guide and reference (German): [docs/modkit/index.md](docs/modkit/index.md) (start, quick start), [scripting guide](docs/modkit/scripting-guide.md),
+Guide and reference (German): [first mod step by step](docs/modkit/erste-mod.md), [docs/modkit/index.md](docs/modkit/index.md) (overview), [scripting guide](docs/modkit/scripting-guide.md),
 [events](docs/modkit/events.md), [API reference](docs/modkit/api-reference.md), [examples](docs/modkit/examples.md). The example mods in
 `examples/mods` are named `demo_*` (learning examples), `probe_*` (measurement mods) or have their own name (small mods with game content).
 
 ## Limits
 
-Details in [limitations](docs/modkit/limitations.md) (German).
-
 **In principle:** Gothic 3's game logic lives in native DLLs. A mod can only hook in where the modkit exposes a place.
+The full list is in [limitations](docs/modkit/limitations.md) (German).
 
 **Does not work** (measured in the game or examined in the game code):
-- Drawing plain colored rectangles: the rectangle functions of the GUI and the renderer draw nothing in the game; only text and images work.
-- Letting the game teach own perks: `LearnSkill` returns `false` for a cloned perk; the mod provides the effect itself.
-- Setting references to other templates as text with `SetProperty` (eleven spellings tried); use `SetTemplateRef`/`SetEntityRef` instead.
-- A general hit hook before the damage calculation: Game.dll exports no entry point for it.
-- File patches (`ScriptPatches`) for players: as a script DLL the runtime starts only after the game has scanned its files. Mod packages therefore
-  ship game files as archives (`ModFiles\<volume>.m0x`); file patches work only with the loader.
-- Loading saves without the mod when they contain permanent state (items from cloned templates, perks): such a save crashed without the mod when
-  opening the character sheet. Mods therefore remove that state in `OnBeforeSave` and restore it afterwards (pattern: `perk_lifesteal`).
+- Drawing plain colored rectangles; only text and images work.
+- Letting the game teach custom skills; the mod implements the effect itself.
+- A hit hook before damage is calculated; you can step in via the game script `OnHit`, `Override_MonsterDamage` and `Override_Damage`.
+- Writing the quest log directly and setting conditions of custom infos; entries come from dialog lines, the script checks conditions itself.
+- File patches (`ScriptPatches`) for players: mod packages ship changed game files as archives (`ModFiles\<volume>.m0x`).
 
-**Not available** (not built or not examined yet, not proven impossible):
-- Animations: playing, intercepting, adding own ones.
-- World editing (placing objects), own models.
-- Own input controls, a settings menu in the game.
-- Writing the quest log directly (entries come from dialog lines) and setting the condition lists of own infos (items, reputation); the script
-  checks conditions itself.
-- File patches on compressed archive entries (`Strings.pak`) and binary files; file patches always patch the version from the `.pak`, even if
-  another mod archive replaces the same file.
+**Does not exist** (not built or not examined yet):
+- Animations, editing the world, custom models.
+- Custom UI controls with input, an in-game settings menu.
+- File patches on compressed archive entries (`Strings.pak`) and binary files.
 - The detailed documentation in English (only this README is English).
 
-**Experimental** (works, effect not fully measured, may still change): `HurtHitPoints` (lowers hit points, does not kill), `SetProperty` (text
-values only), `GenerateTradeGoods` (goods did not change in tests), `Override_CombatMove`.
+**Experimental:** `HurtHitPoints`, `SetProperty`, `GenerateTradeGoods`, `Override_CombatMove`.
 
-**Not tested** (details in [compatibility](docs/compatibility.md)):
-- GOG and CD/DVD versions; without DXVK only on one installation. Not supported without Community Patch 1.75 or Parallel Universe Patch.
-- Together with other script plugins that set their own hooks (e.g. CombatFix). `Script_MonsterDamage.dll` and `Script_LearningThresholdTweaks.dll`
-  change the same code as the modkit; if they are installed, `Override_MonsterDamage` or `Override_LearnCost` stays off.
-- On a Steam installation with many third-party mods, a save with `perk_lifesteal` crashed when opening the character sheet, even without mods;
-  the cause is unknown. It does not happen on a clean installation.
-- Never triggered in the game: AI routines (`AI_ROUTINE`), divisor 2 in `Override_MonsterDamage` (summoned attackers) and the doubled learning
-  costs with "Alternative Balance". Dependencies in `mod.ini` are tested without the game only; file patches on `.info` files are untested.
-- Mod packages through the Union Starter: tested in the game; two mods with different runtime versions are not tested yet.
+**Not tested** (details in [compatibility](docs/compatibility.md), German):
+- GOG and CD/DVD versions. Without Community Patch 1.75 or the Parallel Universe Patch: not supported.
+- Together with other script plugins that set their own hooks (e.g. CombatFix). If `Script_MonsterDamage.dll` or
+  `Script_LearningThresholdTweaks.dll` is installed, `Override_MonsterDamage` or `Override_LearnCost` stays off.
+- Two mods with different runtime versions on a player's machine.
+
+**Important for mods with lasting changes** (items from cloned templates, skills): such a save crashed without the mod. Mods therefore remove
+them in `OnBeforeSave` and restore them afterwards (pattern: `perk_lifesteal`).
 
 ## Layout
 | Folder | Content |
@@ -131,7 +121,7 @@ and does not compute bit-exactly like the original; measure the original's behav
       git push origin v0.46.1-beta.1
   Tags with a hyphen (`-alpha.N`, `-beta.N`) are published as pre-releases; naming scheme in the [versioning rules](docs/modkit/api-policy.md).
 - Local package: `powershell -NoProfile -File tools\package_release.ps1 -BuildDir build32 -Version v0.46.1` (result in `dist\`). Content: loader,
-  `g3asm.dll`, `g3asm_packmod.exe`, `tools\install_loader.ps1`, example mods (off by default), documentation, `INSTALL.txt`; no game files.
+  `g3asm.dll`, `Script_G3ASM_<API>.dll` (runtime for mod packages), `g3asm_packmod.exe`, `tools\install_loader.ps1`, `tools\g3pak_read.py`, example mods (off by default), documentation, `INSTALL.txt`; no game files.
 - Not in CI: everything that needs the real game (measurements with the original `SharedBase.dll`, game tests). Game files do not belong in the repository.
 
 ## Installing the loader

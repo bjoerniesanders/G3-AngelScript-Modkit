@@ -1,63 +1,91 @@
 # Speichern und Laden
 
-Quests, Dialoge und Texte, die eine Mod zur Laufzeit anlegt, kennt das Spiel nicht von sich aus. Beim Laden eines Spielstands baut es Quests und Infos neu aus seinen
-Datendateien auf und liest danach die gespeicherten Laufzeitdaten dazu ein (Status, Questlog, "Info gegeben"). Eigene Objekte müssen deshalb **während des Aufbaus**
-angelegt werden, bevor das Spiel die Laufzeitdaten einliest. Dann stellt das Spiel Status und Questlog selbst wieder her.
+Quests, Dialoge und Texte, die eine Mod anlegt, kennt das Spiel nicht von sich aus. Damit sie Speichern und Laden überstehen, musst du wissen, wie das
+Spiel lädt:
+
+1. Es baut alle Quests aus seinen Dateien neu auf.
+2. Es baut alle Dialoge (Infos) neu auf.
+3. Erst danach liest es aus dem Spielstand, was sich geändert hat: Status der Quests, Questlog, welche Gesprächsoptionen schon gewählt wurden.
+
+Legst du deine Quests und Infos **nach Schritt 1 und 2, aber vor Schritt 3** an, gehören sie dazu, und das Spiel stellt ihren Stand selbst wieder her.
+Genau dafür gibt es zwei Ereignisse.
 
 ## Lade-Ereignisse
 
 | Funktion | Wann |
 |---|---|
-| `void OnQuestsLoaded()` | direkt nach dem Neuaufbau der Quests (`LoadQuestsFromInis`), beim Spielstart und bei jedem Laden |
-| `void OnInfosLoaded()` | direkt nach dem Neuaufbau der Dialoge (`ReadCompiledInfoManager`) |
-
-Während dieser Ereignisse arbeiten die Quest- und Dialogfunktionen auf dem Manager, der gerade aufgebaut wird (das Spiel kennt ihn zu dem Zeitpunkt noch nicht als
-"aktuellen" Manager). Lege deine Quest in `OnQuestsLoaded` und deine Infos in `OnInfosLoaded` an:
+| `void OnQuestsLoaded()` | Nach Schritt 1, beim Spielstart und bei jedem Laden: hier eigene Quests anlegen |
+| `void OnInfosLoaded()` | Nach Schritt 2: hier eigene Infos anlegen |
 
 ```angelscript
+const bCString QUEST = "MeineMod_Wolfsfell";
+
 void OnQuestsLoaded() {
+    if (GetQuestCount() < 0) return;               // Hauptmenü: noch keine Quests
     CreateQuest(QUEST);
-    SetQuestTopic(QUEST, "Wolfsfell für Jens");
+    SetQuestTopic(QUEST, "Wolfsfell fuer Jens");
     SetQuestDescription(QUEST, "Jens braucht ein Wolfsfell.");
     SetQuestXP(QUEST, 100);
 }
-void OnInfosLoaded() { ErstelleInfos(); }
+
+void OnInfosLoaded() {
+    // eigene Infos anlegen, siehe Dialoge
+}
 ```
 
-Die Reihenfolge beim Laden (im Protokoll sichtbar): `LoadQuestsFromInis` → `OnQuestsLoaded` → Quest-Laufzeitdaten werden gelesen → Info-Manager `ReadSaveGame`.
+**Ergebnis:** Nach dem Laden hat die Quest wieder ihren Status, das Questlog ist vollständig, und gewählte Gesprächsoptionen bleiben ausgeblendet.
+
+**Achtung:**
+- In `main()` oder `OnFrame` angelegte Quests und Infos verlieren beim Laden ihren Stand.
+- Im Hauptmenü läuft `OnQuestsLoaded` schon einmal, ohne Quests (`GetQuestCount()` liefert -1). Lege dann nichts an; der richtige Aufbau folgt beim
+  Laden eines Spielstands.
+
+Eine vollständige Mod nach diesem Muster steht in [Erste Mod Schritt für Schritt](erste-mod.md).
 
 ## Speicher-Ereignisse
 
 | Funktion | Wann |
 |---|---|
-| `void OnBeforeSave(const bCString &in name)` (ab Version 31) | direkt vor dem Schreiben eines Spielstands |
-| `void OnAfterSave(const bCString &in name, int ok)` (ab Version 31) | direkt danach; `ok` 1 = Erfolg, 0 = Fehlschlag |
+| `void OnBeforeSave(const bCString &in name)` (ab Version 31) | Direkt bevor ein Spielstand geschrieben wird |
+| `void OnAfterSave(const bCString &in name, int ok)` (ab Version 31) | Direkt danach; `ok` 1 = gelungen, 0 = fehlgeschlagen |
 
-Beide laufen genau einmal je Speichern (gemessen: Menü und Schnellspeichern, `gCWorld::SaveGameWorld`, derselbe Thread wie beim Laden). Sie dienen dazu, **dauerhafte
-Zustände aus dem Spielstand herauszuhalten**: Was eine Mod dem Helden dauerhaft hinzufügt (zum Beispiel ein eigenes Item), steht danach im Spielstand und fehlt, wenn der
-Mod nicht läuft oder sich eine andere Mod daran stört. Die Mod nimmt es in `OnBeforeSave` heraus und legt es in `OnAfterSave` wieder an.
+Beide laufen genau einmal je Speichern, auch beim Schnellspeichern.
+
+Wozu: Was eine Mod dauerhaft ins Spiel bringt, zum Beispiel ein Item aus einer geklonten Vorlage oder ein eigenes Talent, steht danach im Spielstand.
+Lädt jemand diesen Spielstand ohne die Mod, zeigt der Eintrag ins Leere, und das Spiel kann abstürzen. Die Mod nimmt solche Dinge deshalb vor dem
+Speichern heraus und legt sie danach wieder an:
 
 ```angelscript
-void OnBeforeSave(const bCString &in name) { /* Talent deaktivieren, Stapel loeschen */ }
-void OnAfterSave(const bCString &in name, int ok) { /* Stapel wieder anlegen, Talent neu aktivieren */ }
+void OnBeforeSave(const bCString &in name) { /* Talent ausschalten, Stapel entfernen */ }
+void OnAfterSave(const bCString &in name, int ok) { /* Stapel wieder anlegen, Talent einschalten */ }
 ```
 
-Ein Beispiel ist `examples/mods/perk_lifesteal`. Entity-Handles nicht über das Speichern hinweg aufbewahren. Während der Ereignisse nichts Langes tun: das Spiel wartet.
+**Ergebnis:** Der Spielstand enthält nichts von der Mod und lädt auch ohne sie. Vollständiges Beispiel: `examples/mods/perk_lifesteal`.
+
+**Achtung:**
+- Nach dem **Laden** fehlt das Entfernte ebenfalls; lege es auch bei jedem Laden wieder an (z. B. in `OnWorldActivate`).
+- Während der beiden Ereignisse wartet das Spiel. Nichts Langes tun.
+- `Entity`-Griffe nicht über das Speichern hinweg aufbewahren, sondern neu holen (`GetHero()`).
+
 ## Eigene Schalter im Spielstand
 
-`SetGameEvent(name)`, `ClearGameEvent(name)`, `IsGameEventSet(name)` speichern kleine Ja/Nein-Werte im Gedächtnis des Helden. Das Spiel schreibt sie in jeden Spielstand.
-Sie überstehen Speichern und Laden und gelten für den jeweiligen Spielstand, auch wenn die Mod nicht lief.
+`SetGameEvent(name)`, `ClearGameEvent(name)` und `IsGameEventSet(name)` speichern Ja/Nein-Werte im Gedächtnis des Helden. Das Spiel schreibt sie in jeden
+Spielstand; sie gelten für den jeweiligen Spielstand, auch wenn die Mod zwischendurch abgeschaltet war.
 
-Benutze sie für alles, was die Mod nach dem Laden wissen muss und das das Spiel nicht selbst speichert (zum Beispiel "Quest gescheitert"). Wähle Namen mit Präfix
-(`MeinMod_...`), damit sie nicht mit Spielereignissen kollidieren.
+Benutze sie für alles, was die Mod nach dem Laden wissen muss und das das Spiel nicht selbst speichert, etwa „Belohnung schon bekommen“. Gib den Namen
+ein Präfix (`MeineMod_...`), damit sie nicht mit Schaltern des Spiels zusammenstoßen.
 
 ## Notfall-Wiederherstellung
 
-Falls das Spiel Quest oder Dialoge nicht zurückbringt (zum Beispiel wenn die Mod erst nach einem Laden dazukam), prüft eine Mod am besten einmal pro Sekunde in
-`OnFrame`, ob `QuestExists` und `InfoExists` stimmen, legt sie sonst neu an und stellt den Stand aus den Schaltern her. Dafür gilt:
+Kam die Mod erst nach einem Spielstand dazu, kennt dieser Spielstand ihre Quest und Infos nicht. Dann hilft folgender Rückfall:
 
-- Den Status setzt du mit `SetQuestStatus(quest, QUEST_RUNNING)`, **nicht** mit `RunQuest`: Letzteres zeigt die Meldung "Quest angenommen" erneut.
-- Für abgeschlossene Quests setzt du Belohnung und XP vorher auf 0, damit das Setzen des Status nichts doppelt auszahlt.
-- Das Questlog lässt sich in diesem Notfall nicht wiederherstellen, es ist Teil der Laufzeitdaten der Quest.
+1. Den Fortschritt zusätzlich in Schaltern merken (`SetGameEvent("MeineMod_Begonnen")` usw.).
+2. In `OnFrame` etwa einmal je Sekunde prüfen, ob `QuestExists` und `InfoExists` stimmen; fehlt etwas, neu anlegen.
+3. Den Stand aus den Schaltern herstellen.
 
-Das Beispiel `examples/mods/jens_dialog/main.as` macht beides: Lade-Ereignisse im Normalfall, Schalter als Rückfall.
+**Achtung:**
+- Den Status mit `SetQuestStatus(quest, QUEST_RUNNING)` setzen, **nicht** mit `RunQuest`; sonst meldet das Spiel noch einmal „Quest angenommen“.
+- Bei abgeschlossenen Quests vorher XP und Belohnung auf 0 setzen, sonst zahlt das Spiel sie beim Setzen des Status noch einmal aus.
+- Das Questlog lässt sich so nicht wiederherstellen.
+
+`examples/mods/jens_dialog/main.as` macht beides: Lade-Ereignisse im Normalfall, Schalter als Rückfall.

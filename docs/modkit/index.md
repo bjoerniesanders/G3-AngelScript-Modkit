@@ -4,12 +4,15 @@ Mit **G3ASM** schreibst du Mods für Gothic 3 in einer Skriptsprache, ohne das S
 Die Skripte sind **AngelScript** (C++-ähnliche Syntax, `int`, `float`, `bCString`, Klassen, Arrays). Das Modkit lädt sie beim Spielstart, führt sie
 bei Spielereignissen aus und lädt sie im laufenden Spiel neu, sobald du die Datei speicherst.
 
+**Für wen:** Modder mit Grundkenntnissen im Programmieren.
+
 Aktuelle Skript-Schnittstelle: **Version 46** (`GetApiVersion()`).
 
 ## Inhalt
 
 | Seite | Inhalt |
 |---|---|
+| [Erste Mod Schritt für Schritt](erste-mod.md) | **Hier anfangen:** eine kleine Mod mit Quest und Gespräch, Kapitel für Kapitel |
 | [Mod-Ordner und Installation](mod-package.md) | Wo eine Mod liegt, Ladereihenfolge, ini-Einstellungen, Protokoll, Hot-Reload |
 | [Scripting-Guide](scripting-guide.md) | Die Sprache, Eigenheiten, Fallstricke, Fehlersuche |
 | [Ereignisse](events.md) | Alle Funktionen, die eine Mod definieren kann (Engine- und Spielereignisse) |
@@ -23,7 +26,7 @@ Aktuelle Skript-Schnittstelle: **Version 46** (`GetApiVersion()`).
 | [Speichern und Laden](saving.md) | Lade-Ereignisse, Schalter im Spielstand, Wiederherstellung |
 | [Beispiele](examples.md) | Fertige Mods zum Lernen und Kopieren |
 | [Referenz](reference.md) | Geprüfte Werte, Namen und Konstanten: Schadensarten, Statuseffekte, Qualitäten, Slots, KI-Modi, Attribute, Namen aus dem Spiel |
-| [Grenzen und Stand](limitations.md) | Was funktioniert, was ungetestet ist, was noch fehlt |
+| [Grenzen](limitations.md) | Was geht, was nicht geht und was ungetestet ist |
 
 ## Schnellstart
 
@@ -42,6 +45,8 @@ Aktuelle Skript-Schnittstelle: **Version 46** (`GetApiVersion()`).
    ```
 3. Spiel starten, die Rollen-Taste (Scroll Lock) drücken: der Text erscheint auf dem Bildschirm. In `<Spielordner>\g3asm.log` steht `[hallo] Hallo aus meiner ersten Mod`.
 4. Datei ändern und speichern: nach einer Sekunde ist die neue Fassung aktiv, ohne Neustart.
+
+Weiter geht es mit [Erste Mod Schritt für Schritt](erste-mod.md).
 
 ## Wie es funktioniert (Kurzfassung)
 

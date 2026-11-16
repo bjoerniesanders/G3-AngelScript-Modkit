@@ -10,7 +10,7 @@ unterstützt.
 
 - `tools/install_loader.ps1` prüft beim Einbau beides und bricht ab, wenn etwas fehlt. Mit `-Force` baut er trotzdem ein (ungetestet).
 - Das Modkit schreibt beim Start die Zeile `Voraussetzungen: Community Patch 1.75 ja/NEIN, Parallel-Universe-Patch ja/NEIN` ins Protokoll, bei einem `NEIN`
-  zusätzlich eine `WARNUNG`. Er läuft trotzdem weiter; Hooks an festen Adressen prüfen ihre Bytes selbst.
+  zusätzlich eine `WARNUNG`. Es läuft trotzdem weiter; Hooks an festen Adressen prüfen ihre Bytes selbst.
 - Erkennung: Community Patch 1.75 am PE-Zeitstempel `4F959F4F` der `Gothic3.exe` (die `Game.dll` taugt dafür nicht, Mods patchen sie binär), PU an
   `paru_s1.dll` und `scripts\Script_paru.dll` im Spielordner.
 
@@ -62,9 +62,9 @@ danach löschen.
 5. **Ausbauen:** `... install_loader.ps1 -Game "<Kopie>" -Uninstall`, danach das Spiel **ohne Modkit** starten.
 
 **Achtung bei Schritt 5:** `perk_lifesteal` legt einen Gegenstandsstapel im Inventar des Helden an. Lädt man einen Spielstand mit diesem Stapel **ohne** die Mod
-und öffnet den Charakterbogen, stürzt das Spiel ab (gemessen, siehe [Grenzen und Stand](modkit/limitations.md)). Seit Version 31 nimmt die Mod den Stapel vor
+und öffnet den Charakterbogen, stürzt das Spiel ab (gemessen, siehe [Grenzen](modkit/limitations.md)). Seit Version 31 nimmt die Mod den Stapel vor
 jedem Speichern heraus und legt ihn danach und nach jedem Laden neu an; Spielstände dieser Fassung enthalten ihn also nicht. Ältere Spielstände können ihn
-enthalten: dann `ENTFERNEN = true` in `perk_lifesteal` setzen, einmal laden, speichern und erst dann die Mod abschalten (so auch im Test vom 2026-11-13).
+enthalten: dann `ENTFERNEN = true` in `perk_lifesteal` setzen, einmal laden, speichern und erst dann die Mod abschalten.
 
 ## Was bei einem Bericht helfen würde
 - Installation (Steam/GOG/CD), DXVK ja/nein und die Zeile `Voraussetzungen: ...` aus dem Protokoll.

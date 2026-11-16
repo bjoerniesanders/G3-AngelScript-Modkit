@@ -63,6 +63,10 @@ try:
     check(sorted(os.listdir(os.path.join(pkg, 'ModFiles'))) == ['G3ASM.m0x', 'Quests.m0x'], 'Paket: ModFiles enthaelt Skript-Archiv und Spieldaten-Archiv')
     ini = read(os.path.join(pkg, 'Mod.ini'))
     check(ini == '[Main]\r\nName=Meine Mod\r\nCategory=Testkategorie\r\n', 'Paket: Mod.ini mit Name und Category aus title/category')
+    lic = os.path.join(pkg, 'G3ASM-LICENSE.txt')
+    lic_text = read(lic) if os.path.isfile(lic) else ''
+    check(bool(rt) and rt[0] in lic_text and 'GNU General Public License' in lic_text and 'https://github.com/' in lic_text,
+          'Paket: G3ASM-LICENSE.txt nennt Laufzeit, GPL und Quellcode-Adresse')
     rc, o = pm('release', abh, dist)
     check(rc == 0 and read(os.path.join(dist, 'abh', 'Mod.ini')) == '[Main]\r\nName=abh\r\nCategory=G3ASM\r\nRequired=basis;extra\r\n',
           'Paket: ohne title/category Ordnername und G3ASM; requires wird Required (mod.ini mit BOM)')

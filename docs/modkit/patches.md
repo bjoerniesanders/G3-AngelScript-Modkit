@@ -4,7 +4,7 @@ Wie beim G1R-Modkit kann eine Mod **Unified-Diff-Dateien** mitbringen, die die D
 seine Quests, Dialoge und Tabellen sind Textdateien in Archiven (`Data\Quests.pak`, `Data\Infos.pak`, ...). Genau auf diese Textdateien wirken die Patches.
 
 ```
-<Gothic 3>\g3asm\mods\mein_mod\ScriptPatches\wolfsfell_xp.patch
+<Gothic 3>\g3asm\mods\meine_mod\ScriptPatches\wolfsfell_xp.patch
 ```
 
 Eine Mod kann **nur** aus Patches bestehen (ohne `main.as`). Sie braucht nur den Ordner `ScriptPatches` mit `.patch`-Dateien.

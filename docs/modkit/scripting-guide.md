@@ -25,7 +25,11 @@ Alle Ereignisfunktionen sind optional. Die vollständige Liste steht auf der Sei
 
 ## Strings: `bCString`
 
-Texte sind `bCString` (das Zeichenkettenobjekt des Spiels, Windows-1252). Literale wandeln sich automatisch um.
+Texte sind `bCString`, die Zeichenketten des Spiels. Ein Text in Anführungszeichen wird automatisch zu einem `bCString`.
+
+**Achtung, Umlaute:** Das Spiel liest Texte als Windows-1252, und das Modkit übernimmt die Bytes deiner `.as`-Datei unverändert. Speichere die Datei
+deshalb als ANSI (Windows-1252), wenn Texte Umlaute enthalten; aus einer UTF-8-Datei erscheinen „ü“ und „ß“ als Zeichensalat. Kommentare sind davon
+nicht betroffen. Die Beispiel-Mods schreiben in Texten „ue“ und „ss“.
 
 ```angelscript
 bCString s = "Hallo";
@@ -56,14 +60,15 @@ Standardwerte (leerer Name, Position 0, -1 bei Zahlen), das Spiel stürzt nicht 
 
 ## Referenzen
 
-`&in` für Eingabeparameter (`const bCString &in`) ist erlaubt. Referenzen auf einfache Typen als Ausgabeparameter (`int &out`, `int &inout`) sind gesperrt.
-Rückgaben gehen über den Rückgabewert, notfalls über ein `array<T>` oder eine Klasse.
+`&in` für Eingabeparameter (`const bCString &in`) und `&out` für Ausgabeparameter (`void Teile(int a, int &out q, int &out r)`) sind erlaubt.
+`&inout` geht nur bei Objekttypen mit Handles, also nicht bei `int`, `float`, `bCString` oder `Entity` (Übersetzungsfehler „Only object types that
+support object handles can use &inout“). Für einen Wert, der hinein- und wieder herausgeht, ein `&in`- und ein `&out`-Parameter oder der Rückgabewert.
 
 ## Zeit und Einheiten
 
 - `OnFrame(float dt)`: `dt` in Sekunden (Spielzeit, skaliert).
 - Entfernungen (`GetDistanceTo`, Positionen) sind in der Einheit der Spielwelt, vermutlich **Zentimeter** (400 ≈ 4 m; die Jens-Mod nutzt 400 als Reichweite).
-- `GetTimeStamp()` liefert den Zeitstempel des Spiels (`uint`, `bCTimer`), Einheit nicht eigens geprüft.
+- `GetTimeStamp()` liefert den Zeitstempel des Spiels (`uint`); die Einheit ist nicht geprüft.
 
 ## Tasten
 
@@ -71,21 +76,21 @@ Rückgaben gehen über den Rückgabewert, notfalls über ein `array<T>` oder ein
 
 | Taste | Code | Taste | Code |
 |---|---|---|---|
-| Numblock 0-9 | 0x60-0x69 | Umschalt (Shift) | 0x10 |
+| Ziffernblock 0-9 | 0x60-0x69 | Umschalt (Shift) | 0x10 |
 | A-Z | 0x41-0x5A | Strg | 0x11 |
 | 0-9 (Reihe) | 0x30-0x39 | Leertaste | 0x20 |
 
 `IsKeyDown(code)` fragt den Zustand ab (nur wenn das Spiel im Vordergrund ist). Viele Tasten sind im Spiel belegt, darunter die meisten F-Tasten
-(siehe `ini\controls.ini` und die Liste unter [Beispiele](examples.md#tastenbelegung-der-beispiel-mods)). Der Ziffernblock ist bis auf 7, 8, 9 und
+(siehe `ini\controls.ini` und die Liste unter [Beispiele](examples.md#tastenbelegung)). Der Ziffernblock ist bis auf 7, 8, 9 und
 Strg + 1 bis 6 frei. Die Nachricht geht immer zusätzlich an das Spiel.
 
 ## Fehlersuche
 
 | Symptom | Ursache und Lösung |
 |---|---|
-| Mod startet nicht, im Protokoll `Skript enthält Fehler` | Zeilen davor lesen: sie nennen Zeile, Spalte und Grund |
+| Mod startet nicht, im Protokoll `Skript enthaelt Fehler` | Zeilen davor lesen: sie nennen Zeile, Spalte und Grund |
 | `Skript-Ausnahme in ... (Zeile n)` | Laufzeitfehler (Division durch 0, Null-Zugriff in deinem Code) |
-| `Skript abgebrochen (länger als 5 s ...)` | Endlosschleife oder zu viel Arbeit in einem Aufruf |
+| `Skript abgebrochen (laenger als 5 s ...)` | Endlosschleife oder zu viel Arbeit in einem Aufruf |
 | Ereignisfunktion wird nicht aufgerufen | Die Signatur stimmt nicht exakt (siehe [Ereignisse](events.md)): Parametertypen und `const bCString &in` genau so schreiben |
 | `Entity` liefert leeren Namen / -1 | Die Entity ist ungültig (nicht geladen, anderer Name). Mit `IsValid()` prüfen |
 | `GetItemCount` liefert -1 | Entity hat kein lesbares Inventar |
