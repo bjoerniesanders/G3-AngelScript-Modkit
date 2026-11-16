@@ -20,19 +20,23 @@ jobs:
         run: cmake -S . -B build -A Win32
 
       - name: Build
-        run: cmake --build build --config Release --parallel --target g3asm g3asm_loader g3asm_packmod g3asm_test g3asm_loader_test g3asm_sb_stub
+        run: cmake --build build --config Release --parallel --target g3asm g3asm_script g3asm_loader g3asm_packmod g3asm_test g3asm_loader_test g3asm_sb_stub
 
       - name: Check build output
         shell: pwsh
         run: |
-          foreach ($f in 'build/g3asm/g3asm.dll', 'build/loader/dbghelp.dll', 'build/g3asm/g3asm_packmod.exe', 'build/g3asm/g3asm_test.exe', 'build/g3asm/g3asm_loader_test.exe', 'build/sbstub/SharedBase.dll') {
+          $script = Get-ChildItem build/g3asm -Filter 'Script_G3ASM_*.dll' | Select-Object -First 1
+          if (-not $script) { throw "Script_G3ASM_*.dll is missing" }
+          foreach ($f in 'build/g3asm/g3asm.dll', "build/g3asm/$($script.Name)", 'build/loader/dbghelp.dll', 'build/g3asm/g3asm_packmod.exe', 'build/g3asm/g3asm_test.exe', 'build/g3asm/g3asm_loader_test.exe', 'build/sbstub/SharedBase.dll') {
             if (-not (Test-Path $f)) { throw "$f is missing" }
             "{0,-32} {1,9} bytes" -f $f, (Get-Item $f).Length
           }
 
       - name: FPU fix active (no fninit)
         shell: pwsh
-        run: ./tools/check_no_fninit.ps1 -Dll build/g3asm/g3asm.dll
+        run: |
+          ./tools/check_no_fninit.ps1 -Dll build/g3asm/g3asm.dll
+          ./tools/check_no_fninit.ps1 -Dll (Get-ChildItem build/g3asm -Filter 'Script_G3ASM_*.dll' | Select-Object -First 1).FullName
 
       # Static analysis with the checks from .clang-tidy. Report only for now: the runner's clang-tidy is newer than the one the code base
       # was cleaned with (LLVM 15) and may know more checks; make this step blocking (-Strict, no continue-on-error) once it has run clean here.
@@ -85,6 +89,14 @@ jobs:
       # File patches: overlay files, backup and restore of a foreign loose file at the target path, rejected paths.
       - name: File patches overlay (stub SharedBase)
         run: python -I tests/file_patches_overlay.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll
+
+      # Packed mods: Data\G3ASM.mod/.m00 unpacked to the mods folder, kept up to date, removed with the archive; loose folders win.
+      - name: Packed mods (stub SharedBase)
+        run: python -I tests/packed_mods.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll build/g3asm/g3asm_packmod.exe
+
+      # Player package: g3asm_packmod release -> install like the Union Starter -> the mod's main() runs
+      - name: Release package (stub SharedBase)
+        run: python -I tests/packmod_release.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll build/g3asm/g3asm_packmod.exe
 
       - name: Build a sample release package
         shell: pwsh

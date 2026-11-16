@@ -60,6 +60,9 @@ Protokollzeilen: `Datei-Patch angewendet: <Datei> (Basis: Archiv Quests.pak, 2 P
 - Binärdateien (Templates, Meshes) lassen sich nicht per Diff ändern.
 - Die Datei wird beim **Start des Spiels** gepatcht; Änderungen an Patches brauchen einen Neustart.
 - `ini [g3asm] filepatches=0` schaltet das Feature ab.
+- **Nur mit dem Loader.** Bei Spielern startet die Laufzeit als Script-DLL, nachdem das Spiel seine Dateien erfasst hat; dort kommen Patches zu spät.
+  `g3asm_packmod release` lässt `ScriptPatches\` deshalb weg. Für Mod-Pakete die geänderte Datei als Archiv ausliefern ([Mod-Archive](archives.md),
+  [Mods weitergeben](mod-package.md#mods-weitergeben)).
 
 ## Beispiel
 

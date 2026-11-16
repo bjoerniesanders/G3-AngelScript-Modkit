@@ -9,6 +9,7 @@
 
 #include <angelscript.h>
 
+#include <algorithm>
 #include <cctype>
 #include <cstdint>
 #include <cstdio>
@@ -454,6 +455,13 @@ bool IsInfoGiven(const SStr& name) {
 
 bool InfoExists(const SStr& name) { return Resolve() && FindInfoByName(name.c_str()) != nullptr; }
 
+// Namen aller per Skript angelegten Infos. gCInfoManager_PS fuehrt neben der Info-Liste (+0x2c) eine Namens-Tabelle (+0x4c), ueber die GetInfo
+// sucht. LoadInfosFromInis gibt nur die Liste frei, die Tabelle behaelt die alten Eintraege: kam das Laden aus ini-Dateien NACH dem Anlegen (z. B.
+// ReadCompiledInfoManager, dann LoadInfosFromInis bei vielen Union-Starter-Mods), haelt AddInfo den Namen fuer vergeben und haengt eine Nummer an.
+// Darum vor jedem LoadInfosFromInis die eigenen Infos ueber RemoveInfo austragen (ForgetCreatedInfos). Gemessen 2026-11-16 (Steamkopie, Game.dll).
+std::vector<std::string> g_createdInfos;
+bool g_renameLogged = false;
+
 bool CreateInfo(const SStr& name, const SStr& owner) {
     if (!WriteReady()) return false;
     void* mgr = Manager();
@@ -461,6 +469,22 @@ bool CreateInfo(const SStr& name, const SStr& owner) {
     if (FindInfoByName(name.c_str())) return true;
     void* info = nullptr;
     if (!SafeAdd(mgr, &name, &info) || !info) return false;
+    const char* got = SafeStr(g_d.getName, info);
+    if (!got || std::strcmp(got, name.c_str()) != 0) {
+        // Namens-Tabelle des Spiels kennt den Namen noch (siehe oben): die umbenannte, leere Info sofort wieder entfernen, sonst stapeln sich
+        // bei jedem neuen Versuch leere Dialoge ("invalid infoscript") beim NPC
+        const SStr renamed(got ? got : "");
+        bool r = false;
+        if (got) SafeRemove(mgr, &renamed, &r);
+        if (!g_renameLogged && ScriptHost::s_current) {
+            g_renameLogged = true;
+            ScriptHost::s_current->Log(std::string("CreateInfo('") + name.c_str() + "'): Name im Info-Manager noch belegt, Spiel vergab '" +
+                                       (got ? got : "?") + "' - wieder entfernt, Info NICHT angelegt");
+        }
+        return false;
+    }
+    if (std::find(g_createdInfos.begin(), g_createdInfos.end(), name.c_str()) == g_createdInfos.end())
+        g_createdInfos.push_back(name.c_str());
     SafeSetStr(g_d.setOwner, info, &owner);
     SafeSetEnum(g_d.accessType, info, 3);   // Info
     SafeSetEnum(g_d.accessCond, info, 3);   // General
@@ -608,6 +632,17 @@ bool RegisterDialogBindings(asIScriptEngine* e) {
 }
 
 void SetInfoManagerOverride(void* mgr) { g_imOverride = mgr; }
+
+int ForgetCreatedInfos(void* mgr) {
+    if (!mgr || !Resolve() || !g_d.removeInfo) return 0;
+    int n = 0;
+    for (const std::string& s : g_createdInfos) {
+        const SStr name(s.c_str());
+        bool r = false;
+        if (SafeRemove(mgr, &name, &r) && r) ++n;
+    }
+    return n;
+}
 
 bool InfoNames(const void* info, std::string* name, std::string* owner, std::string* quest) {
     if (!info || !Resolve()) return false;

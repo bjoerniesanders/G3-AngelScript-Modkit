@@ -144,6 +144,8 @@ std::string CurrentGameLanguage();   // "English", "German", ...; leer, solange 
 // Beim Laden: Manager, der gerade neu aufgebaut wird, fuer die Bindings vorruebergehend als "aktueller" Manager setzen (nullptr = zurueck)
 void SetQuestManagerOverride(void* mgr);
 void SetInfoManagerOverride(void* mgr);
+// vor gCInfoManager_PS::LoadInfosFromInis: per Skript angelegte Infos austragen (sonst bleiben ihre Namen in der Namens-Tabelle belegt); Rueckgabe = Anzahl
+int ForgetCreatedInfos(void* mgr);
 // Hook auf gCInfoManager_PS::OnInfoScriptFinished -> Skript-Ereignis OnInfoFinished (dialog_bindings.cpp)
 void InstallInfoHook(ScriptHost& host);
 
@@ -153,6 +155,9 @@ std::string TemplateNameForId(const void* propertyId);
 std::vector<std::string> DiscoverModNames(const std::string& modsDir);
 // Datei-Patches (file_patches.cpp): <Mod>\ScriptPatches\*.patch (Unified Diff) auf Datendateien des Spiels anwenden; Rueckgabe = Zahl gepatchter Dateien
 int ApplyScriptPatches(const std::string& gameDir, const std::string& modsDir, const std::function<void(const std::string&)>& log);
+// Gepackte Mods (packed_mods.cpp): <Spiel>\Data\G3ASM.mod/.m00/... nach <modsDir>\<Mod>\ entpacken (mit Markierung .g3asm_packed), veraltete
+// entpackte Mods entfernen; lose Ordner ohne Markierung bleiben unangetastet und gewinnen. Rueckgabe = Zahl der gepackten Mods, die jetzt bereitliegen
+int ExtractPackedMods(const std::string& gameDir, const std::string& modsDir, const std::function<void(const std::string&)>& log);
 // Namen einer Info (Info, Besitzer, Quest) fuer den Override-Hook (dialog_bindings.cpp)
 bool InfoNames(const void* info, std::string* name, std::string* owner, std::string* quest);
 // Optionen der Spielereignisse: Nav_*-Bereiche (interne Navigationszonen der NPCs) an OnEnter/OnLeave melden? (Standard: nein)

@@ -25,6 +25,21 @@ Wer am Code mitarbeitet: Hausregeln (Hooks, Gleitkomma, Stil, statische Pruefung
    gespeichert, ist die neue Fassung nach etwa einer Sekunde aktiv (Hot-Reload).
 4. **Reihenfolge und Schalter** in `g3asm\mods\load_order.txt`: `-name` schaltet eine Mod ab, `+name` eine standardmaessig abgeschaltete zu
    (so sind alle Beispiel-Mods ausgeliefert). Version, Abhaengigkeiten und Einstellungen einer Mod stehen in ihrer `mod.ini`.
+5. **Weitergeben:** `bin\g3asm\g3asm_packmod.exe release <Spielordner>\g3asm\mods\meine_mod <Zielordner>` baut ein Paket fuer Spieler
+   (Aufbau des Union Starters, Laufzeit eingeschlossen). Einzelheiten: [Mods weitergeben](docs/modkit/mod-package.md#mods-weitergeben).
+
+## Mods nutzen (fuer Spieler)
+
+Spieler brauchen das Modkit nicht. Jedes Mod-Paket bringt die Laufzeit (`Script_G3ASM_<Version>.dll`) mit; das Spiel laedt sie selbst.
+
+- **Mit dem Union Starter:** den Paketordner nach `<Spielordner>\MDS\Mods\` legen, im Starter anhaken, installieren. Abwaehlen und erneut
+  installieren baut die Mod wieder aus.
+- **Ohne Starter:** `ScriptFiles\scripts\*.dll` nach `<Spielordner>\scripts\` kopieren und jede Datei aus `ModFiles\` als naechste freie
+  Generation nach `<Spielordner>\Data\` (aus `G3ASM.m0x` wird `G3ASM.mod`, bei einer zweiten Mod `G3ASM.m00` usw.; ebenso fuer andere
+  Archive wie `Quests.m0x`).
+
+Beim Start entpackt die Laufzeit jede Mod aus `Data\G3ASM.*` nach `g3asm\mods\<Mod>\`. Ausgaben und Fehler stehen in `g3asm.log` im Spielordner.
+Voraussetzung wie oben: Community Patch 1.75 und Parallel-Universe-Patch.
 
 Was eine Mod kann:
 - auf Spielereignisse reagieren (Kills, Items, Zauber, Schaden, Bereiche, Quest-Status, Speichern/Laden, gesprochene Saetze, Tasten, jedes Bild);
@@ -51,6 +66,8 @@ Einzelheiten in [Grenzen und Stand](docs/modkit/limitations.md).
 - Eigene Talente vom Spiel lernen lassen: `LearnSkill` liefert fuer ein geklontes Talent `false`; die Wirkung stellt die Mod selbst her.
 - Verweise auf andere Vorlagen per `SetProperty` als Text setzen (elf Schreibweisen probiert); dafuer gibt es `SetTemplateRef`/`SetEntityRef`.
 - Ein allgemeiner Treffer-Hook vor der Schadensberechnung: Die Game.dll exportiert dafuer keinen Einstiegspunkt.
+- Datei-Patches (`ScriptPatches`) bei Spielern: Die Laufzeit startet als Script-DLL erst, nachdem das Spiel seine Dateien erfasst hat. Mod-Pakete
+  liefern Spieldateien deshalb als Archiv (`ModFiles\<Volume>.m0x`); Datei-Patches wirken nur mit dem Loader.
 - Spielstaende ohne die Mod, wenn sie dauerhafte Zustaende enthalten (Items aus geklonten Vorlagen, Talente): Ein solcher Spielstand stuerzte ohne
   die Mod beim Oeffnen des Charakterbogens ab. Mods raeumen das deshalb in `OnBeforeSave` weg und stellen es danach wieder her (Muster: `perk_lifesteal`).
 
@@ -77,11 +94,12 @@ Einzelheiten in [Grenzen und Stand](docs/modkit/limitations.md).
 - Im Spiel nie ausgeloest: KI-Routinen (`AI_ROUTINE`), der Teiler 2 bei `Override_MonsterDamage` (beschworene Angreifer) und die verdoppelten
   Lernkosten mit "Alternative Balance". Abhaengigkeiten in der `mod.ini` sind nur ohne Spiel getestet; Datei-Patches auf `.info`-Dateien
   sind ungeprueft.
+- Mod-Pakete ueber den Union Starter: im Spiel geprueft; zwei Mods mit verschiedenen Laufzeit-Versionen noch nicht.
 
 ## Aufbau
 | Ordner | Inhalt |
 |---|---|
-| `src/` | DLL-Quellen (`g3asm_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`), `src/loader/` (Loader = `dbghelp.dll`) |
+| `src/` | DLL-Quellen (`g3asm_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`, `packed_mods`), `script_dll.cpp` (Laufzeit als `Script_G3ASM_<API>.dll`), `src/loader/` (Loader = `dbghelp.dll`) |
 | `tests/` | `test_runner.cpp` (g3asm_test), `scripts/selftest.as`, `mods/` (Ordner-Test), `sb_stub/` (Ersatz-SharedBase.dll fuer Tests ohne Spieldateien) |
 | `examples/` | Beispiel-Mods (`mods/`) und Mini-Mod (`scripts/main.as`) |
 | `docs/` | `modkit/` (Modder-Doku), `compatibility.md` (gepruefte Installationen) |
@@ -90,21 +108,23 @@ Einzelheiten in [Grenzen und Stand](docs/modkit/limitations.md).
 
 ## Bauen (32 Bit)
     cmake -S . -B build32 -A Win32
-    cmake --build build32 --config Release --target g3asm g3asm_test g3asm_packmod g3asm_loader g3asm_loader_test g3asm_sb_stub
-Ausgabe: `build32/g3asm/` (g3asm.dll, Tests, g3asm_packmod) und `build32/loader/dbghelp.dll` (Loader).
+    cmake --build build32 --config Release --target g3asm g3asm_script g3asm_test g3asm_packmod g3asm_loader g3asm_loader_test g3asm_sb_stub
+Ausgabe: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, Tests, g3asm_packmod) und `build32/loader/dbghelp.dll` (Loader).
 
 ## Test
     g3asm_test.exe <SharedBase.dll> tests\scripts\selftest.as
     g3asm_test.exe <SharedBase.dll> tests\mods
     powershell -NoProfile -File tests\run_loader_test.ps1 -SharedBase <SharedBase.dll> -DbghelpOrig <dbghelp_orig.dll>   (Loader in einem Wegwerf-Ordner)
     python -I tests\file_patches_overlay.py g3asm_test.exe <SharedBase.dll>   (Datei-Patches in einem Wegwerf-Ordner)
+    python -I tests\packed_mods.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (gepackte Mods entpacken, aktuell halten, entfernen)
+    python -I tests\packmod_release.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (Paket fuer Spieler bauen, einspielen, starten)
 Ohne Spieldateien: als `<SharedBase.dll>` die Ersatz-DLL `build32\sbstub\SharedBase.dll` nehmen (Ziel `g3asm_sb_stub`), als `<dbghelp_orig.dll>`
 die System-DLL `%WINDIR%\SysWOW64\dbghelp.dll`. Die Ersatz-DLL hat nur die Exporte, die das Modkit fuer bCString und die Mathe-Typen braucht,
 und rechnet nicht bitgenau wie das Original; Messungen am Verhalten des Originals nur mit der echten SharedBase.dll.
 
 ## CI und Release (GitHub Actions)
 - `.github/workflows/ci.yml` (jeder Push auf `main`, Pull-Requests, von Hand): baut 32 Bit mit MSVC, prueft, dass `g3asm.dll` kein `fninit` enthaelt
-  (`tools/check_no_fninit.ps1`, Schutz fuer den FPU-Fix), fuehrt Selbsttest, Test-Mods, Kompilierpruefung der Beispiel-Mods und Loader-Test mit der Ersatz-SharedBase aus, dazu `tests/packmod_generations.py` und `tests/file_patches_overlay.py`, und packt probeweise ein Zip (Artefakt, 7 Tage).
+  (`tools/check_no_fninit.ps1`, Schutz fuer den FPU-Fix), fuehrt Selbsttest, Test-Mods, Kompilierpruefung der Beispiel-Mods und Loader-Test mit der Ersatz-SharedBase aus, dazu `tests/packmod_generations.py`, `tests/file_patches_overlay.py`, `tests/packed_mods.py` und `tests/packmod_release.py`, und packt probeweise ein Zip (Artefakt, 7 Tage).
 - `.github/workflows/release.yml`: beim Push eines Tags `v*` dasselbe plus GitHub-Release mit dem Zip:
       git tag v0.46.1-beta.1
       git push origin v0.46.1-beta.1

@@ -18,11 +18,13 @@ jobs:
         run: cmake -S . -B build -A Win32
 
       - name: Build
-        run: cmake --build build --config Release --parallel --target g3asm g3asm_loader g3asm_packmod g3asm_test g3asm_loader_test g3asm_sb_stub
+        run: cmake --build build --config Release --parallel --target g3asm g3asm_script g3asm_loader g3asm_packmod g3asm_test g3asm_loader_test g3asm_sb_stub
 
       - name: FPU fix active (no fninit)
         shell: pwsh
-        run: ./tools/check_no_fninit.ps1 -Dll build/g3asm/g3asm.dll
+        run: |
+          ./tools/check_no_fninit.ps1 -Dll build/g3asm/g3asm.dll
+          ./tools/check_no_fninit.ps1 -Dll (Get-ChildItem build/g3asm -Filter 'Script_G3ASM_*.dll' | Select-Object -First 1).FullName
 
       # Same tests as ci.yml: a tag must not produce a release that the CI would reject.
       - name: Self test and test mods (stub SharedBase)
@@ -44,6 +46,12 @@ jobs:
 
       - name: File patches overlay (stub SharedBase)
         run: python -I tests/file_patches_overlay.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll
+
+      - name: Packed mods (stub SharedBase)
+        run: python -I tests/packed_mods.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll build/g3asm/g3asm_packmod.exe
+
+      - name: Release package (stub SharedBase)
+        run: python -I tests/packmod_release.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll build/g3asm/g3asm_packmod.exe
 
       - name: Determine version
         id: ver

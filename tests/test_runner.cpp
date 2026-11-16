@@ -56,6 +56,14 @@ int main(int argc, char** argv) {
         if (apply && bar != std::string::npos)
             std::printf("Datei-Patches: %d Datei(en) gepatcht\n", apply(v.substr(0, bar).c_str(), v.substr(bar + 1).c_str()));
     }
+    // "<Spielordner>|<Modordner>": gepackte Mods aus Data\G3ASM.* entpacken (ohne Spiel)
+    if (const char* pk = std::getenv("G3ASM_TEST_PACKED")) {
+        std::string v(pk);
+        const size_t bar = v.find('|');
+        auto extract = reinterpret_cast<int (*)(const char*, const char*)>(GetProcAddress(p, "g3asm_extract_packed"));
+        if (extract && bar != std::string::npos)
+            std::printf("Gepackte Mods bereit: %d\n", extract(v.substr(0, bar).c_str(), v.substr(bar + 1).c_str()));
+    }
     if (const char* gd = std::getenv("G3ASM_TEST_GAMEDLL")) {   // optional: echte Game.dll laden und die Spielereignis-Hooks pruefen
         std::string gdir(gd);
         SetDllDirectoryA(gdir.substr(0, gdir.find_last_of("\\/")).c_str());

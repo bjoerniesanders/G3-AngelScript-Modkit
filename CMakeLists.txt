@@ -60,13 +60,35 @@ set_target_properties(g3asm_angelscript PROPERTIES MSVC_RUNTIME_LIBRARY MultiThr
 enable_language(C)
 file(GLOB G3ASM_MINHOOK_SRCS ${G3ASM_MINHOOK_DIR}/src/*.c ${G3ASM_MINHOOK_DIR}/src/hde/*.c)
 set(G3ASM_SRCS src/g3asm_main.cpp src/script_host.cpp src/sb_api.cpp src/engine_bindings.cpp src/game_hooks.cpp
-              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp src/combat_patches.cpp src/schema_dump.cpp src/ai_trace.cpp src/mod_settings.cpp)
+              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/packed_mods.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp src/combat_patches.cpp src/schema_dump.cpp src/ai_trace.cpp src/mod_settings.cpp)
 list(TRANSFORM G3ASM_SRCS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
-add_library(g3asm SHARED ${G3ASM_SRCS} ${G3ASM_MINHOOK_SRCS})
-target_include_directories(g3asm PRIVATE src ${G3ASM_MINHOOK_DIR}/include)
+# Gemeinsame Objekte fuer g3asm.dll (Loader-Weg) und Script_G3ASM_<API>.dll (Script-DLL fuer Spieler); einmal uebersetzt
+add_library(g3asm_core OBJECT ${G3ASM_SRCS} ${G3ASM_MINHOOK_SRCS})
+target_include_directories(g3asm_core PRIVATE src ${G3ASM_MINHOOK_DIR}/include)
+target_link_libraries(g3asm_core PRIVATE g3asm_angelscript)
+set_target_properties(g3asm_core PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded)
+add_library(g3asm SHARED $<TARGET_OBJECTS:g3asm_core>)
 target_link_libraries(g3asm PRIVATE g3asm_angelscript)
 # Map-Datei neben der DLL (g3asm.map): ordnet Adressen aus og3_hooks.log ("g3asm.dll+0x...") Funktionen zu
 target_link_options(g3asm PRIVATE /MAP)
+
+# Script-DLL: das Spiel laedt scripts\Script_*.dll selbst (src/script_dll.cpp). Name traegt die API-Version (Script_G3ASM_046.dll), damit mehrere
+# Fassungen nebeneinander liegen koennen und die neueste startet.
+file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/src/script_host.h G3ASM_API_LINE REGEX "#define G3ASM_SCRIPT_API_VERSION [0-9]+")
+string(REGEX REPLACE ".*VERSION ([0-9]+).*" "\\1" G3ASM_API "${G3ASM_API_LINE}")
+string(LENGTH "${G3ASM_API}" G3ASM_API_LEN)
+math(EXPR G3ASM_API_PADN "3 - ${G3ASM_API_LEN}")
+if(G3ASM_API_PADN GREATER 0)
+    string(REPEAT "0" ${G3ASM_API_PADN} G3ASM_API_PAD)
+else()
+    set(G3ASM_API_PAD "")
+endif()
+set(G3ASM_SCRIPT_DLL_NAME "Script_G3ASM_${G3ASM_API_PAD}${G3ASM_API}")
+add_library(g3asm_script SHARED $<TARGET_OBJECTS:g3asm_core> ${CMAKE_CURRENT_SOURCE_DIR}/src/script_dll.cpp)
+target_include_directories(g3asm_script PRIVATE src)
+target_link_libraries(g3asm_script PRIVATE g3asm_angelscript)
+set_target_properties(g3asm_script PROPERTIES OUTPUT_NAME ${G3ASM_SCRIPT_DLL_NAME} MSVC_RUNTIME_LIBRARY MultiThreaded
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/g3asm ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/g3asm_script_lib)
 
 add_executable(g3asm_test tests/test_runner.cpp)
 # Kommandozeilenwerkzeug zum Packen/Pruefen von Mod-Archiven (Gegenstueck zu G3PakDir), teilt sich src/pack_mod.cpp mit der DLL

@@ -19,6 +19,8 @@ foreach ($f in "g3asm.dll", "g3asm.map", "g3asm_packmod.exe") {
     $p = Join-Path $BuildDir "g3asm\$f"
     if (Test-Path $p) { Copy-Item $p (Join-Path $stage "bin\g3asm\") }
 }
+# Laufzeit als Script-DLL (Script_G3ASM_<API>.dll) fuer Mod-Pakete an Spieler
+Get-ChildItem (Join-Path $BuildDir "g3asm") -Filter "Script_G3ASM_*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $stage "bin\g3asm\")
 Copy-Item (Join-Path $root "tools\install_loader.ps1"), (Join-Path $root "tools\g3pak_read.py") (Join-Path $stage "tools\")
 Copy-Item (Join-Path $root "examples") $stage -Recurse
 Copy-Item (Join-Path $root "docs\modkit") (Join-Path $stage "docs") -Recurse
@@ -41,6 +43,10 @@ Uninstall:
   powershell -NoProfile -ExecutionPolicy Bypass -File tools\install_loader.ps1 -Game "C:\Path\to\Gothic 3" -Uninstall
 
 Example mods: copy examples\mods\<name> to <Gothic 3>\g3asm\mods\ and enable it with a line "+<name>" in g3asm\mods\load_order.txt.
+
+Share a mod with players (they do not need the modkit; the package brings the runtime bin\g3asm\Script_G3ASM_*.dll):
+  bin\g3asm\g3asm_packmod.exe release "C:\Path\to\Gothic 3\g3asm\mods\my_mod" "C:\Path\to\output"
+Players: put the package folder into <Gothic 3>\MDS\Mods\ and install it with the Union Starter (README: "Using mods (for players)").
 Overview: README.en.md (English), README.md (German)
 Documentation (German): docs\modkit\index.md
 "@

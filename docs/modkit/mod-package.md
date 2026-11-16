@@ -20,10 +20,55 @@ Rückbau: dasselbe mit `-Uninstall` statt `-BuildDir bin` stellt die originale `
 
 Änderungen an `g3asm.dll` (C++) brauchen einen Neustart des Spiels. Änderungen an Skripten nicht (Hot-Reload).
 
+Der Loader ist der Weg für Modder. Spieler installieren nur Mod-Pakete, siehe [Mods weitergeben](#mods-weitergeben).
+
+## Mods weitergeben
+
+Spieler sollen nicht das Modkit installieren müssen. `g3asm_packmod release` macht aus einem Mod-Ordner ein Paket im Aufbau des Union Starters,
+das die Laufzeit mitbringt:
+
+```
+bin\g3asm\g3asm_packmod.exe release <Spielordner>\g3asm\mods\meine_mod <Zielordner>
+```
+
+```
+<Zielordner>\meine_mod\
+  Mod.ini                              [Main] Name, Category, Required (aus title, category, requires der mod.ini)
+  ScriptFiles\scripts\Script_G3ASM_046.dll   Laufzeit; das Spiel lädt jede scripts\Script_*.dll selbst
+  ModFiles\G3ASM.m0x                   Skripte, mod.ini, Texte der Mod, im Archiv unter meine_mod/
+  ModFiles\Quests.m0x ...              Spieldaten-Archive der Mod (aus meine_mod\ModFiles\), unverändert
+```
+
+- **Nicht im Skript-Archiv:** `ModFiles\*.m0x`/`*.n0x` (eigene Spieldaten-Archive, die liegen daneben), `Source\` (Quellen dieser Archive),
+  `ScriptPatches\` (siehe unten) und alles, was mit einem Punkt beginnt (`.git`). `release` nennt jede ausgelassene Datei.
+- **`enabled=0`** in der `mod.ini` steht im Paket als `enabled=1`: Spieler haben kein `load_order.txt`.
+- **Laufzeit:** die `Script_G3ASM_<n>.dll` mit der höchsten Nummer neben `g3asm_packmod.exe` (im Release-Zip `bin\g3asm\`), oder ausdrücklich
+  mit `--runtime <Datei>`. Die Nummer ist die Skript-Schnittstelle.
+- Ein vorhandener Zielordner wird nicht überschrieben.
+
+**Beim Spieler** legt der Union Starter `ScriptFiles\*` in den Spielordner und jede `ModFiles\<Name>.m0x` als nächste freie Generation nach
+`Data\` (`G3ASM.mod`, `G3ASM.m00`, ...). Ohne Starter geht dasselbe von Hand oder mit `g3asm_packmod copy <Datei> <Spielordner> <Name>`.
+
+**Beim Start** des Spiels:
+- Das Spiel lädt `scripts\Script_G3ASM_<n>.dll`. Liegen mehrere davon nebeneinander (Mods mit verschiedenen Laufzeiten), startet nur die mit der
+  höchsten Nummer. Läuft das Modkit schon über den Loader, tut die Script-DLL nichts. `g3asm.ini` braucht sie nicht; gibt es eine, gilt sie
+  (auch `enable=0`).
+- Die Laufzeit entpackt jede Mod aus `Data\G3ASM.*` nach `g3asm\mods\<Mod>\` und legt dort die Markierung `.g3asm_packed` ab. Danach lädt die Mod
+  wie ein loser Ordner. Ändert sich das Archiv, wird neu entpackt. Steht die Mod in keinem Archiv mehr (im Starter abgewählt), werden ihre
+  entpackten Dateien wieder entfernt; Dateien, die nicht aus dem Archiv stammen, bleiben.
+- Ein Ordner **ohne** Markierung (eine lose Mod, etwa beim Entwickeln) wird nie überschrieben und gewinnt gegen die gepackte Fassung gleichen Namens.
+- Steht dieselbe Mod in zwei Archiven, gilt die aus dem früheren (`.mod` vor `.m00` vor `.m01`); das Protokoll meldet das.
+- Das Spiel selbst öffnet `Data\G3ASM.*` nicht (unbekannter Archivname).
+
+**Datei-Patches** (`ScriptPatches`) wirken bei Spielern nicht: Die Script-DLL startet erst, nachdem das Spiel seine Dateien erfasst hat. Neue oder
+geänderte Spieldateien gehören deshalb als Archiv in `meine_mod\ModFiles\` (siehe [Mod-Archive](archives.md)).
+
 ## Aufbau
 
 ```
 <Gothic 3>\
+  scripts\Script_G3ASM_046.dll  nur bei Spielern (Mod-Pakete), statt Loader und g3asm.dll
+  Data\G3ASM.mod, G3ASM.m00 ... gepackte Mods (Mod-Pakete), werden nach g3asm\mods\ entpackt
   g3asm.dll
   g3asm.log                 Protokoll (print() und Fehlermeldungen)
   g3asm.ini                 Einstellungen, Abschnitte [g3asm] und [loader]
@@ -70,6 +115,8 @@ enabled=1                              ; 0 = standardmäßig aus (siehe oben)
 version=1.2.0                          ; Version dieser Mod
 api=40                                 ; mindestens nötige Skript-Schnittstelle (GetApiVersion)
 requires=basis_mod >= 1.1, andere_mod  ; benötigte Mods, Komma-getrennt, Mindestversion optional
+title=Meine Mod                        ; nur für release: Name im Union Starter (Standard: Ordnername)
+category=Kampf                         ; nur für release: Kategorie im Union Starter (Standard: G3ASM)
 ```
 
 Alle Einträge sind freiwillig. Eine Mod, deren Bedingungen nicht erfüllt sind, **wird nicht geladen**: weder ihr Skript noch ihre Datei-Patches oder ihre
@@ -119,6 +166,7 @@ hotreload=1                 ; Skripte bei Dateiänderung neu laden (Prüfung ein
 mods=g3asm\mods               ; Mod-Ordner
 hooks=1                     ; 0 = keine Spielereignisse (Hooks auf Game.dll) einhängen
 filepatches=1               ; 0 = ScriptPatches (Datei-Patches) nicht anwenden
+packedmods=1                ; 0 = gepackte Mods aus Data\G3ASM.* nicht entpacken (siehe Mods weitergeben)
 navevents=0                 ; 1 = OnEnter/OnLeave melden auch interne Navigationszonen "Nav_*"
 scriptlog=0                 ; 1 = alle 60 s die haeufigsten Spielskripte und den Zeitaufwand der Hooks protokollieren
 aitrace=0                   ; 1 = KI-Tracer: Wechsel von KI-Zustand, -Aufgabe, -Routine, KI-Modus und Aktion der NPCs protokollieren

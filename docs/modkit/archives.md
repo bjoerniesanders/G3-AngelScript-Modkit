@@ -28,7 +28,11 @@ g3asm_packmod pack    <Ordner> <Archiv>                            Ordner als Ar
 g3asm_packmod install <Ordner> <Spielordner> <Volume> [m|n]        als nächste freie Generation ablegen
 g3asm_packmod next    <Data-Ordner> <Volume> [m|n]                 nächsten freien Dateinamen anzeigen
 g3asm_packmod list    <Archiv>                                     Inhalt anzeigen
+g3asm_packmod copy    <Archiv> <Spielordner> <Volume> [m|n]        fertiges Archiv als nächste Generation einspielen
+g3asm_packmod release <Mod-Ordner> <Zielordner>                    Paket für Spieler, siehe Mods weitergeben
 ```
+
+`release` beschreibt [Mods weitergeben](mod-package.md#mods-weitergeben).
 
 `install` wählt die erste freie Datei der Reihe `Volume.mod`, `Volume.m00`, `Volume.m01`, ... (mit `n`: `.nod`, `.n00`, ...). Eine Lücke wird zuerst gefüllt. Beispiel:
 

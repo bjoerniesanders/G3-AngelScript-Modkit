@@ -40,6 +40,13 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 - Datei-Patches auf Quest-Dateien (`demo_patch`); Mod-Archive (`PackMod`) werden geladen und überschreiben vorhandene Dateien
 - Zeichnen über HUD und Inventar: Text (`DrawText`) und Bilder aus den GUI-Daten (`DrawImage`), `WorldToScreen`
 
+**Mod-Pakete für Spieler** ([Mods weitergeben](mod-package.md#mods-weitergeben))
+- Laufzeit als Script-DLL (`scripts\Script_G3ASM_046.dll`) ohne Loader, ohne `g3asm.ini` und ohne `g3asm\`-Ordner: alle Hooks aktiv, gepackte Mods aus
+  `Data\G3ASM.mod`/`.m00` entpackt und geladen, Stringtabellen, Lebensraub, Speichern, sauberes Ende (saubere Steam-Kopie, 2026-11-16)
+- Archive mit dem Namen `G3ASM.*` öffnet das Spiel nicht; Start, Laden und Speichern laufen normal
+- Die Script-DLL startet nach `OnPostInitializeModules`; `main()` der Mods läuft beim ersten Bild. **Datei-Patches kommen auf diesem Weg zu spät**
+  (gemessen: Quest-XP blieb beim Original); Spieldateien gehören in Mod-Pakete als Archiv
+
 **Installationen:** Voraussetzung sind Community Patch 1.75 und Parallel-Universe-Patch. Geprüft: Entwicklerinstallation, eine stark gemoddete und eine saubere Steam-Kopie, siehe `docs/compatibility.md` im Repository.
 
 ## Nicht oder nur teilweise geprüft
@@ -52,6 +59,11 @@ Einzelne Funktionen tragen in der [API-Referenz](api-reference.md) die Vermerke 
 - **KI-Zustände** (`Override_AI`/`OnAI` mit `AI_STATE`, Version 41): Zustand, Callback und KI-Funktion sind im Spiel bestätigt (Zustand nach der Korrektur mit kopiertem Namen, 2026-11-10). Routinen (`AI_ROUTINE`) sind nie ausgelöst worden.
 - **Satztexte:** `GetSpeechText` liefert Dialogzeilen und Befehle des Helden; das Umgebungsgerede (`SVM_..._Smalltalk_NN`) hat keinen gefundenen Text.
 - **Abhängigkeiten in `mod.ini`** (`version`, `api`, `requires`, Version 40): ohne Spiel getestet (Testmods in `tests/mods`), im Spiel noch nicht.
+- **Mod-Pakete mit dem Union Starter:** im Spiel geprüft (2026-11-16, Steam-Kopie mit vielen Starter-Mods und 20 weiteren Script-Plugins wie
+  `Script_CombatFix.dll` und `Script_G3Fixes.dll`): Paket aus `release` installiert, Laufzeit startet als Script-DLL, Mod wird aus `Data\G3ASM.mod`
+  entpackt, Quest aus dem mitgelieferten Archiv, Dialoge und Quest funktionieren. Zwei Mods mit verschiedenen Laufzeit-Versionen sind noch nicht geprüft.
+  Das Spiel erst starten, wenn der Starter die Installation gemeldet hat: Während er die Archive neu einspielt, ist `Data\` unvollständig.
+  Der Starter legt beim Installieren keine neuen Ordner unter `ScriptFiles\` an (nur vorhandene wie `scripts\`); Pakete aus `release` brauchen nur `scripts\`.
 - **Datei-Patches auf `.info`-Dateien:** offen, weil das Spiel Infos aus der kompilierten `Infos.cpt` lädt; ebenso komprimierte Archiveinträge (`Strings.pak`).
 - **`owner` im Gruppenkampf** ist eine Näherung (der aktuelle Gegner des Opfers, nicht zwingend der Schläger).
 - **Attribut `"XP"`** las im Test 0. Quest-XP zahlt das Spiel selbst aus.

@@ -6,8 +6,8 @@ Bauen, Testen und Einbau stehen in der [README](README.md), die Regeln fuer die 
 
 ## Vor jedem Commit
 1. Bauen (32 Bit) und die Testlaeufe aus der README: Selbsttest, `tests\mods`, Kompilierpruefung `examples\mods`
-   (dort ist genau der eine Fehler "Override-Kette ueber mehrere Mods" erwartet), Loader-Test und `tests\file_patches_overlay.py`.
-2. `powershell -NoProfile -File tools\check_no_fninit.ps1 -Dll <Build>\g3asm\g3asm.dll` (siehe Gleitkomma).
+   (dort ist genau der eine Fehler "Override-Kette ueber mehrere Mods" erwartet), Loader-Test, `tests\file_patches_overlay.py`, `tests\packed_mods.py` und `tests\packmod_release.py`.
+2. `powershell -NoProfile -File tools\check_no_fninit.ps1 -Dll <Build>\g3asm\g3asm.dll` und dasselbe fuer `Script_G3ASM_<API>.dll` (siehe Gleitkomma).
 3. `powershell -NoProfile -File tools\run_clang_tidy.ps1 -BuildDir <Build> -Changed -Strict` (siehe Statische Pruefung).
 4. Was das Verhalten im Spiel aendert, im Spiel pruefen und das Protokoll (`g3asm.log`) lesen. Ohne Spieldateien geht nur der Teil mit der
    Ersatz-SharedBase (`tests/sb_stub`).

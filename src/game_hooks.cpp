@@ -690,8 +690,14 @@ bool __fastcall HLoadQuests(void* self, void*) {
     return r;
 }
 bool __fastcall HLoadInfos(void* self, void*) {
+    // LoadInfosFromInis leert nur die Info-Liste, nicht die Namens-Tabelle: eigene Infos vorher austragen, sonst gelten ihre Namen danach als belegt
+    const int forgot = ForgetCreatedInfos(self);
     const bool r = o_loadInfos(self);
-    LogLine("Laden: LoadInfosFromInis fertig -> OnInfosLoaded");
+    {
+        char tb[128];
+        std::snprintf(tb, sizeof tb, "Laden: LoadInfosFromInis fertig (%d eigene Info(s) vorher ausgetragen) -> OnInfosLoaded", forgot);
+        LogLine(tb);
+    }
     SetInfoManagerOverride(self);
     g_host->CallEvent("void OnInfosLoaded()", nullptr, 0);
     SetInfoManagerOverride(nullptr);

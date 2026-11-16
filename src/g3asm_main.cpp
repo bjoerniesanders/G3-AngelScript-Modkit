@@ -31,6 +31,7 @@ namespace {
 
 ScriptHost g_host;
 std::string g_gameDir, g_scriptPath, g_modsDir;
+bool g_scriptIsDefault = true;   // script= nicht oder mit dem Standardwert eingetragen
 bool g_hotReload = true, g_gameHooks = true, g_filePatches = true;
 FILE* g_log = nullptr;
 void (*g_hostLog)(const char*) = nullptr;
@@ -38,6 +39,10 @@ CRITICAL_SECTION g_logLock;
 bool g_logLockInit = false;
 std::atomic<bool> g_initDone{false};
 bool g_mainRan = false;
+}   // namespace
+// Wer das Modkit gestartet hat (Protokollzeile); script_dll.cpp setzt es vor g3asm_start
+const char* g_startOrigin = "Loader (dbghelp.dll)";
+namespace {
 
 // Protokoll. Standard: sofort schreiben. Optional asynchron (ini [g3asm] asynclog=1): Der aufrufende Thread legt die Zeile nur in eine Warteschlange, ein
 // Hintergrund-Thread schreibt g3asm.log und reicht die Zeilen an den Loader (g3asm_loader.log) weiter. Entstanden beim Suchen der verwaschenen Texturen;
@@ -160,7 +165,9 @@ void RunMainOnce() {
     if (g_mainRan) return;
     g_mainRan = true;
     if (g_gameHooks) InstallGameHooks(g_host);
-    g_host.AddScript("main", g_scriptPath);   // Einzelskript (ini script=), falls vorhanden
+    // Einzelskript (ini script=). Fehlt die Datei am Standardort, ist das der Normalfall bei Spielern (nur Mods, Script-DLL ohne ini): dann kein Eintrag
+    // und keine Fehlermeldung. Ein ausdruecklich eingetragener Pfad wird immer angelegt (Meldung, Hot-Reload greift, sobald die Datei entsteht).
+    if (!g_scriptIsDefault || GetFileAttributesA(g_scriptPath.c_str()) != INVALID_FILE_ATTRIBUTES) g_host.AddScript("main", g_scriptPath);
     g_host.SetModsDir(g_modsDir);
     g_host.ScanMods();
     FpuState("vor main");
@@ -452,6 +459,13 @@ extern "C" __declspec(dllexport) int g3asm_init(HMODULE sharedBase, const char* 
     return InitCommon(sharedBase, logDir, hostLog) ? 1 : 0;
 }
 
+// Fuer Tests: gepackte Mods aus <gameDir>\Data\G3ASM.* nach modsDir entpacken; Rueckgabe = Zahl bereiter Mods
+extern "C" __declspec(dllexport) int g3asm_extract_packed(const char* gameDir, const char* modsDir) {
+    std::string g = gameDir ? gameDir : "";
+    if (!g.empty() && g.back() != '\\' && g.back() != '/') g += '\\';
+    return ExtractPackedMods(g, modsDir ? modsDir : "", [](const std::string& s) { Log(s); });
+}
+
 // Fuer Tests: Datei-Patches auf ein Testverzeichnis anwenden
 extern "C" __declspec(dllexport) int g3asm_apply_patches(const char* gameDir, const char* modsDir) {
     return ApplyScriptPatches(gameDir, modsDir, [](const std::string& s) { Log(s); });
@@ -551,6 +565,7 @@ extern "C" __declspec(dllexport) int g3asm_start(HMODULE sharedBase, const char*
                                                      void (*hostLog)(const char*)) {
     if (!InitCommon(sharedBase, gameDir, hostLog)) return 0;
     char script[MAX_PATH] = "g3asm\\scripts\\main.as", modsRel[MAX_PATH] = "g3asm\\mods";
+    bool packedMods = true;
     if (ini && *ini) {
         // Abschnitt [g3asm]; fehlt er, gilt der fruehere Name [patch] (aeltere ini, og3_hooks.ini des Hauptrepos)
         // IniFile: wie GetPrivateProfile*, liest aber auch Dateien mit UTF-8-BOM (ini_file.h)
@@ -573,10 +588,14 @@ extern "C" __declspec(dllexport) int g3asm_start(HMODULE sharedBase, const char*
         SetAiTraceOptions(cfg.Int(sec, "aitrace", 0) != 0, aiFilter, cfg.Int(sec, "aitracemax", 2000));
         SetAniSpeedLog(cfg.Int(sec, "anispeedlog", 0) != 0);
         cfg.Str(sec, "mods", modsRel, modsRel, MAX_PATH);
+        packedMods = cfg.Int(sec, "packedmods", 1) != 0;
     }
     g_modsDir = (modsRel[1] == ':' || modsRel[0] == '\\') ? std::string(modsRel) : g_gameDir + modsRel;
     while (!g_modsDir.empty() && (g_modsDir.back() == '\\' || g_modsDir.back() == '/')) g_modsDir.pop_back();
+    g_scriptIsDefault = _stricmp(script, "g3asm\\scripts\\main.as") == 0;
     g_scriptPath = (script[1] == ':' || script[0] == '\\') ? std::string(script) : g_gameDir + script;
+    Log(std::string("Gestartet ueber: ") + g_startOrigin);
+    if (packedMods) ExtractPackedMods(g_gameDir, g_modsDir, [](const std::string& s) { Log(s); });   // Data\G3ASM.* -> Mod-Ordner
     if (g_filePatches)
         ApplyScriptPatches(g_gameDir, g_modsDir, [](const std::string& s) { Log(s); });   // vor dem ersten Lesen der Daten durch das Spiel
     Log("Skript: " + g_scriptPath + (g_hotReload ? " (Neuladen bei Aenderung an)" : "") + ", Mod-Ordner: " + g_modsDir);

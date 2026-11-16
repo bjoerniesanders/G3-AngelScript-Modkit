@@ -27,6 +27,21 @@ Contributing: house rules (hooks, floating point, style, static analysis with cl
    new version is active after about one second (hot reload).
 4. **Order and switches** in `g3asm\mods\load_order.txt`: `-name` disables a mod, `+name` enables a mod that is off by default (all example mods
    ship that way). A mod's version, dependencies and settings go into its `mod.ini`.
+5. **Share it:** `bin\g3asm\g3asm_packmod.exe release <game folder>\g3asm\mods\my_mod <target folder>` builds a package for players (Union Starter
+   layout, runtime included). Details (German): [sharing mods](docs/modkit/mod-package.md#mods-weitergeben).
+
+## Using mods (for players)
+
+Players do not need the modkit. Every mod package brings the runtime (`Script_G3ASM_<version>.dll`); the game loads it by itself.
+
+- **With the Union Starter:** put the package folder into `<game folder>\MDS\Mods\`, tick it in the Starter, install. Untick and install again to
+  remove the mod.
+- **Without the Starter:** copy `ScriptFiles\scripts\*.dll` to `<game folder>\scripts\` and every file from `ModFiles\` to `<game folder>\Data\` as
+  the next free generation (`G3ASM.m0x` becomes `G3ASM.mod`, for a second mod `G3ASM.m00` and so on; the same for other archives such as
+  `Quests.m0x`).
+
+At startup the runtime unpacks every mod from `Data\G3ASM.*` to `g3asm\mods\<mod>\`. Output and errors go to `g3asm.log` in the game folder.
+Requirements as above: Community Patch 1.75 and Parallel Universe Patch.
 
 What a mod can do:
 - react to game events (kills, items, spells, damage, areas, quest status, saving/loading, spoken lines, keys, every frame);
@@ -53,6 +68,8 @@ Details in [limitations](docs/modkit/limitations.md) (German).
 - Letting the game teach own perks: `LearnSkill` returns `false` for a cloned perk; the mod provides the effect itself.
 - Setting references to other templates as text with `SetProperty` (eleven spellings tried); use `SetTemplateRef`/`SetEntityRef` instead.
 - A general hit hook before the damage calculation: Game.dll exports no entry point for it.
+- File patches (`ScriptPatches`) for players: as a script DLL the runtime starts only after the game has scanned its files. Mod packages therefore
+  ship game files as archives (`ModFiles\<volume>.m0x`); file patches work only with the loader.
 - Loading saves without the mod when they contain permanent state (items from cloned templates, perks): such a save crashed without the mod when
   opening the character sheet. Mods therefore remove that state in `OnBeforeSave` and restore it afterwards (pattern: `perk_lifesteal`).
 
@@ -77,11 +94,12 @@ values only), `GenerateTradeGoods` (goods did not change in tests), `Override_Co
   the cause is unknown. It does not happen on a clean installation.
 - Never triggered in the game: AI routines (`AI_ROUTINE`), divisor 2 in `Override_MonsterDamage` (summoned attackers) and the doubled learning
   costs with "Alternative Balance". Dependencies in `mod.ini` are tested without the game only; file patches on `.info` files are untested.
+- Mod packages through the Union Starter: tested in the game; two mods with different runtime versions are not tested yet.
 
 ## Layout
 | Folder | Content |
 |---|---|
-| `src/` | DLL sources (`g3asm_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`), `src/loader/` (loader = `dbghelp.dll`) |
+| `src/` | DLL sources (`g3asm_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`, `packed_mods`), `script_dll.cpp` (runtime as `Script_G3ASM_<API>.dll`), `src/loader/` (loader = `dbghelp.dll`) |
 | `tests/` | `test_runner.cpp` (g3asm_test), `scripts/selftest.as`, `mods/` (folder test), `sb_stub/` (replacement SharedBase.dll for tests without game files) |
 | `examples/` | example mods (`mods/`) and mini mod (`scripts/main.as`) |
 | `docs/` | `modkit/` (modder documentation), `compatibility.md` (tested installations) |
@@ -90,14 +108,16 @@ values only), `GenerateTradeGoods` (goods did not change in tests), `Override_Co
 
 ## Building (32 bit)
     cmake -S . -B build32 -A Win32
-    cmake --build build32 --config Release --target g3asm g3asm_test g3asm_packmod g3asm_loader g3asm_loader_test g3asm_sb_stub
-Output: `build32/g3asm/` (g3asm.dll, tests, g3asm_packmod) and `build32/loader/dbghelp.dll` (loader).
+    cmake --build build32 --config Release --target g3asm g3asm_script g3asm_test g3asm_packmod g3asm_loader g3asm_loader_test g3asm_sb_stub
+Output: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, tests, g3asm_packmod) and `build32/loader/dbghelp.dll` (loader).
 
 ## Tests
     g3asm_test.exe <SharedBase.dll> tests\scripts\selftest.as
     g3asm_test.exe <SharedBase.dll> tests\mods
     powershell -NoProfile -File tests\run_loader_test.ps1 -SharedBase <SharedBase.dll> -DbghelpOrig <dbghelp_orig.dll>   (loader in a throwaway folder)
     python -I tests\file_patches_overlay.py g3asm_test.exe <SharedBase.dll>   (file patches in a throwaway folder)
+    python -I tests\packed_mods.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (packed mods: unpack, keep up to date, remove)
+    python -I tests\packmod_release.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (build a player package, install, start)
 Without game files: use the replacement `build32\sbstub\SharedBase.dll` (target `g3asm_sb_stub`) as `<SharedBase.dll>` and the system DLL
 `%WINDIR%\SysWOW64\dbghelp.dll` as `<dbghelp_orig.dll>`. The replacement only has the exports the modkit needs for bCString and the math types
 and does not compute bit-exactly like the original; measure the original's behavior only with the real SharedBase.dll.
@@ -105,7 +125,7 @@ and does not compute bit-exactly like the original; measure the original's behav
 ## CI and release (GitHub Actions)
 - `.github/workflows/ci.yml` (every push to `main`, pull requests, manual): builds 32 bit with MSVC, checks that `g3asm.dll` contains no `fninit`
   (`tools/check_no_fninit.ps1`, guards the FPU fix), runs self test, test mods, compile check of the example mods and loader test with the
-  replacement SharedBase, plus `tests/packmod_generations.py` and `tests/file_patches_overlay.py`, and packs a trial zip (artifact, 7 days).
+  replacement SharedBase, plus `tests/packmod_generations.py`, `tests/file_patches_overlay.py`, `tests/packed_mods.py` and `tests/packmod_release.py`, and packs a trial zip (artifact, 7 days).
 - `.github/workflows/release.yml`: on pushing a tag `v*` the same plus a GitHub release with the zip:
       git tag v0.46.1-beta.1
       git push origin v0.46.1-beta.1
