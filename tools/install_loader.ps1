@@ -21,17 +21,16 @@ if (Get-Process -Name Gothic3 -ErrorAction SilentlyContinue) { throw "Gothic3.ex
 function Replace-File([string]$src, [string]$dst) { if (Test-Path $dst) { Remove-Item $dst -Force }; Copy-Item $src $dst }
 function Looks-Like-Proxy([string]$file) {   # Loader und Proxy des Hauptrepos enthalten diese Zeichenketten
     $t = [Text.Encoding]::GetEncoding(1252).GetString([IO.File]::ReadAllBytes($file))
-    return $t.Contains("g3asm.dll") -or $t.Contains("og3_patch.dll") -or $t.Contains("og3_hooks.ini") -or $t.Contains("G3ASM-Loader") -or $t.Contains("OG3-Loader")
+    return $t.Contains("g3asm.dll") -or $t.Contains("og3_hooks.ini") -or $t.Contains("G3ASM-Loader")
 }
-function Is-Loader([string]$file) {   # nur der schlanke Loader dieses Repos, auch unter dem frueheren Namen OG3-Loader (der Proxy des Hauptrepos hat diese Zeichenketten nicht)
+function Is-Loader([string]$file) {   # nur der schlanke Loader dieses Repos (der Proxy des Hauptrepos hat diese Zeichenketten nicht)
     $t = [Text.Encoding]::GetEncoding(1252).GetString([IO.File]::ReadAllBytes($file))
-    return $t.Contains("G3ASM-Loader") -or $t.Contains("OG3-Loader")
+    return $t.Contains("G3ASM-Loader")
 }
 
 if ($Uninstall) {
     # neueste Sicherung, deren dbghelp.dll NICHT der Loader ist (Original oder ein frueherer Proxy des Hauptrepos; ein zweiter Einbau sichert den Loader nicht)
-    # (auch unter og3_backup: so hiess der Sicherungsordner bis API 46, als das Projekt noch OG3-Patch hiess)
-    $last = Get-ChildItem $backupRoot, (Join-Path $Game "og3_backup") -Directory -Filter "loader_*" -ErrorAction SilentlyContinue | Sort-Object Name -Descending |
+    $last = Get-ChildItem $backupRoot -Directory -Filter "loader_*" -ErrorAction SilentlyContinue | Sort-Object Name -Descending |
         Where-Object { (Test-Path (Join-Path $_.FullName "dbghelp.dll")) -and -not (Is-Loader (Join-Path $_.FullName "dbghelp.dll")) } | Select-Object -First 1
     if ($last) {
         Replace-File (Join-Path $last.FullName "dbghelp.dll") $dbg
@@ -39,8 +38,8 @@ if ($Uninstall) {
     } elseif (Test-Path $dbgOrig) {
         Replace-File $dbgOrig $dbg
         "dbghelp.dll aus dbghelp_orig.dll wiederhergestellt (keine Sicherung gefunden)"
-    } else { throw "Weder Sicherung unter $backupRoot (oder og3_backup) noch dbghelp_orig.dll gefunden" }
-    foreach ($f in "g3asm.dll", "g3asm.map", "og3_patch.dll", "og3_patch.map") { $p = Join-Path $Game $f; if (Test-Path $p) { Remove-Item $p -Force } }
+    } else { throw "Weder Sicherung unter $backupRoot noch dbghelp_orig.dll gefunden" }
+    foreach ($f in "g3asm.dll", "g3asm.map") { $p = Join-Path $Game $f; if (Test-Path $p) { Remove-Item $p -Force } }
     "g3asm.dll entfernt (g3asm.ini, g3asm\ und dbghelp_orig.dll bleiben liegen)"
     return
 }
@@ -66,33 +65,6 @@ foreach ($f in $loader, $patchDll) { if (-not (Test-Path $f)) { throw "$f fehlt 
 if (-not (Test-Path $dbg)) { throw "$dbg fehlt - ist das ein Gothic-3-Ordner?" }
 $haveOrig = Test-Path $dbgOrig
 if (-not $haveOrig -and (Looks-Like-Proxy $dbg)) { throw "dbghelp.dll ist schon ein Proxy (Hauptrepo oder frueherer Loader) und dbghelp_orig.dll fehlt - das Original zuerst wiederherstellen" }
-
-# Umzug einer Installation mit den frueheren Namen (bis API 46 hiess das Projekt OG3-Patch): Ordner og3 -> g3asm, og3_backup -> g3asm_backup,
-# og3_patch.ini -> g3asm.ini (Pfade darin angepasst); og3_patch.dll/.map werden entfernt. Nur was es unter dem neuen Namen noch nicht gibt.
-foreach ($pair in @(@("og3", "g3asm"), @("og3_backup", "g3asm_backup"))) {
-    $old = Join-Path $Game $pair[0]; $new = Join-Path $Game $pair[1]
-    if ((Test-Path $old) -and -not (Test-Path $new)) { Rename-Item $old $pair[1]; "Umzug: $($pair[0])\ -> $($pair[1])\" }
-    elseif (Test-Path $old) { "Hinweis: $old bleibt liegen ($new gibt es schon)" }
-}
-$oldIni = Join-Path $Game "og3_patch.ini"
-if ((Test-Path $oldIni) -and -not (Test-Path (Join-Path $Game "g3asm.ini"))) {
-    $t = [IO.File]::ReadAllText($oldIni, [Text.Encoding]::GetEncoding(1252)) -replace '(?i)(=\s*)og3([\\/])', '${1}g3asm${2}'
-    [IO.File]::WriteAllText((Join-Path $Game "g3asm.ini"), $t, [Text.Encoding]::GetEncoding(1252))
-    Rename-Item $oldIni "og3_patch.ini.alt"
-    "Umzug: og3_patch.ini -> g3asm.ini (alte Datei als og3_patch.ini.alt)"
-}
-foreach ($f in "og3_patch.dll", "og3_patch.map") { $p = Join-Path $Game $f; if (Test-Path $p) { Remove-Item $p -Force; "Umzug: $f entfernt" } }
-
-# Der ini-Abschnitt hiess bis API 46 [patch]; die DLL liest ihn noch, wenn [g3asm] fehlt. Hier wird er umbenannt (Inhalt bleibt).
-$iniNow = Join-Path $Game "g3asm.ini"
-if (Test-Path $iniNow) {
-    $enc = [Text.Encoding]::GetEncoding(1252)
-    $t = [IO.File]::ReadAllText($iniNow, $enc)
-    if ($t -match '(?im)^\[patch\]' -and $t -notmatch '(?im)^\[g3asm\]') {
-        [IO.File]::WriteAllText($iniNow, ($t -replace '(?im)^\[patch\]', '[g3asm]'), $enc)
-        "Umzug: Abschnitt [patch] in g3asm.ini heisst jetzt [g3asm]"
-    }
-}
 
 $bk = Join-Path $backupRoot ("loader_" + (Get-Date -Format "yyyyMMdd_HHmmss"))
 New-Item -ItemType Directory -Force $bk | Out-Null

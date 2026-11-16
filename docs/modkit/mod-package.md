@@ -12,8 +12,7 @@ Das Skript
 - prüft die Voraussetzungen und bricht ab, wenn etwas fehlt,
 - legt die `dbghelp.dll` des Spiels als `dbghelp_orig.dll` beiseite und sichert sie nach `<Spiel>\g3asm_backup\loader_<Zeit>\`,
 - kopiert den Loader (als `dbghelp.dll`) und `g3asm.dll` in den Spielordner,
-- legt `g3asm.ini`, `g3asm\scripts\` (mit einer Mini-Mod) und `g3asm\mods\` an,
-- zieht eine ältere Installation mit den früheren Namen (`og3_patch.dll`, `og3_patch.ini`, Ordner `og3\`, ini-Abschnitt `[patch]`) auf die neuen Namen um.
+- legt `g3asm.ini`, `g3asm\scripts\` (mit einer Mini-Mod) und `g3asm\mods\` an.
 
 Rückbau: dasselbe mit `-Uninstall` statt `-BuildDir bin` stellt die originale `dbghelp.dll` wieder her und entfernt `g3asm.dll`. `g3asm.ini` und der Ordner
 `g3asm\` bleiben liegen.
@@ -182,8 +181,6 @@ memlog=0                    ; 1 = alle 30 s freien Speicher und Adressraum proto
 [loader]
 crashlog=1                  ; 0 = der Loader schreibt bei einem Absturz keine Zeile nach g3asm_loader.log
 ```
-
-Der Abschnitt hieß bis Version 46 `[patch]`; eine ini mit dem alten Namen wird weiter gelesen, der Installer benennt ihn um.
 
 ## Protokoll
 

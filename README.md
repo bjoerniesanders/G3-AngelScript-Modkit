@@ -141,9 +141,6 @@ des Spiels funktionieren weiter), stellt den Loader als `dbghelp.dll` hin und ko
 `<Spiel>\g3asm_backup\loader_<Zeit>\`. Protokolle: `g3asm_loader.log` (Loader, Absturzkandidaten) und `g3asm.log` (Modkit). Einstellungen in `g3asm.ini`
 (`[g3asm] enable/script/hotreload/mods`, `[loader] crashlog`).
 
-**Frueherer Name:** Bis API 46 hiess das Projekt OG3-Patch (`og3_patch.dll`, `og3_patch.ini`, Ordner `og3\`, ini-Abschnitt `[patch]`). Der Installer zieht eine solche Installation beim
-Einbau um (Ordner und ini werden umbenannt, die alte DLL entfernt) und findet beim Ausbau auch die alten Sicherungen.
-
 ## Lizenz
 GPL-3.0-or-later, siehe `LICENSE`, mit zwei Zusatzerlaubnissen nach Abschnitt 7 in `LICENSE-EXCEPTIONS.md`: Das Modkit darf mit den Programmdateien
 von Gothic 3 zusammen weitergegeben werden, und Mods, die nur die Skript-Schnittstelle nutzen, duerfen unter jeder Lizenz stehen. Die Beispiel-Mods in

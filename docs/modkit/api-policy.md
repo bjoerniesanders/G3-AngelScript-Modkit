@@ -39,10 +39,6 @@ Mit **Version 46** ist die Skript-Schnittstelle für die Beta eingefroren (2026-
   `aitrace`, `anispeedlog`, `memlog` und ähnliche) und die Mess-Mods unter `examples/mods`.
 - Nach der Beta geht es mit Version 47 weiter; neue Funktionen kommen dann wieder nach der Tabelle oben dazu.
 
-Die Umbenennung des Projekts (vorher OG3-Patch, jetzt G3 AngelScript Modkit) hat an der Skript-Schnittstelle nichts geändert: Dateinamen, Ordner und
-ini-Abschnitt heißen anders, alle Funktionen, Ereignisse und Konstanten sind gleich geblieben. Geändert haben sich nur die automatisch vergebenen
-Text-IDs (`G3ASM_INFO_...`, `G3ASM_QTOPIC_...`, `G3ASM_QDESC_...`, vorher mit `OG3_`); Mods legen sie nicht selbst an und brauchen sie normalerweise nicht.
-
 ## Veraltete Funktionen
 
 1. Die Funktion bekommt in der Referenz den Vermerk **Veraltet** mit dem Ersatz (oder dem Hinweis, dass es noch keinen gibt).
