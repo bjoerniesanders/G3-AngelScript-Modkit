@@ -10,7 +10,7 @@ if one is missing (`-Force` installs anyway, untested); the modkit writes the re
 
 The detailed documentation under `docs/` and all log messages are in German. This page is the English overview.
 
-Contributing: house rules (hooks, floating point, style, static analysis with clang-tidy) are in [CONTRIBUTING.md](CONTRIBUTING.md) (German).
+Contributing (layout, building, tests, CI and release, house rules): [CONTRIBUTING.md](CONTRIBUTING.md) (German).
 
 ## Modding
 
@@ -85,52 +85,6 @@ The full list is in [limitations](docs/modkit/limitations.md) (German).
 
 **Important for mods with lasting changes** (items from cloned templates, skills): such a save crashed without the mod. Mods therefore remove
 them in `OnBeforeSave` and restore them afterwards (pattern: `perk_lifesteal`).
-
-## Layout
-| Folder | Content |
-|---|---|
-| `src/` | DLL sources (`g3asm_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`, `packed_mods`), `script_dll.cpp` (runtime as `Script_G3ASM_<API>.dll`), `src/loader/` (loader = `dbghelp.dll`) |
-| `tests/` | `test_runner.cpp` (g3asm_test), `scripts/selftest.as`, `mods/` (folder test), `sb_stub/` (replacement SharedBase.dll for tests without game files) |
-| `examples/` | example mods (`mods/`) and mini mod (`scripts/main.as`) |
-| `docs/` | `modkit/` (modder documentation), `compatibility.md` (tested installations) |
-| `tools/` | `g3pak_read.py` (read archives, including compressed entries), `reference_from_log.py` (reference from the dump), `install_loader.ps1` (install/uninstall), `package_release.ps1` (release zip), `check_no_fninit.ps1`, `run_clang_tidy.ps1`, `packmod_main.cpp` (`g3asm_packmod`), `graphify_modding_sync.ps1` |
-| (fetched when building) | AngelScript (zlib) and MinHook: `G3ASM_ANGELSCRIPT_DIR` / `G3ASM_MINHOOK_DIR` or automatic download |
-
-## Building (32 bit)
-    cmake -S . -B build32 -A Win32
-    cmake --build build32 --config Release --target g3asm g3asm_script g3asm_test g3asm_packmod g3asm_loader g3asm_loader_test g3asm_sb_stub
-Output: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, tests, g3asm_packmod) and `build32/loader/dbghelp.dll` (loader).
-
-## Tests
-    g3asm_test.exe <SharedBase.dll> tests\scripts\selftest.as
-    g3asm_test.exe <SharedBase.dll> tests\mods
-    powershell -NoProfile -File tests\run_loader_test.ps1 -SharedBase <SharedBase.dll> -DbghelpOrig <dbghelp_orig.dll>   (loader in a throwaway folder)
-    python -I tests\file_patches_overlay.py g3asm_test.exe <SharedBase.dll>   (file patches in a throwaway folder)
-    python -I tests\packed_mods.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (packed mods: unpack, keep up to date, remove)
-    python -I tests\packmod_release.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (build a player package, install, start)
-Without game files: use the replacement `build32\sbstub\SharedBase.dll` (target `g3asm_sb_stub`) as `<SharedBase.dll>` and the system DLL
-`%WINDIR%\SysWOW64\dbghelp.dll` as `<dbghelp_orig.dll>`. The replacement only has the exports the modkit needs for bCString and the math types
-and does not compute bit-exactly like the original; measure the original's behavior only with the real SharedBase.dll.
-
-## CI and release (GitHub Actions)
-- `.github/workflows/ci.yml` (every push to `main`, pull requests, manual): builds 32 bit with MSVC, checks that `g3asm.dll` contains no `fninit`
-  (`tools/check_no_fninit.ps1`, guards the FPU fix), runs self test, test mods, compile check of the example mods and loader test with the
-  replacement SharedBase, plus `tests/packmod_generations.py`, `tests/file_patches_overlay.py`, `tests/packed_mods.py` and `tests/packmod_release.py`, and packs a trial zip (artifact, 7 days).
-- `.github/workflows/release.yml`: on pushing a tag `v*` the same plus a GitHub release with the zip:
-      git tag v0.46.1-beta.1
-      git push origin v0.46.1-beta.1
-  Tags with a hyphen (`-alpha.N`, `-beta.N`) are published as pre-releases; naming scheme in the [versioning rules](docs/modkit/api-policy.md).
-- Local package: `powershell -NoProfile -File tools\package_release.ps1 -BuildDir build32 -Version v0.46.1` (result in `dist\`). Content: loader,
-  `g3asm.dll`, `Script_G3ASM_<API>.dll` (runtime for mod packages), `g3asm_packmod.exe`, `tools\install_loader.ps1`, `tools\g3pak_read.py`, example mods (off by default), documentation, `INSTALL.txt`; no game files.
-- Not in CI: everything that needs the real game (measurements with the original `SharedBase.dll`, game tests). Game files do not belong in the repository.
-
-## Installing the loader
-    powershell -NoProfile -File tools\install_loader.ps1 -Game <game folder> [-BuildDir build32]
-    powershell -NoProfile -File tools\install_loader.ps1 -Game <game folder> -Uninstall
-The installer moves the game's `dbghelp.dll` aside as `dbghelp_orig.dll` (the loader forwards `MiniDumpWriteDump` to it, so the game's crash
-reports keep working), puts the loader in place as `dbghelp.dll` and copies `g3asm.dll`, a `g3asm.ini` and a mini mod. Backup in
-`<game>\g3asm_backup\loader_<time>\`. Logs: `g3asm_loader.log` (loader, crash candidates) and `g3asm.log` (modkit). Settings in `g3asm.ini`
-(`[g3asm] enable/script/hotreload/mods`, `[loader] crashlog`).
 
 ## License
 GPL-3.0-or-later, see `LICENSE`, with two additional permissions under section 7 in `LICENSE-EXCEPTIONS.md`: the modkit may be distributed together
