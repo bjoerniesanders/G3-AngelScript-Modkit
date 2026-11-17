@@ -1,6 +1,6 @@
-// Mess-Mod fuer DumpPropertySchema (ab API 43): schreibt das Schema aller Eigenschaftsklassen bei den ersten beiden Weltaktivierungen
-// (Hauptmenue, dann nach dem Laden eines Spielstands) nach <Spiel>\g3asm\property_schema_1.json und _2.json. Zwei Dateien zeigen, ob spaeter
-// geladene DLLs (Script_*.dll) weitere Klassen anmelden. Dauer ohne Spiel gemessen: etwa 0,1 s je Dump. Keine Taste.
+// Measurement mod for DumpPropertySchema (from API 43): writes the schema of all property classes at the first two world activations
+// (main menu, then after the load of a saved game) to <game>\g3asm\property_schema_1.json and _2.json. Two files show if DLLs that load
+// later (Script_*.dll) register more classes. Duration measured without the game: approximately 0.1 s for each dump. No key.
 int laeufe = 0;
 
 void OnWorldActivate() {

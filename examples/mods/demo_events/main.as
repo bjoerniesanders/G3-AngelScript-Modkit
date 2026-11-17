@@ -1,6 +1,6 @@
-// Beispiel-Mod: zeigt Spielereignisse (Kills, Items, Bereiche, Zauber) als Bildschirmtext und im Protokoll.
-// Installation: Ordner nach <Gothic3>\g3asm\mods\demo_events kopieren. Abschalten: in g3asm\mods\load_order.txt "-demo_events" eintragen.
-// Bildschirmtext nur fuer den Helden (Items, Bereiche, Zauber); alles andere nur im Protokoll.
+// Example mod: shows game events (kills, items, areas, spells) as screen text and in the log.
+// Installation: copy the folder to <Gothic3>\g3asm\mods\demo_events. To turn off: write "-demo_events" in g3asm\mods\load_order.txt.
+// Screen text only for the hero (items, areas, spells). All other events only in the log.
 bool IstHeld(Entity e) { return e.IsValid() && e == GetHero(); }
 
 void OnNPCKilled(Entity opfer) {

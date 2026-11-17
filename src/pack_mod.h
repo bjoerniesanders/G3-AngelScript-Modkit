@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// PackMod: Ordner -> Gothic-3-Archiv (G3V0). Das Ergebnis entspricht dem, was G3PakDir (Union Starter) schreibt, und wird von der Engine wie ein .pak geladen.
-// Mod-Archive tragen die Endungen .mod (.m00, .m01, ...) bzw. .nod (.n00, ...): sie setzen die Reihe der .pak-Dateien fort, werden immer geladen und ueberschreiben
-// alles Normale; ohne Luecke in der Nummerierung (die Engine hoert an der ersten Luecke auf). .nod gilt nur bei aktivem "Alternativen Balancing".
-// Keine Abhaengigkeit von Skript-Host oder Spiel (auch als Kommandozeilenwerkzeug g3asm_packmod).
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// PackMod: folder -> Gothic 3 archive (G3V0). The result is the same as the output of G3PakDir (Union Starter), and the engine loads it as a .pak.
+// Mod archives have the extensions .mod (.m00, .m01, ...) or .nod (.n00, ...): they continue the sequence of the .pak files, the engine always loads them, and they overwrite
+// all normal files. No gap in the numbers (the engine stops at the first gap). .nod applies only when "Alternative Balancing" is active.
+// No dependency on the script host or the game (also used as the command-line tool g3asm_packmod).
 #pragma once
 
 #include <cstdint>
@@ -13,34 +13,34 @@
 namespace g3asm {
 
 struct PackOptions {
-    bool comments = false;   // Quellpfad als Kommentar je Datei speichern (G3PakDir-Standard; verraet lokale Pfade, deshalb hier aus)
-    bool deletions = true;   // "<name>.deleted" -> Eintrag "Datei geloescht" (entfernt die Datei aus der darunterliegenden Schicht)
+    bool comments = false;   // keep the source path as a comment for each file (G3PakDir default; it shows local paths, thus off here)
+    bool deletions = true;   // "<name>.deleted" -> entry "file deleted" (removes the file from the layer below)
 };
 
 struct PackStats {
     int files = 0, dirs = 0, deleted = 0;
     uint64_t bytes = 0;   // Nutzdaten
-    std::string error;    // leer = Erfolg
+    std::string error;    // empty = success
 };
 
-// Ordner (rekursiv) in ein Archiv schreiben. Pfade im Archiv sind relativ zum Ordner, mit '/', Verzeichnisse enden auf '/'.
-// Geschrieben wird zuerst in <outFile>.tmp, dann umbenannt; bei Fehler bleibt eine vorhandene Zieldatei unveraendert.
+// Write a folder (recursive) into an archive. Paths in the archive are relative to the folder, with '/'. Directories end with '/'.
+// The function writes to <outFile>.tmp first, then renames it. If there is an error, an existing target file does not change.
 bool PackFolder(const std::string& srcDir, const std::string& outFile, const PackOptions& opt, PackStats* stats);
 
-// Naechste freie Mod-Datei fuer ein Volume (Archivname ohne Endung, z. B. "Quests"): kind 'm' -> Quests.mod, Quests.m00, ... ; kind 'n' -> Quests.nod, Quests.n00, ...
-// Rueckgabe: voller Pfad in dataDir, leer wenn alle 101 Plaetze belegt sind.
+// Next free mod file for a volume (archive name without extension, for example "Quests"): kind 'm' -> Quests.mod, Quests.m00, ... ; kind 'n' -> Quests.nod, Quests.n00, ...
+// Return value: the full path in dataDir, empty if all 101 places are used.
 std::string NextGenerationFile(const std::string& dataDir, const std::string& volume, char kind);
 
-// Ordner als naechste Mod-Generation von <volume> in <dataDir> ablegen. Rueckgabe: Pfad der neuen Datei, leer bei Fehler (stats->error).
+// Put the folder as the next mod generation of <volume> into <dataDir>. Return value: the path of the new file, empty if there is an error (stats->error).
 std::string PackMod(const std::string& srcDir, const std::string& dataDir, const std::string& volume, char kind, const PackOptions& opt,
                     PackStats* stats);
 
-// Lesen (Pruefung/Werkzeug): Eintraege eines Archivs; Inhalt nur fuer unkomprimierte Eintraege.
+// Read (check and tool): the entries of an archive. Contents only for entries that are not compressed.
 struct ArchiveEntry {
-    std::string name;   // voller Pfad im Archiv ('/' getrennt, Verzeichnisse mit '/' am Ende)
+    std::string name;   // full path in the archive (separated by '/', directories with '/' at the end)
     bool isDir = false, deleted = false, compressed = false;
     uint32_t attrs = 0;
-    uint64_t size = 0;   // ungepackte Groesse
+    uint64_t size = 0;   // size before packing
     uint64_t offset = 0, stored = 0;
     std::string comment;
 };

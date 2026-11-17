@@ -1,30 +1,32 @@
 # Mod-Ordner und Installation
 
+**Deutsch** | [English](../en/modkit/mod-package.md)
+
 ## Installation
 
-Voraussetzung: Gothic 3 mit Community Patch 1.75 und Parallel-Universe-Patch. Gothic 3 muss beendet sein. Im entpackten Release-Ordner:
+Bevor du anfängst: Gothic 3 braucht den Community Patch 1.75 und den Parallel-Universe-Patch. Beende Gothic 3. Gib im entpackten Release-Ordner ein:
 
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\install_loader.ps1 -Game "<Spielordner>" -BuildDir bin
 ```
 
-Das Skript
-- prüft die Voraussetzungen und bricht ab, wenn etwas fehlt,
-- legt die `dbghelp.dll` des Spiels als `dbghelp_orig.dll` beiseite und sichert sie nach `<Spiel>\g3asm_backup\loader_<Zeit>\`,
-- kopiert den Loader (als `dbghelp.dll`) und `g3asm.dll` in den Spielordner,
-- legt `g3asm.ini`, `g3asm\scripts\` (mit einer Mini-Mod) und `g3asm\mods\` an.
+Das Skript macht diese Schritte:
+- Es prüft die Voraussetzungen. Fehlt etwas, bricht es ab.
+- Es benennt die `dbghelp.dll` des Spiels in `dbghelp_orig.dll` um. Außerdem sichert es sie nach `<Spiel>\g3asm_backup\loader_<Zeit>\`.
+- Es kopiert den Loader (als `dbghelp.dll`) und `g3asm.dll` in den Spielordner.
+- Es legt `g3asm.ini`, `g3asm\scripts\` (mit einer Mini-Mod) und `g3asm\mods\` an.
 
-Rückbau: dasselbe mit `-Uninstall` statt `-BuildDir bin` stellt die originale `dbghelp.dll` wieder her und entfernt `g3asm.dll`. `g3asm.ini` und der Ordner
-`g3asm\` bleiben liegen.
+Ausbauen: Nimm denselben Befehl mit `-Uninstall` statt `-BuildDir bin`. Das stellt die originale `dbghelp.dll` wieder her und entfernt `g3asm.dll`.
+`g3asm.ini` und der Ordner `g3asm\` bleiben liegen.
 
-Änderungen an `g3asm.dll` (C++) brauchen einen Neustart des Spiels. Änderungen an Skripten nicht (Hot-Reload).
+Änderst du `g3asm.dll` (C++), starte das Spiel neu. Für Änderungen an Skripten ist das nicht nötig (Hot-Reload).
 
-Der Loader ist der Weg für Modder. Spieler installieren nur Mod-Pakete, siehe [Mods weitergeben](#mods-weitergeben).
+Der Loader ist für Modder. Spieler installieren nur Mod-Pakete. Siehe [Mods weitergeben](#mods-weitergeben).
 
 ## Mods weitergeben
 
-Spieler sollen nicht das Modkit installieren müssen. `g3asm_packmod release` macht aus einem Mod-Ordner ein Paket im Aufbau des Union Starters,
-das die Laufzeit mitbringt:
+Spieler sollen das Modkit nicht installieren müssen. `g3asm_packmod release` macht aus einem Mod-Ordner ein Paket. Das Paket hat den Aufbau des Union
+Starters und bringt die Laufzeit mit:
 
 ```
 bin\g3asm\g3asm_packmod.exe release <Spielordner>\g3asm\mods\meine_mod <Zielordner>
@@ -39,31 +41,32 @@ bin\g3asm\g3asm_packmod.exe release <Spielordner>\g3asm\mods\meine_mod <Zielordn
   G3ASM-LICENSE.txt                    Lizenz der Laufzeit und Adresse ihres Quellcodes
 ```
 
-- **Nicht im Skript-Archiv:** `ModFiles\*.m0x`/`*.n0x` (eigene Spieldaten-Archive, die liegen daneben), `Source\` (Quellen dieser Archive),
-  `ScriptPatches\` (siehe unten) und alles, was mit einem Punkt beginnt (`.git`). `release` nennt jede ausgelassene Datei.
-- **`enabled=0`** in der `mod.ini` steht im Paket als `enabled=1`: Spieler haben kein `load_order.txt`.
-- **Laufzeit:** die `Script_G3ASM_<n>.dll` mit der höchsten Nummer neben `g3asm_packmod.exe` (im Release-Zip `bin\g3asm\`), oder ausdrücklich
-  mit `--runtime <Datei>`. Die Nummer ist die Skript-Schnittstelle.
-- Ein vorhandener Zielordner wird nicht überschrieben.
-- **Lizenz:** Deine Mod darf unter jeder Lizenz stehen (`LICENSE-EXCEPTIONS.md`). Die mitgelieferte Laufzeit steht aber unter der GPL: Wer ein
-  Paket weitergibt, gibt auch sie weiter und muss sagen, wo ihr Quellcode liegt. Das erledigt `G3ASM-LICENSE.txt`; lass die Datei im Paket.
+- **Nicht im Skript-Archiv:** `ModFiles\*.m0x` und `*.n0x` (eigene Spieldaten-Archive, die liegen daneben), `Source\` (Quellen dieser Archive),
+  `ScriptPatches\` (siehe unten) und alles, was mit einem Punkt beginnt (`.git`). `release` nennt jede Datei, die es auslässt.
+- **`enabled=0`** in der `mod.ini` wird im Paket zu `enabled=1`, weil Spieler kein `load_order.txt` haben.
+- **Laufzeit:** die `Script_G3ASM_<n>.dll` mit der höchsten Nummer neben `g3asm_packmod.exe` (im Release-Zip `bin\g3asm\`). Du kannst sie auch
+  ausdrücklich mit `--runtime <Datei>` angeben. Die Nummer ist die Skript-Schnittstelle.
+- `release` überschreibt keinen vorhandenen Zielordner.
+- **Lizenz:** Deine Mod darf unter jeder Lizenz stehen (`LICENSE-EXCEPTIONS.md`). Die mitgelieferte Laufzeit steht aber unter der GPL. Gibst du ein
+  Paket weiter, gibst du auch die Laufzeit weiter und musst sagen, wo ihr Quellcode liegt. Das erledigt `G3ASM-LICENSE.txt`. Lass die Datei im Paket.
   Nimm die Laufzeit aus einem veröffentlichten Release, denn auf dessen Quellcode verweist die Datei.
 
-**Beim Spieler** legt der Union Starter `ScriptFiles\*` in den Spielordner und jede `ModFiles\<Name>.m0x` als nächste freie Generation nach
+**Beim Spieler** legt der Union Starter `ScriptFiles\*` in den Spielordner. Jede `ModFiles\<Name>.m0x` legt er als nächste freie Generation nach
 `Data\` (`G3ASM.mod`, `G3ASM.m00`, ...). Ohne Starter geht dasselbe von Hand oder mit `g3asm_packmod copy <Datei> <Spielordner> <Name>`.
 
 **Beim Start** des Spiels:
 - Das Spiel lädt `scripts\Script_G3ASM_<n>.dll`. Liegen mehrere davon nebeneinander (Mods mit verschiedenen Laufzeiten), startet nur die mit der
-  höchsten Nummer. Läuft das Modkit schon über den Loader, tut die Script-DLL nichts. `g3asm.ini` braucht sie nicht; gibt es eine, gilt sie
-  (auch `enable=0`).
+  höchsten Nummer. Läuft das Modkit schon über den Loader, tut die Script-DLL nichts. Die Script-DLL braucht keine `g3asm.ini`. Gibt es eine, gilt
+  sie (auch `enable=0`).
 - Die Laufzeit entpackt jede Mod aus `Data\G3ASM.*` nach `g3asm\mods\<Mod>\` und legt dort die Markierung `.g3asm_packed` ab. Danach lädt die Mod
-  wie ein loser Ordner. Ändert sich das Archiv, wird neu entpackt. Steht die Mod in keinem Archiv mehr (im Starter abgewählt), werden ihre
-  entpackten Dateien wieder entfernt; Dateien, die nicht aus dem Archiv stammen, bleiben.
-- Ein Ordner **ohne** Markierung (eine lose Mod, etwa beim Entwickeln) wird nie überschrieben und gewinnt gegen die gepackte Fassung gleichen Namens.
-- Steht dieselbe Mod in zwei Archiven, gilt die aus dem früheren (`.mod` vor `.m00` vor `.m01`); das Protokoll meldet das.
-- Das Spiel selbst öffnet `Data\G3ASM.*` nicht (unbekannter Archivname).
+  wie ein loser Ordner. Ändert sich das Archiv, entpackt die Laufzeit neu. Steht die Mod in keinem Archiv mehr (der Spieler hat sie im Starter
+  abgewählt), entfernt die Laufzeit ihre entpackten Dateien. Dateien, die nicht aus dem Archiv stammen, bleiben.
+- Einen Ordner **ohne** Markierung (eine lose Mod, etwa beim Entwickeln) überschreibt die Laufzeit nie. Er gewinnt gegen die gepackte Fassung mit
+  gleichem Namen.
+- Steht dieselbe Mod in zwei Archiven, gilt die aus dem früheren (`.mod` vor `.m00` vor `.m01`). Das Protokoll meldet das.
+- Das Spiel selbst öffnet `Data\G3ASM.*` nicht, weil es den Archivnamen nicht kennt.
 
-**Datei-Patches** (`ScriptPatches`) wirken bei Spielern nicht: Die Script-DLL startet erst, nachdem das Spiel seine Dateien erfasst hat. Neue oder
+**Datei-Patches** (`ScriptPatches`) wirken bei Spielern nicht. Die Script-DLL startet erst, nachdem das Spiel seine Dateiliste gelesen hat. Neue oder
 geänderte Spieldateien gehören deshalb als Archiv in `meine_mod\ModFiles\` (siehe [Mod-Archive](archives.md)).
 
 ## Aufbau
@@ -86,11 +89,11 @@ geänderte Spieldateien gehören deshalb als Archiv in `meine_mod\ModFiles\` (si
       meine_mod\ScriptPatches\  optional: *.patch (Unified Diff auf Spieldateien, siehe Datei-Patches)
 ```
 
-Jeder Ordner unter `g3asm\mods\`, der eine `main.as`, einen Ordner `ScriptPatches` oder eine `stringtable.ini` (siehe unten) enthält, ist eine Mod. Der Ordnername ist der Modname und steht im Protokoll in eckigen Klammern (`[meine_mod] ...`).
-Der Name `main` ist für das Einzelskript reserviert.
+Jeder Ordner unter `g3asm\mods\`, der eine `main.as`, einen Ordner `ScriptPatches` oder eine `stringtable.ini` (siehe unten) enthält, ist eine Mod.
+Der Ordnername ist der Modname. Das Protokoll zeigt ihn in eckigen Klammern (`[meine_mod] ...`). Der Name `main` ist für das Einzelskript reserviert.
 
-Jede Mod ist ein **eigenes AngelScript-Modul**: globale Variablen und Funktionen sind von anderen Mods getrennt, Namen können doppelt vorkommen.
-`#include "datei.as"` funktioniert relativ zur Datei, die es einbindet. So kannst du eine Mod auf mehrere Dateien verteilen.
+Jede Mod ist ein **eigenes AngelScript-Modul**. Ihre globalen Variablen und Funktionen sind von anderen Mods getrennt. Dieselben Namen dürfen in
+mehreren Mods vorkommen. `#include "datei.as"` funktioniert relativ zur Datei, die es einbindet. So kannst du eine Mod auf mehrere Dateien verteilen.
 
 ## Ladereihenfolge: `load_order.txt`
 
@@ -102,13 +105,15 @@ meine_mod
 +demo_lifesteal      # Pluszeichen schaltet eine standardmaessig abgeschaltete Mod zu
 ```
 
-- Je Zeile ein Modname. Die genannten Mods laden in dieser Reihenfolge.
+- Schreibe je Zeile einen Modnamen. Die genannten Mods laden in dieser Reihenfolge.
 - Nicht genannte Mods folgen alphabetisch.
-- `-Name` schaltet die Mod ab (sie wird nicht geladen, bzw. im laufenden Spiel entladen).
-- Eine Mod mit `mod.ini` und `[mod] enabled=0` im eigenen Ordner ist **standardmäßig aus** (so sind alle Beispiel-Mods ausgeliefert). Sie lädt nur, wenn `+Name` in `load_order.txt` steht; `+Name` legt zugleich ihre Stelle in der Reihenfolge fest. Mods ohne `mod.ini` laden wie bisher.
+- `-Name` schaltet die Mod ab. Sie lädt nicht, oder sie wird im laufenden Spiel entladen.
+- Eine Mod mit `[mod] enabled=0` in der `mod.ini` im eigenen Ordner ist **standardmäßig aus**. So sind alle Beispiel-Mods ausgeliefert. Sie lädt nur,
+  wenn `+Name` in `load_order.txt` steht. `+Name` legt zugleich ihre Stelle in der Reihenfolge fest. Mods ohne `mod.ini` laden wie bisher.
 - Das Einzelskript `main` läuft immer zuerst.
 - Jedes Ereignis geht der Reihe nach an alle Mods.
-- Braucht eine Mod eine andere (`requires` in `mod.ini`, siehe unten), lädt die benötigte zuerst, auch wenn `load_order.txt` es anders sagt. Das Protokoll nennt jede solche Umstellung.
+- Braucht eine Mod eine andere (`requires` in `mod.ini`, siehe unten), lädt die benötigte zuerst, auch wenn `load_order.txt` es anders sagt. Das
+  Protokoll nennt jede solche Umstellung.
 
 ## Version und Abhängigkeiten: `mod.ini` (ab Version 40)
 
@@ -122,8 +127,8 @@ title=Meine Mod                        ; nur für release: Name im Union Starter
 category=Kampf                         ; nur für release: Kategorie im Union Starter (Standard: G3ASM)
 ```
 
-Alle Einträge sind freiwillig. Eine Mod, deren Bedingungen nicht erfüllt sind, **wird nicht geladen**: weder ihr Skript noch ihre Datei-Patches oder ihre
-Stringtabelle. Das Protokoll nennt den Grund einmal, zum Beispiel:
+Alle Einträge sind freiwillig. Sind die Bedingungen einer Mod nicht erfüllt, **lädt das Modkit die Mod nicht**: weder ihr Skript noch ihre
+Datei-Patches noch ihre Stringtabelle. Das Protokoll nennt den Grund einmal, zum Beispiel:
 
 ```
 [meine_mod] wird nicht geladen: braucht die Mod 'basis_mod' ab Version 1.1, vorhanden ist Version 1.0
@@ -131,19 +136,21 @@ Stringtabelle. Das Protokoll nennt den Grund einmal, zum Beispiel:
 [meine_mod] wird nicht geladen: braucht Skript-Schnittstelle 41, vorhanden ist 40 (G3ASM aktualisieren)
 ```
 
-- Fehlt eine benötigte Mod, ist sie abgeschaltet oder wird sie selbst nicht geladen, wird auch die Mod nicht geladen, die sie braucht.
-- Versionen werden Teil für Teil als Zahlen verglichen: `1.10` ist neuer als `1.9`, `1.2` gleich `1.2.0`. Text hinter einer Zahl zählt nicht (`1.0-beta` = `1.0`).
-  Hat die benötigte Mod keine `version`, erfüllt sie keine Mindestversion.
-- `api` ersetzt die Prüfung mit `GetApiVersion()` im Skript: Fehlt eine Funktion, scheitert sonst schon das Übersetzen, und der Spieler sieht nur einen
+- Fehlt eine benötigte Mod, ist sie abgeschaltet oder lädt sie selbst nicht, lädt auch die Mod nicht, die sie braucht.
+- Das Modkit vergleicht Versionen Teil für Teil als Zahlen. `1.10` ist neuer als `1.9`. `1.2` ist gleich `1.2.0`. Text hinter einer Zahl zählt nicht
+  (`1.0-beta` = `1.0`). Hat die benötigte Mod keine `version`, erfüllt sie keine Mindestversion.
+- `api` ersetzt die Prüfung mit `GetApiVersion()` im Skript. Fehlt eine Funktion, scheitert sonst schon das Übersetzen, und der Spieler sieht nur einen
   Übersetzungsfehler. Mit `api` sieht er, dass das Modkit zu alt ist. Fassungen vor Version 40 kennen `api` und `requires` nicht und ignorieren sie.
-- Brauchen sich zwei Mods gegenseitig, meldet das Protokoll den Kreis; beide laden in der Reihenfolge von `load_order.txt`.
-- Kodierung: `mod.ini`, `load_order.txt` und `g3asm.ini` dürfen ANSI oder UTF-8 sein, mit oder ohne BOM (Editor-Einstellung „UTF-8 mit BOM“, PowerShell 5 `-Encoding utf8`). Bei `g3asm.ini` mit BOM vermerkt das Protokoll einen Hinweis.
+- Brauchen sich zwei Mods gegenseitig, meldet das Protokoll den Kreis. Beide laden in der Reihenfolge von `load_order.txt`.
+- Kodierung: `mod.ini`, `load_order.txt` und `g3asm.ini` dürfen ANSI oder UTF-8 sein, mit oder ohne BOM (Editor-Einstellung „UTF-8 mit BOM“,
+  PowerShell 5 `-Encoding utf8`). Bei `g3asm.ini` mit BOM vermerkt das Protokoll einen Hinweis.
 - Ändert sich `mod.ini` oder `load_order.txt` im laufenden Spiel, gilt das beim nächsten Scan (einmal je Sekunde, mit `hotreload=1`).
-- Im Skript: `IsModActive("name")` und `GetModVersion("name")` für optionale Zusammenarbeit mit anderen Mods, siehe [API-Referenz](api-reference.md).
+- Im Skript: `IsModActive("name")` und `GetModVersion("name")` für optionale Zusammenarbeit mit anderen Mods. Siehe
+  [API-Referenz](api-reference.md).
 
 ## Einstellungen einer Mod: `[settings]` (ab Version 44)
 
-Vorgaben stehen in der `mod.ini` der Mod, Abschnitt `[settings]`:
+Die Vorgaben stehen in der `mod.ini` der Mod, im Abschnitt `[settings]`:
 
 ```
 [mod]
@@ -155,9 +162,10 @@ Faktor=2.5
 Anzeige=ja
 ```
 
-Das Skript liest sie mit `GetModSetting("Faktor")`, `GetModSettingFloat(...)` usw. und kann eigene Werte mit `SetModSetting` speichern. Die landen in
-`<Spiel>\g3asm\settings\<Mod>.ini`, nie in der `mod.ini`; ein Update der Mod behält sie also. Wer eine Einstellung von Hand ändert, trägt sie dort ein
-(Abschnitt `[settings]`); sie gilt nach dem Neuladen der Mod (Hot-Reload) oder einem Neustart. Jede Mod sieht nur ihre eigenen Werte.
+Das Skript liest sie mit `GetModSetting("Faktor")`, `GetModSettingFloat(...)` und ähnlichen Funktionen. Mit `SetModSetting` kann es eigene Werte
+speichern. Die landen in `<Spiel>\g3asm\settings\<Mod>.ini`, nie in der `mod.ini`. Ein Update der Mod behält sie also. Willst du eine Einstellung von
+Hand ändern, trage sie dort ein (Abschnitt `[settings]`). Sie gilt nach dem Neuladen der Mod (Hot-Reload) oder einem Neustart. Jede Mod sieht nur ihre
+eigenen Werte.
 
 ## Einstellungen: `g3asm.ini`
 
@@ -188,42 +196,44 @@ crashlog=1                  ; 0 = der Loader schreibt bei einem Absturz keine Ze
 
 ## Protokoll
 
-`<Spiel>\g3asm.log`, während des Spiels lesbar. Es enthält:
+`<Spiel>\g3asm.log`. Du kannst es während des Spiels lesen. Es enthält:
 
-- die Ausgaben deiner `print()`-Aufrufe mit `[Modname]` davor,
-- Übersetzungsfehler mit Datei, Zeile und Spalte (die Mod wird dann nicht geladen),
-- Laufzeitfehler (Funktion und Zeile), zum Beispiel Division durch 0,
+- Die Ausgaben deiner `print()`-Aufrufe, mit `[Modname]` davor.
+- Übersetzungsfehler mit Datei, Zeile und Spalte. Das Modkit lädt die Mod dann nicht.
+- Laufzeitfehler (Funktion und Zeile), zum Beispiel eine Division durch 0.
 - Hinweise des Modkits (`Spielereignisse: 8 von 8 Hooks aktiv`, `Skript geladen: ...`).
 
 ## Hot-Reload
 
-Speicherst du `main.as` (oder legst einen neuen Mod-Ordner an), erkennt das Modkit das innerhalb einer Sekunde:
+Speicherst du `main.as` (oder legst einen neuen Mod-Ordner an), erkennt das Modkit das innerhalb von 1 Sekunde:
 
 1. Beim Neuladen einer Mod läuft ihr `OnShutdown()`.
-2. Das neue Skript wird übersetzt. Bei Fehlern bleibt die Mod entladen, bis du die Datei wieder änderst.
+2. Das Modkit übersetzt das neue Skript. Bei Fehlern bleibt die Mod entladen, bis du die Datei wieder änderst.
 3. Danach läuft `main()` erneut.
 
-Ordner entfernen oder `-Name` eintragen entlädt die Mod (mit `OnShutdown()`).
+Entfernst du den Ordner oder trägst `-Name` ein, entlädt das Modkit die Mod (mit `OnShutdown()`).
 
 ## Fehlerisolation
 
 Ein Fehler in einer Mod (Syntaxfehler, Laufzeitfehler, Endlosschleife) beeinträchtigt die anderen Mods und das Spiel nicht.
-Ein Aufruf, der länger als **5 Sekunden** läuft, wird abgebrochen.
+Einen Aufruf, der länger als **5 Sekunden** läuft, bricht das Modkit ab.
 
 ## Eigene Texte: `stringtable.ini`
 
-Eine Mod kann Texte des Spiels (Itemnamen, Beschreibungen, Quest- und Dialogtexte) mit einer eigenen Stringtabelle überschreiben oder ergänzen. Datei: `<Mod>\stringtable.ini` oder, wie beim Union Starter, `<Mod>\ModFiles\stringtable.ini` (liegen beide da, gilt die im Mod-Ordner).
-Die Mod braucht dafür kein Skript. Eigene Dateien des Spiels (Quests, Vorlagen, ...) packt [PackMod](archives.md) in ein Mod-Archiv.
+Eine Mod kann Texte des Spiels (Itemnamen, Beschreibungen, Quest- und Dialogtexte) mit einer eigenen Stringtabelle überschreiben oder ergänzen. Datei:
+`<Mod>\stringtable.ini` oder, wie beim Union Starter, `<Mod>\ModFiles\stringtable.ini`. Liegen beide da, gilt die im Mod-Ordner. Die Mod braucht dafür
+kein Skript. Eigene Dateien des Spiels (Quests, Vorlagen, ...) packt [PackMod](archives.md) in ein Mod-Archiv.
 
 ```
 Languages=English;Italian;French;German;Spanish;Czech;Hungarian;Polish;Russian;TRC
 FO_It_Wolf_Fur=Wolf skin (Mod);;Pelle di lupo (Mod);;Peau de loup (Mod);;Wolfsfell (Mod);;...
 ```
 
-- Format wie die `stringtable.ini` des Spiels: `Schlüssel=Text;;Text;;...`. Mit der Zeile `Languages=` sind die Spalten in dieser Reihenfolge; genommen wird die Spalte der aktuellen
-  Spielsprache, bei leerem oder fehlendem Eintrag die erste. Ohne `Languages=` gilt der ganze Wert als ein Text.
-- Schlüssel: `FO_<Vorlage>` (Itemname), `ITEMDESC_<Vorlage>` (Beschreibung); weitere Schlüssel stehen in `Strings.pak\stringtable.ini`.
+- Das Format ist wie die `stringtable.ini` des Spiels: `Schlüssel=Text;;Text;;...`. Mit der Zeile `Languages=` stehen die Spalten in dieser
+  Reihenfolge. Das Modkit nimmt die Spalte der aktuellen Spielsprache. Ist dieser Eintrag leer oder fehlt er, nimmt es die erste Spalte. Ohne
+  `Languages=` gilt der ganze Wert als ein Text.
+- Schlüssel: `FO_<Vorlage>` (Itemname), `ITEMDESC_<Vorlage>` (Beschreibung). Weitere Schlüssel stehen in `Strings.pak\stringtable.ini`.
 - Kodierung: UTF-16 (mit BOM), UTF-8 (mit BOM) oder ANSI (cp1252). Kommentarzeilen beginnen mit `;`, `#` oder `[`.
-- Spätere Mods überschreiben frühere. Das Skript-Gegenstück ist `RegisterText(id, text)`.
-- Änderungen an der Datei wirken per Hot-Reload nach etwa einer Sekunde; das Protokoll zeigt `Stringtabellen angewendet: N Eintraege, Sprache ...`.
+- Spätere Mods überschreiben frühere. Das Gegenstück im Skript ist `RegisterText(id, text)`.
+- Änderungen an der Datei wirken nach etwa 1 Sekunde (Hot-Reload). Das Protokoll zeigt `Stringtabellen angewendet: N Eintraege, Sprache ...`.
 - Beispiel: `examples/mods/demo_text`.

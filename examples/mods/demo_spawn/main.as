@@ -1,19 +1,19 @@
-// NPCs erzeugen und entfernen.
-//   Numblock +      sucht Vorlagen mit dem Suchtext im Namen (Liste im Protokoll)
-//   Numblock ,      erzeugt den ersten Treffer dort, wo das Fadenkreuz hinzeigt (PickCenter), sonst 2 m neben dem Helden, und dreht ihn zum Helden
-//   Numblock -      entfernt den zuletzt erzeugten NPC
-//   Numblock *      entfernt alle in dieser Sitzung erzeugten NPCs
-//   Numblock /      entfernt ALLE per SpawnNPC erzeugten Entities mit dem Suchtext im Namen, auch solche aus frueheren Sitzungen (nach dem Laden
-//                   eines Spielstands); Welt-NPCs bleiben (DestroyNPC lehnt Entities ausserhalb des Systemsektors ab)
-// Schaut der NPC vom Helden weg, BLICK_VERSATZ auf 180 setzen. Protokoll: g3asm.log.
+// Make and remove NPCs.
+//   Numeric keypad +      searches templates with the search text in the name (list in the log)
+//   Numeric keypad ,      makes the first result at the point of the crosshair (PickCenter), if there is none 2 m next to the hero, and turns it to the hero
+//   Numeric keypad -      removes the last NPC that the mod made
+//   Numeric keypad *      removes all NPCs that the mod made in this session
+//   Numeric keypad /      removes ALL entities that SpawnNPC made with the search text in the name, also from previous sessions (after the load
+//                         of a saved game). World NPCs stay (DestroyNPC refuses entities outside of the system sector)
+// If the NPC looks away from the hero, set BLICK_VERSATZ to 180. Log: g3asm.log.
 const bCString SUCHE = "Diego";
 const float BLICK_VERSATZ = 0;
 array<Entity> erzeugt;
 
-void OnWorldDeactivate() { erzeugt.resize(0); }   // Entities nicht ueber Weltwechsel aufbewahren
+void OnWorldDeactivate() { erzeugt.resize(0); }   // do not keep entities across a world change
 
 void OnKey(int vk, bool down) {
-    if (IsKeyDown(0x11) || IsKeyDown(0x10)) return;   // mit Strg oder Umschalt gehoeren die Ziffernblock-Tasten anderen Mods (probe_lightning, probe_script, probe_events, probe_time, ...)
+    if (IsKeyDown(0x11) || IsKeyDown(0x10)) return;   // with Ctrl or Shift, the numeric keypad keys belong to other mods (probe_lightning, probe_script, probe_events, probe_time, ...)
     if (!down) return;
     if (vk == 0x6B) {
         bCString namen = FindTemplateNames(SUCHE, 30);
@@ -24,8 +24,8 @@ void OnKey(int vk, bool down) {
         if (namen == "") { PrintScreen("Keine Vorlage mit '" + SUCHE + "'", 4, 255, 120, 120); return; }
         Entity held = GetHero();
         bCVector p = held.GetPosition();
-        p.x += 200 + 60 * erzeugt.length();   // Rueckfall: jeder weitere ein Stueck weiter rechts
-        PickCenter();                          // Strahl durch die Bildmitte, der Held wird ausgeschlossen
+        p.x += 200 + 60 * erzeugt.length();   // fallback: each next one a little more to the right
+        PickCenter();                          // ray through the center of the screen, the hero is excluded
         if (HasPickPoint()) p = GetPickPoint();
         Entity npc = SpawnNPC(namen, p);
         if (npc.IsValid()) {
@@ -43,7 +43,7 @@ void OnKey(int vk, bool down) {
         PrintScreen("Entfernt: " + ok + ", uebrig " + erzeugt.length(), 3, 180, 255, 180);
     } else if (vk == 0x6F) {
         int n = CountEntities(SUCHE), weg = 0, behalten = 0;
-        for (int i = n - 1; i >= 0; i--) {   // rueckwaerts: nach dem Entfernen rutschen die Indizes
+        for (int i = n - 1; i >= 0; i--) {   // backward: after a removal, the indexes move
             Entity e = GetEntityByPart(SUCHE, i);
             if (e.IsValid() && IsDynamicSpawn(e)) { if (DestroyNPC(e)) weg++; } else behalten++;
         }

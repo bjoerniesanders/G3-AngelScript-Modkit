@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Gepackte Mods: Spieler bekommen eine Mod als Archiv <Spiel>\Data\G3ASM.mod, .m00, .m01, ... (Union Starter: ModFiles\G3ASM.m0x). Das Spiel selbst
-// oeffnet diese Archive nie (unbekannter Name, gemessen 2026-11-16). Beim Start entpackt das Modkit jede Mod darin nach <Mods>\<Mod>\ und legt dort die
-// Markierung .g3asm_packed ab (Quellarchiv, Dateiliste). Danach laedt die Mod wie ein loser Ordner (main.as, #include, mod.ini, stringtable.ini, load_order.txt).
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// Packed mods: players get a mod as the archive <game>\Data\G3ASM.mod, .m00, .m01, ... (Union Starter: ModFiles\G3ASM.m0x). The game itself
+// never opens these archives (unknown name, measured 2026-11-16). At the start, the modkit unpacks each mod in them to <mods>\<mod>\ and puts the
+// marker .g3asm_packed there (source archive, file list). Then the mod loads as a loose folder (main.as, #include, mod.ini, stringtable.ini, load_order.txt).
 //
-// Aufbau eines Archivs: oberste Ebene = ein Ordner je Mod (<Mod>/main.as, <Mod>/mod.ini, ...). Dateien direkt auf oberster Ebene werden ignoriert.
-// Regeln:
-//   - Ein Ordner OHNE Markierung (lose Mod, Entwicklung) wird nie angefasst und gewinnt gegen die gepackte Fassung gleichen Namens.
-//   - Ein markierter Ordner wird neu entpackt, wenn sich Quellarchiv (Name, Groesse, Zeit) geaendert hat, sonst bleibt er.
-//   - Ein markierter Ordner, dessen Mod in keinem Archiv mehr steckt (im Starter abgewaehlt), wird entfernt: nur die gelisteten Dateien, dann leere Ordner.
-//   - Steht dieselbe Mod in zwei Archiven, gilt das erste (.mod vor .m00 vor .m01 ...).
+// Layout of an archive: top level = one folder for each mod (<mod>/main.as, <mod>/mod.ini, ...). Files directly on the top level are ignored.
+// Rules:
+//   - The modkit never touches a folder WITHOUT a marker (loose mod, development). It has priority over the packed version with the same name.
+//   - The modkit unpacks a marked folder again if the source archive (name, size, time) changed. If not, the folder stays.
+//   - The modkit removes a marked folder whose mod is not in an archive anymore (cleared in the Starter): only the listed files, then empty folders.
+//   - If the same mod is in two archives, the first one applies (.mod before .m00 before .m01 ...).
 #include <windows.h>
 
 #include <cstdint>
@@ -48,14 +48,14 @@ bool IsFile(const std::string& p) {
     const DWORD a = GetFileAttributesA(p.c_str());
     return a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY);
 }
-// Legt alle fehlenden Ordner eines Pfads an (ohne Dateinamen)
+// makes all missing folders of a path (without the file name)
 bool MakeDirs(const std::string& dir) {
     if (dir.empty() || IsDir(dir)) return true;
     const size_t s = dir.find_last_of('\\');
     if (s != std::string::npos && s > 2 && !MakeDirs(dir.substr(0, s))) return false;
     return CreateDirectoryA(dir.c_str(), nullptr) || GetLastError() == ERROR_ALREADY_EXISTS;
 }
-// Ein Teil eines Pfads im Archiv: kein leerer Teil, kein "." / "..", keine Laufwerks- oder Steuerzeichen
+// one part of a path in the archive: no empty part, no "." or "..", no drive characters or control characters
 bool SafePart(const std::string& p) {
     if (p.empty() || p == "." || p == "..") return false;
     for (char c : p)
@@ -79,11 +79,11 @@ bool SplitSafe(const std::string& name, std::vector<std::string>* parts) {
 }
 
 struct Archive {
-    std::string path, file;   // voller Pfad, Dateiname (G3ASM.m00)
+    std::string path, file;   // full path, file name (G3ASM.m00)
     uint64_t size = 0, time = 0;
 };
 std::string SourceLine(const Archive& a) { return a.file + "\t" + std::to_string(a.size) + "\t" + std::to_string(a.time); }
-// Archive in der Reihenfolge .mod, .m00 ... .m99
+// archives in the sequence .mod, .m00 ... .m99
 std::vector<Archive> FindArchives(const std::string& dataDir) {
     std::vector<Archive> out;
     for (int i = -1; i < 100; ++i) {
@@ -106,8 +106,8 @@ std::vector<Archive> FindArchives(const std::string& dataDir) {
 
 struct Marker {
     bool valid = false;
-    std::string source;               // Zeile wie SourceLine
-    std::vector<std::string> files;   // relativ zum Mod-Ordner, '\' getrennt
+    std::string source;               // line as SourceLine
+    std::vector<std::string> files;   // relative to the mod folder, separated by '\'
 };
 Marker ReadMarker(const std::string& modDir) {
     Marker m;
@@ -128,7 +128,7 @@ Marker ReadMarker(const std::string& modDir) {
             m.source = t.substr(7);
         else if (t.compare(0, 5, "file\t") == 0) {
             const std::string rel = t.substr(5);
-            // nur sichere relative Pfade loeschen (eine von Hand veraenderte Markierung darf nichts ausserhalb treffen)
+            // delete only safe relative paths (a marker that was changed by hand must not affect anything outside)
             std::vector<std::string> parts;
             std::string s = rel;
             for (char& c : s)
@@ -139,7 +139,7 @@ Marker ReadMarker(const std::string& modDir) {
     std::fclose(f);
     return m;
 }
-// Gelistete Dateien und die Markierung loeschen, danach leere Unterordner und den Mod-Ordner selbst (falls leer)
+// delete the listed files and the marker, then empty subfolders and the mod folder itself (if empty)
 void RemoveExtracted(const std::string& modDir, const Marker& m) {
     std::set<std::string> dirs;
     for (const std::string& rel : m.files) {
@@ -149,7 +149,7 @@ void RemoveExtracted(const std::string& modDir, const Marker& m) {
     }
     DeleteFileA((modDir + "\\" + kMarker).c_str());
     for (auto it = dirs.rbegin(); it != dirs.rend(); ++it)
-        RemoveDirectoryA((modDir + "\\" + *it).c_str());   // laengste zuerst, nur wenn leer
+        RemoveDirectoryA((modDir + "\\" + *it).c_str());   // longest first, only if empty
     RemoveDirectoryA(modDir.c_str());
 }
 bool WriteAll(const std::string& path, const std::string& data) {
@@ -160,10 +160,10 @@ bool WriteAll(const std::string& path, const std::string& data) {
 }
 
 struct PackedMod {
-    std::string name;   // Schreibweise im Archiv
+    std::string name;   // spelling in the archive
     const Archive* src = nullptr;
-    std::vector<const ArchiveEntry*> files;   // nur Dateien (keine Ordner, keine geloeschten)
-    std::vector<std::string> rel;             // passend zu files: Pfad relativ zum Mod-Ordner, '\'
+    std::vector<const ArchiveEntry*> files;   // only files (no folders, no deleted entries)
+    std::vector<std::string> rel;             // agrees with files: path relative to the mod folder, '\'
     std::string error;
 };
 
@@ -171,9 +171,9 @@ struct PackedMod {
 
 int ExtractPackedMods(const std::string& gameDir, const std::string& modsDir, const std::function<void(const std::string&)>& log) {
     const std::vector<Archive> archives = FindArchives(gameDir + "Data");
-    std::map<std::string, std::vector<ArchiveEntry>> lists;   // Archivpfad -> Eintraege (bleiben fuer die Zeiger in PackedMod bestehen)
-    std::map<std::string, PackedMod> mods;                    // Name klein -> Mod
-    std::vector<std::string> order;                           // Namen klein, in Fundreihenfolge
+    std::map<std::string, std::vector<ArchiveEntry>> lists;   // archive path -> entries (they stay for the pointers in PackedMod)
+    std::map<std::string, PackedMod> mods;                    // name in lower case -> mod
+    std::vector<std::string> order;                           // names in lower case, in the sequence in which they were found
     for (const Archive& a : archives) {
         std::string err;
         std::vector<ArchiveEntry>& entries = lists[a.path];
@@ -190,7 +190,7 @@ int ExtractPackedMods(const std::string& gameDir, const std::string& modsDir, co
                 log("Gepackte Mods: " + a.file + ": unzulaessiger Pfad '" + e.name + "' uebersprungen");
                 continue;
             }
-            if (parts.size() < 2) {   // Datei auf oberster Ebene: gehoert zu keiner Mod
+            if (parts.size() < 2) {   // file on the top level: belongs to no mod
                 ++loose;
                 continue;
             }
@@ -249,7 +249,7 @@ int ExtractPackedMods(const std::string& gameDir, const std::string& modsDir, co
             }
             if (old.source == SourceLine(*m.src)) {
                 ++ready;
-                continue;   // unveraendert
+                continue;   // no change
             }
             RemoveExtracted(dir, old);
         }
@@ -264,7 +264,7 @@ int ExtractPackedMods(const std::string& gameDir, const std::string& modsDir, co
             else if (!WriteAll(target, data))
                 fail = "Datei nicht schreibbar: " + target;
         }
-        // Markierung auch bei Fehler schreiben, damit Teilergebnisse beim naechsten Start sauber entfernt werden
+        // write the marker also if there is an error, so that partial results are removed cleanly at the next start
         std::string marker =
             std::string(kMarkerHead) + "\r\nsource\t" + (fail.empty() ? SourceLine(*m.src) : std::string("unvollstaendig")) + "\r\n";
         for (const std::string& r : m.rel) marker += "file\t" + r + "\r\n";
@@ -280,7 +280,7 @@ int ExtractPackedMods(const std::string& gameDir, const std::string& modsDir, co
         ++ready;
     }
 
-    // Entpackte Mods, die in keinem Archiv mehr stehen, entfernen
+    // remove unpacked mods that are not in an archive anymore
     WIN32_FIND_DATAA fd;
     HANDLE h = FindFirstFileA((modsDir + "\\*").c_str(), &fd);
     if (h != INVALID_HANDLE_VALUE) {

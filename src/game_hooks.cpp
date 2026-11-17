@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Spiel-Ereignisse fuer Skripte (Skript-Schnittstelle ab Version 5): Inline-Hooks (MinHook) auf die Ereignis-Eintrittspunkte des
-// Questsystems in Game.dll. Das Spiel meldet dort Kills, Itemuebergaben, Betreten/Verlassen von Bereichen und Zauber an
-// gCQuestManager_PS; der Hook ruft zuerst das Originalverhalten und danach die Skript-Ereignisse aller Mods
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// Game events for scripts (script interface from version 5): inline hooks (MinHook) on the event entry points of the
+// quest system in Game.dll. There, the game reports kills, item transfers, entering and leaving areas, and spells to
+// gCQuestManager_PS. The hook first calls the original behavior, and then the script events of all mods
 // (OnNPCKilled, OnNPCDefeated, OnReceiveItem, OnEnter, OnLeave, OnSpellCast).
-// Aufrufkonvention: Memberfunktionen = thiscall, hier als __fastcall(this, edx, ...) abgefangen (gleiche Stapelbereinigung).
-// bCString-Wertparameter (OnSpellCast) sind 4 Byte und gehen unveraendert an das Original weiter (der Aufgerufene zerstoert sie);
-// fuer das Skript wird vorher eine Referenz (Kopie) gehalten.
+// Calling convention: member functions = thiscall, intercepted here as __fastcall(this, edx, ...) (same stack cleanup).
+// bCString value parameters (OnSpellCast) are 4 bytes and go without changes to the original (the callee destroys them).
+// For the script, the code first keeps a reference (copy).
 #include <windows.h>
 
 #include <cstdio>
@@ -42,7 +42,7 @@ bool IsNav(const void* area) {
     const char* t = SafeStrText(area, nullptr);
     return t && std::strncmp(t, "Nav_", 4) == 0;
 }
-// bCPropertyID::GetText in den Rohspeicher text (bCString); false bei Fehler (dann bleibt text unberuehrt)
+// bCPropertyID::GetText into the raw memory text (bCString); false if there is an error (then text does not change)
 bool SafeIdText(const void* id, void** text) {
     if (!g_idText || !ReadableMem(id, 16)) return false;
     __try {
@@ -55,14 +55,14 @@ void Seen(int i, const char* name) {
     if (InterlockedIncrement(&g_count[i]) == 1 && g_host) g_host->Log(std::string("Spielereignis erstmals ausgeloest: ") + name);
 }
 
-// Kopie eines bCString-Rohwerts (erhaelt die Zeichen ueber den Aufruf des Originals hinweg)
+// copy of a raw bCString value (keeps the characters across the call of the original)
 struct StrHold {
     void* raw;
     explicit StrHold(void* r) { g_sb.strCopy(&raw, &r); }
     ~StrHold() { g_sb.strDtor(&raw); }
 };
 
-// Aufruf mit Override-Kette: liefert das Ergebnis fuer das Spiel; *called sagt, ob das Original lief (Nachereignisse On<Name> nur dann)
+// call with the override chain: gives the result for the game; *called tells if the original ran (the events On<Name> after it only in that case)
 bool RunHook(const char* overrideDecl, const EvArg* a, int n, const std::function<bool(const EvArg*)>& original, bool* called) {
     bool res = false;
     *called = false;
@@ -103,15 +103,15 @@ bool __fastcall HDefeated(void* self, void*, const void* e) {
     return r;
 }
 bool __fastcall HItem(void* self, void*, const void* giver, const void* receiver, const void* itemId, DWORD count) {
-    void* text = nullptr;   // bCString (4 Byte), vom Export in den Rohspeicher gebaut
+    void* text = nullptr;   // bCString (4 bytes), built by the export in raw memory
     if (!itemId) NoteNull("OnReceiveItem: Item-ID");
     if (!SafeIdText(itemId, &text)) text = nullptr;
     if (!text) g_sb.strCtor(&text);
     const std::string nm = TemplateNameForId(itemId);
-    SStr name(nm.empty() ? g_sb.strGetText(&text) : nm.c_str());   // ohne Namen: GUID-Text
+    SStr name(nm.empty() ? g_sb.strGetText(&text) : nm.c_str());   // without a name: GUID text
     EvArg a[] = {EvArg::Ent(giver), EvArg::Ent(receiver), EvArg::Str(&name), EvArg::Str(&text), EvArg::U(count)};
     bool called;
-    // ar[4] = Menge: eine Mod kann sie mit SetOverrideArg(4, ..) aendern, das Original bekommt dann den neuen Wert
+    // ar[4] = quantity: a mod can change it with SetOverrideArg(4, ..), then the original gets the new value
     const bool r = RunHook(
         "bool Override_ReceiveItem(Entity, Entity, const bCString &in, const bCString &in, uint)", a, 5,
         [&](const EvArg* ar) {
@@ -168,17 +168,17 @@ bool __fastcall HSpell(void* self, void*, const void* caster, const void* target
     return r;
 }
 
-// Schaden: gCDamageReceiver_PS::SetHitPoints(const long&). Gemessen im Spiel (Feuerball 200 -> 115 bei OnDamage-Menge 85, Nahkampf 400 -> 323 bei 77): der Schaden
-// wird ueber SetHitPoints angewendet, gCEntity::OnDamage kommt erst danach und ist nur die Meldung. gCEntity::DoDamage wird dabei nicht benutzt.
-// Sinkt der Wert, ist das ein Treffer: Override_Damage(Opfer, Angreifer, Menge, Typ) darf die Menge aendern (SetOverrideArg(2, ..)) oder den Treffer durch
-// Verzicht auf Super() ganz verhindern; Menge = Lebenspunkte-Verlust (bei Tod auf 0 begrenzt).
-// Feldlage gCDamageReceiver_PS: +0x14 HitPoints, +0x18 HitPointsMax, +0x30 Schadenstyp, +0x34 DamageAmount, +0x38 LastInflictor (eCEntityProxy).
+// Damage: gCDamageReceiver_PS::SetHitPoints(const long&). Measured in the game (fireball 200 -> 115 for OnDamage quantity 85, melee 400 -> 323 for 77): the game
+// applies the damage through SetHitPoints. gCEntity::OnDamage comes only after it and is only the message. gCEntity::DoDamage is not used for this.
+// If the value decreases, this is a hit: Override_Damage(victim, attacker, quantity, type) can change the quantity (SetOverrideArg(2, ..)) or prevent the hit fully
+// without Super(). Quantity = loss of hit points (limited to 0 at death).
+// Field layout gCDamageReceiver_PS: +0x14 HitPoints, +0x18 HitPointsMax, +0x30 damage type, +0x34 DamageAmount, +0x38 LastInflictor (eCEntityProxy).
 typedef void(__thiscall* FnSetHP)(void*, const long*);
 typedef void*(__thiscall* FnGetEnt)(void*);
 FnSetHP o_setHP = nullptr;
 FnGetEnt g_psEntity = nullptr, g_proxyEntity = nullptr;
-bool g_inDamage = false;   // Schutz: SetHitPoints aus dem Skript heraus (Override) nicht erneut als Treffer melden
-bool g_scriptHurt = false;   // Entity.HurtHitPoints laeuft gerade: Abzug ohne Angreifer melden (LastInflictor waere ein alter Wert)
+bool g_inDamage = false;   // protection: do not report SetHitPoints from the script (override) again as a hit
+bool g_scriptHurt = false;   // Entity.HurtHitPoints runs at this time: report the decrease without an attacker (LastInflictor would be an old value)
 void* SafeCall0(FnGetEnt f, void* obj) {
     if (!f || !obj || !ReadableMem(obj, sizeof(void*))) return nullptr;
     __try {
@@ -186,18 +186,18 @@ void* SafeCall0(FnGetEnt f, void* obj) {
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
 
-// ---- Angreifer des Opfers: gCNPC_PS::CurrentAttackerEntity / LastAttackerEntity ----
+// ---- attacker of the victim: gCNPC_PS::CurrentAttackerEntity / LastAttackerEntity ----
 typedef const void*(__thiscall* FnGetRef)(const void*);
 typedef void*(__thiscall* FnGetPS)(void*, int);
 FnGetRef g_lastAtk = nullptr, g_curAtk = nullptr;
 FnGetPS g_getPS = nullptr;
 
-// eCEntityProxy-Referenz (Rueckgabe von Get...Entity) -> eCEntity*
+// eCEntityProxy reference (return value of Get...Entity) -> eCEntity*
 void* ProxyTarget(const void* proxyRef) {
     if (!proxyRef || !g_proxyEntity) return nullptr;
     return SafeCall0(g_proxyEntity, const_cast<void*>(proxyRef));
 }
-// gCNPC_PS des Entity (eEPropertySetType_NPC = 30) und daraus Letzter/Aktueller Angreifer; false, wenn das Entity kein NPC ist
+// gCNPC_PS of the entity (eEPropertySetType_NPC = 30) and from it the last or current attacker; false if the entity is not an NPC
 bool NpcAttackers(void* ent, void** last, void** cur) {
     *last = *cur = nullptr;
     if (!ent || !g_getPS || !g_lastAtk || !g_curAtk || !ReadableMem(ent, 8)) return false;
@@ -210,7 +210,7 @@ bool NpcAttackers(void* ent, void** last, void** cur) {
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
-// Item in einem Ausruestungs-Slot des Entity: gCInventory_PS (eEPropertySetType_Inventory = 31)::GetStackFromSlot(gESlot).
+// item in an equipment slot of the entity: gCInventory_PS (eEPropertySetType_Inventory = 31)::GetStackFromSlot(gESlot).
 // gESlot: 1 RightHand, 2 LeftHand, 3 EquipLeftHand, 7 Bow, 14 Ammo.
 typedef void*(__thiscall* FnStackFromSlot)(const void*, int);
 FnStackFromSlot g_stackFromSlot = nullptr;
@@ -221,7 +221,7 @@ void* SlotItem(void* ent, int slot) {
         return ps ? g_stackFromSlot(ps, slot) : nullptr;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-// Name eines Entity in einen Puffer kopieren (SEH: keine C++-Objekte mit Destruktor in dieser Funktion)
+// copy the name of an entity into a buffer (SEH: no C++ objects with a destructor in this function)
 typedef const void*(__thiscall* FnEntName)(const void*);
 FnEntName g_entName = nullptr;
 bool EntNameBuf(const void* ent, char* buf, size_t n) {
@@ -239,16 +239,16 @@ bool EntNameBuf(const void* ent, char* buf, size_t n) {
         return false;
     }
 }
-bool NameHasBow(const void* ent) {   // Bogen/Armbrust: Name enthaelt "bow" (It_Bow_Ranger, ...Crossbow...); Zauber ("It_Spell_*") und Nahkampfwaffen nicht
+bool NameHasBow(const void* ent) {   // bow or crossbow: the name contains "bow" (It_Bow_Ranger, ...Crossbow...); not spells ("It_Spell_*") and not melee weapons
     char nm[64];
     if (!EntNameBuf(ent, nm, sizeof nm)) return false;
     for (char* p = nm; *p; ++p) *p = static_cast<char>(tolower(static_cast<unsigned char>(*p)));
     return std::strstr(nm, "bow") != nullptr;
 }
-// Was der Angreifer dem Opfer "ins Feld fuehrt" (inflictor, beim Helden als Opfer): Nahkampf = die Waffe in der rechten Hand (bei Tieren das Item "Fist"), Zauber = das
-// Zauber-Item. Fernkampf = ein Bogen in der linken Hand: dann das Geschoss, also das Munitions-Item (Slot 14, "Arrow"), damit der Held wie ein NPC-Opfer (dort liefert
-// die Engine das Geschoss) den Pfeil als inflictor bekommt; ohne Munitions-Item der Bogen. Gemessen 2026-11-06: gezogene Waffe rechte Hand, gezogener Bogen linke Hand,
-// weggesteckter Bogen Slot 7. Hinweis: das Munitions-Item ist der Pfeil im Koecher, nicht das fliegende Geschoss (gleicher Name, anderes Entity).
+// What the attacker uses against the victim (inflictor, when the hero is the victim): melee = the weapon in the right hand (for animals the item "Fist"), spell = the
+// spell item. Ranged = a bow in the left hand: then the projectile, thus the ammunition item (slot 14, "Arrow"), so that the hero gets the arrow as the inflictor,
+// as an NPC victim does (there, the engine gives the projectile). Without an ammunition item, the bow. Measured 2026-11-06: drawn weapon right hand, drawn bow left hand,
+// bow that is put away slot 7. Note: the ammunition item is the arrow in the quiver, not the flying projectile (same name, different entity).
 void* HeldWeapon(void* owner) {
     if (!owner) return nullptr;
     if (void* w = SlotItem(owner, 1)) return w;
@@ -259,9 +259,9 @@ void* HeldWeapon(void* owner) {
     return w;
 }
 
-// Art des Treffers (gEDamageType: 1 Impact, 2 Blade, 3 Missile, 4 Fire, 5 Ice, 6 Lightning, 7 Physics) aus dem angreifenden Item: gCDamage_PS (eEPropertySetType_Damage = 51)
-// des Inflictors, Zugriff ueber gCDamage_PS::AccessDamageType (Container: 4 Byte Kopf, dann der Wert; aus dem Assembler: Container bei this+0x14, Wert bei +0x18).
-// Der Wert im Schadensempfaenger des Opfers (frueher als "type" gemeldet) ist dagegen eine Eigenschaft des Opfers und war bei NPCs immer 2.
+// Type of the hit (gEDamageType: 1 Impact, 2 Blade, 3 Missile, 4 Fire, 5 Ice, 6 Lightning, 7 Physics) from the item of the attacker: gCDamage_PS (eEPropertySetType_Damage = 51)
+// of the inflictor, access through gCDamage_PS::AccessDamageType (container: 4-byte header, then the value; from the assembler code: container at this+0x14, value at +0x18).
+// But the value in the damage receiver of the victim (previously reported as "type") is a property of the victim and was always 2 for NPCs.
 typedef void*(__thiscall* FnDmgTypeAcc)(void*);
 FnDmgTypeAcc g_dmgTypeAcc = nullptr;
 bool SafeDamageType(void* ent, int* out) {
@@ -277,23 +277,23 @@ bool SafeDamageType(void* ent, int* out) {
 }
 int HitDamageType(void* inflictor, int fallback) {
     int t = 0;
-    // Gemessen 2026-11-06: Keule 1 (Impact), Schwert/Hellebarde/Speer 2 (Blade), Pfeil 3 (Missile, auch das Munitions-Item), Mis_Fireball 4 (Fire). Nicht lesbar: kein Inflictor
-    // und das Zauber-Item in der Hand des Zaubernden (It_Spell_*), dann gilt der Rueckfall.
+    // Measured 2026-11-06: club 1 (Impact), sword, halberd and spear 2 (Blade), arrow 3 (Missile, also the ammunition item), Mis_Fireball 4 (Fire). Not readable: no inflictor
+    // and the spell item in the hand of the caster (It_Spell_*). Then the fallback applies.
     return SafeDamageType(inflictor, &t) && t >= 0 && t <= 7 ? t : fallback;
 }
 
-// Wahrer Verursacher eines Treffers (API 25, Parameter "owner"): ist der Verursacher (Waffe/Geschoss/Zauber) selbst ein NPC, dieser; sonst der aktuelle Gegner
-// des Opfers (gCNPC_PS::CurrentAttackerEntity, im Spieltest 2026-11-06 bei Held und NPCs der zuschlagende Gegner). Kann leer sein; im Gruppenkampf ist der
-// Fallback nur eine Naeherung (es ist der Gegner, den das Opfer gerade im Visier hat, nicht zwingend der Schlaeger).
+// True cause of a hit (API 25, parameter "owner"): if the inflictor (weapon, projectile, spell) itself is an NPC, that NPC. If not, the current opponent
+// of the victim (gCNPC_PS::CurrentAttackerEntity; in the game test 2026-11-06, the opponent that hit, for the hero and for NPCs). Can be empty. In a group fight, the
+// fallback is only an approximation (it is the opponent that the victim targets at this time, not always the fighter that hit).
 void* DamageOwner(void* victim, void* inflictor) {
     void *l, *c;
     if (inflictor && NpcAttackers(inflictor, &l, &c)) return inflictor;
     if (victim && NpcAttackers(victim, &l, &c) && c && c != victim) return c;
     return nullptr;
 }
-// Schadens-Kette: erst Override_Damage(victim, inflictor, owner, amount, type) (API 25), dann als "Original" dieser Kette die alte Form
-// Override_Damage(victim, attacker, amount, type); deren Original ist apply(Menge) = die eigentliche Spielwirkung. Mods mit alter und neuer Form arbeiten also
-// gemeinsam. *called: lief die Spielwirkung? (dann folgen OnDamage in beiden Formen, mit der urspruenglichen Menge)
+// Damage chain: first Override_Damage(victim, inflictor, owner, amount, type) (API 25), then, as the "original" of this chain, the old form
+// Override_Damage(victim, attacker, amount, type). Its original is apply(quantity) = the real effect in the game. Thus mods with the old and the new form work
+// together. *called: did the effect in the game run? (then OnDamage follows in both forms, with the initial quantity)
 void DamageDispatch(void* victim, void* inflictor, void* owner, int amount, int type, const std::function<bool(int)>& apply, bool* called) {
     static const char* kNew = "bool Override_Damage(Entity, Entity, Entity, int, int)";
     static const char* kOld = "bool Override_Damage(Entity, Entity, int, int)";
@@ -320,7 +320,7 @@ void DamageDispatch(void* victim, void* inflictor, void* owner, int amount, int 
 }
 
 void __fastcall HSetHP(void* self, void*, const long* v) {
-    if (g_inDamage || OnForeignThread() || !v || !self || !ReadableMem(self, 0x40)) {   // fremder Thread: g_inDamage gehoert dem Spiel-Thread
+    if (g_inDamage || OnForeignThread() || !v || !self || !ReadableMem(self, 0x40)) {   // different thread: g_inDamage belongs to the game thread
         o_setHP(self, v);
         return;
     }
@@ -335,7 +335,7 @@ void __fastcall HSetHP(void* self, void*, const long* v) {
     void* attacker = g_scriptHurt ? nullptr : SafeCall0(g_proxyEntity, ps + 0x38);
     void* owner = g_scriptHurt ? nullptr : DamageOwner(victim, attacker);
     const long amount = alt - neu;
-    const int type = HitDamageType(attacker, *reinterpret_cast<int*>(ps + 0x30));   // Art aus dem angreifenden Item, sonst der Wert des Schadensempfaengers
+    const int type = HitDamageType(attacker, *reinterpret_cast<int*>(ps + 0x30));   // type from the item of the attacker; if not available, the value of the damage receiver
     bool called = false;
     g_inDamage = true;
     DamageDispatch(
@@ -358,10 +358,10 @@ void __fastcall HSetHP(void* self, void*, const long* v) {
     g_inDamage = false;
 }
 
-// Tierbisse und anderer Spielskript-Schaden am Helden: Script_Game.dll senkt das Attribut "HP" ueber gCPlayerMemory_PS::SetBaseValue(tag, Wert), ohne
-// gCEntity::OnDamage (gemessen mit dem Haltepunkt 2026-11-06: Wolfsbisse 21 Punkte je Biss). Der Hook meldet das Absinken VOR dem Schreiben an dieselbe Kette
-// Override_Damage/OnDamage wie die Treffer; eine geaenderte Menge wird direkt geschrieben, ohne Super() entfaellt der Verlust. Typ ist hier unbekannt (0).
-// Kommt fuer denselben Treffer spaeter noch gCEntity::OnDamage (HeroHit), wird der nicht zum zweiten Mal gemeldet (g_baseHitAmount/-Tick).
+// Animal bites and other game script damage to the hero: Script_Game.dll decreases the attribute "HP" through gCPlayerMemory_PS::SetBaseValue(tag, value), without
+// gCEntity::OnDamage (measured with a breakpoint 2026-11-06: wolf bites 21 points for each bite). The hook reports the decrease BEFORE the write to the same chain
+// Override_Damage/OnDamage as the hits. A changed quantity is written directly. Without Super(), there is no loss. The type is not known here (0).
+// If gCEntity::OnDamage (HeroHit) comes later for the same hit, it is not reported a second time (g_baseHitAmount/-Tick).
 typedef bool(__thiscall* FnPMSetBase)(void*, const void*, int);
 typedef int(__thiscall* FnPMGetBase)(const void*, const void*);
 FnPMSetBase o_pmSetBase = nullptr;
@@ -380,10 +380,10 @@ bool SafePMBase(const void* ps, const void* tag, int* out) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// Umgebungsschaden (Sturz u. a.) statt Kampftreffer: Die Skript-Schadensroutine (Script_Game.dll) wird bei Kampftreffern (Biss, Schlag, Zauber) direkt von der
-// Engine (Game.dll) aufgerufen, bei Sturz aber von einer anderen Skriptroutine derselben DLL (gemessen 2026-11-06: Rueckkehradressen Script_Game.dll+0x35BF2 < Game.dll
-// bei Kampf, Script_Game.dll+0x35BF2 < Script_Game.dll+0xADF8F < Game.dll beim Sturz). Erkannt wird das strukturell: auf das erste Script_Game-Bild des Aufrufstapels
-// folgt ein weiteres Script_Game-Bild. Dann gibt es keinen Angreifer: owner und inflictor bleiben leer (sonst stuende dort der letzte Gegner).
+// Environment damage (fall and similar) in place of a combat hit: for combat hits (bite, blow, spell), the engine (Game.dll) calls the script damage routine (Script_Game.dll)
+// directly. For a fall, a different script routine of the same DLL calls it (measured 2026-11-06: return addresses Script_Game.dll+0x35BF2 < Game.dll
+// in combat, Script_Game.dll+0x35BF2 < Script_Game.dll+0xADF8F < Game.dll for a fall). The detection is structural: after the first Script_Game frame of the call stack
+// comes a second Script_Game frame. Then there is no attacker: owner and inflictor stay empty (if not, the last opponent would be there).
 bool IsScriptNested() {
     static HMODULE sg = nullptr;
     if (!sg) sg = GetModuleHandleA("Script_Game.dll");
@@ -423,15 +423,15 @@ bool __fastcall HPMSetBase(void* self, void*, const void* tag, int v) {
     return res;
 }
 
-// Treffer auf den Helden: sein gCDamageReceiver_PS steht immer auf 1, die Lebenspunkte liegen im Attribut "HP" und sind beim Aufruf von gCEntity::OnDamage
-// (this = a = b = Held, Menge, Typ) schon abgezogen (gemessen). Der Hook meldet den Treffer an dieselbe Kette Override_Damage wie bei NPCs; eine geaenderte Menge
-// wirkt nachtraeglich: die Differenz wird dem Attribut zurueckgegeben bzw. zusaetzlich abgezogen. Ohne Super() entfaellt der Treffer (volle Rueckgabe).
-// Ein schon toter Held wird nicht wiederbelebt. Falls der Fall-/Umgebungsschaden einen anderen Weg nimmt, sieht der Hook ihn nicht.
+// Hits on the hero: the gCDamageReceiver_PS of the hero is always 1. The hit points are in the attribute "HP" and are already decreased when gCEntity::OnDamage is called
+// (this = a = b = hero, quantity, type) (measured). The hook reports the hit to the same chain Override_Damage as for NPCs. A changed quantity
+// has an effect afterward: the difference is given back to the attribute or also subtracted. Without Super(), there is no hit (full refund).
+// A hero that is already dead does not come back to life. If the fall or environment damage takes a different path, the hook does not see it.
 typedef void(__thiscall* FnOnDmg)(void*, void*, void*, int, int, void*);
 FnOnDmg o_gOnDmg = nullptr;
 void HeroHit(void* hero, int amount, int type) {
     if (g_inDamage || amount <= 0 || OnForeignThread()) return;
-    if (amount == g_baseHitAmount && GetTickCount() - g_baseHitTick < 150) {   // derselbe Treffer wurde schon ueber SetBaseValue gemeldet
+    if (amount == g_baseHitAmount && GetTickCount() - g_baseHitTick < 150) {   // the same hit was already reported through SetBaseValue
         g_baseHitAmount = -1;
         return;
     }
@@ -447,10 +447,10 @@ void HeroHit(void* hero, int amount, int type) {
         },
         &called);
     g_inDamage = false;
-    if (!called) neu = 0;   // Override ohne Super(): Treffer verhindert
+    if (!called) neu = 0;   // override without Super(): hit prevented
     if (neu < 0) neu = 0;
     if (neu != amount) {
-        g_inDamage = true;   // unsere Korrektur nicht als Fremd-Aenderung melden
+        g_inDamage = true;   // do not report the correction of the modkit as a change from another source
         const bool ok = AdjustHeroHitPoints(hero, amount - neu);
         g_inDamage = false;
         g_host->Log("Schaden am Helden: " + std::to_string(amount) + " -> " + std::to_string(neu) +
@@ -462,8 +462,8 @@ void __fastcall HGOnDmg(void* self, void*, void* a, void* b, int amount, int typ
     o_gOnDmg(self, a, b, amount, type, it);
 }
 
-// gCInfo_PS::AreConditionsFulfilled: sind die Bedingungen einer Dialogoption erfuellt, ist sie also gerade waehlbar? Der Info-Manager ruft diese Funktion direkt
-// (IsAvailable hat keine Aufrufer). Mod kann mit Override_InfoAvailable eingreifen.
+// gCInfo_PS::AreConditionsFulfilled: are the conditions of a dialog option met, thus can the player select it at this time? The info manager calls this function directly
+// (IsAvailable has no callers). A mod can change the result with Override_InfoAvailable.
 typedef bool(__thiscall* InfoAvailFn)(const void*);
 InfoAvailFn o_infoAvail = nullptr;
 bool __fastcall HInfoAvail(const void* self, void*) {
@@ -479,9 +479,9 @@ bool __fastcall HInfoAvail(const void* self, void*) {
 }
 
 
-// ---- Statuseffekte als Ereignis (API 27): OnStatusEffect(npc, effect, enabled) bei jeder Aenderung der Bitmaske gCNPC_PS::m_u32StatusEffects. Zwei Wege aendern sie:
-// EnableStatusEffect(effect, an) und SetStatusEffects(maske); beide werden gehookt, ein Zaehler verhindert doppelte Meldungen, wenn der eine den anderen aufruft.
-// Gemeldet wird je geaendertes Bit, nur wenn sich der Wert wirklich aendert (das Spiel ruft EnableStatusEffect auch dauernd mit unveraendertem Wert auf).
+// ---- Status effects as an event (API 27): OnStatusEffect(npc, effect, enabled) for each change of the bit mask gCNPC_PS::m_u32StatusEffects. Two paths change it:
+// EnableStatusEffect(effect, on) and SetStatusEffects(mask). The code hooks the two. A counter prevents duplicate reports if one calls the other.
+// The hook reports each changed bit, only if the value really changes (the game also calls EnableStatusEffect continuously with the same value).
 typedef void(__thiscall* FnEnableSE)(void*, int, bool);
 typedef void(__thiscall* FnSetSE)(void*, const unsigned long*);
 typedef const unsigned long&(__thiscall* FnGetSE)(const void*);
@@ -526,12 +526,12 @@ void __fastcall HSetSE(void* self, void*, const unsigned long* v) {
     InterlockedDecrement(&g_seDepth);
 }
 
-// ---- Eigene Item-Qualitaet "Lebensraub" in der Beschreibung (API 28) ----
-// Das Spiel baut die Qualitaetszeilen der Item-Beschreibung (Vergiftet, Scharf, Gesegnet, ...) in einer Funktion bei Game.dll+0xA3DF0: eax = gCItem_PS* (Qualitaet bei +0x18), ecx = Inventarstapel
-// oder 0 (Qualitaet bei +0x40), ein Stapelparameter = Tooltip-Objekt (ret 4), Rueckgabe eax = Zahl der Zeilen. Je gesetztem Bit holt sie den Text ueber eCLocString(Schluessel).GetString(), baut einen
-// Praefix ("(+10)") und ruft den Zeilen-Helfer bei Game.dll+0xA48B0 (eax = Art 5, ecx = Tooltip, Stapel: Symbol, &Praefix, &Text; ret 0xC). Danach folgt eine Trennzeile (Art 6), wenn Zeilen da waren.
-// Dieser Hook ruft zuerst unsere Zeile (falls das Bit gesetzt ist) und dann das Original; hatte das Original keine Zeilen, kommt die Trennzeile von uns. Text: Schluessel
-// HUD_Quality_Lifesteal aus der Stringtabelle einer Mod. Absicherung: Bytepruefung der Funktion vor dem Einhaengen, SEH um alle Aufrufe in die Engine.
+// ---- Own item quality "Lebensraub" (life steal) in the description (API 28) ----
+// The game builds the quality lines of the item description (poisoned, sharp, blessed, ...) in a function at Game.dll+0xA3DF0: eax = gCItem_PS* (quality at +0x18), ecx = inventory stack
+// or 0 (quality at +0x40), one stack parameter = tooltip object (ret 4), return value eax = number of lines. For each set bit, it gets the text through eCLocString(key).GetString(), builds a
+// prefix ("(+10)") and calls the line helper at Game.dll+0xA48B0 (eax = type 5, ecx = tooltip, stack: symbol, &prefix, &text; ret 0xC). After that comes a separator line (type 6) if there were lines.
+// This hook first calls the modkit line (if the bit is set) and then the original. If the original had no lines, the hook adds the separator line. Text: key
+// HUD_Quality_Lifesteal from the string table of a mod. Protection: byte check of the function before the hook is installed, SEH around all calls into the engine.
 const unsigned kQualityLifesteal = 512;
 const DWORD kTipFuncRva = 0xA3DF0, kTipLineRva = 0xA48B0;
 typedef void*(__thiscall* FnUniCtor)(void*, const char*);
@@ -544,8 +544,8 @@ FnUniDtor g_uniDtor = nullptr;
 FnLocCtor g_locCtor = nullptr;
 FnLocGet g_locGet = nullptr;
 FnLocDtor g_locDtor = nullptr;
-char* g_tipLine = nullptr;      // Zeilen-Helfer
-void* o_tipFunc = nullptr;      // Original der Beschreibungsfunktion
+char* g_tipLine = nullptr;      // line helper
+void* o_tipFunc = nullptr;      // original of the description function
 volatile long g_tipLogged = 0;
 
 __declspec(naked) void __cdecl CallTipLine(void* fn, void* tooltip, void* text, void* prefix, int icon, int kind) {
@@ -553,7 +553,7 @@ __declspec(naked) void __cdecl CallTipLine(void* fn, void* tooltip, void* text, 
         push ebp
         mov ebp, esp
         push dword ptr [ebp+24]   // Symbol
-        push dword ptr [ebp+20]   // Praefix
+        push dword ptr [ebp+20]   // prefix
         push dword ptr [ebp+16]   // Text
         mov ecx, dword ptr [ebp+12]
         mov eax, dword ptr [ebp+28]
@@ -571,7 +571,7 @@ __declspec(naked) int __cdecl CallTipOrig(void* orig, void* item, void* stack, v
         ret
     }
 }
-// Zeile "(20 %) <Text zum Schluessel>" mit Symbol 2 (das der Segnung); false bei Fehler. Keine C++-Objekte mit Destruktor (SEH).
+// line "(20 %) <text for the key>" with symbol 2 (the symbol of the blessing); false if there is an error. No C++ objects with a destructor (SEH).
 bool TipAddLifestealLine(void* tooltip, const void* keyStr) {
     char prefix[32] = {}, text[32] = {}, loc[32] = {};
     __try {
@@ -638,7 +638,7 @@ void InstallQualityTooltip(HMODULE game, ScriptHost& host) {
     char* target = reinterpret_cast<char*>(game) + kTipFuncRva;
     char* line = reinterpret_cast<char*>(game) + kTipLineRva;
     static const unsigned char kSig[] = {0x83, 0xEC, 0x10, 0x8B, 0x40, 0x18, 0x53, 0x56, 0x33, 0xDB, 0x85, 0xC9};   // sub esp,10h / mov eax,[eax+18h] / push ebx / push esi / xor ebx,ebx / test ecx,ecx
-    // Zeilen-Helfer: sub esp,2Ch / push ebx / mov ebx,ecx / push esi / lea ecx,[esp+18h] / mov esi,eax. Der folgende call [Import] bleibt draussen (absolute Adresse).
+    // line helper: sub esp,2Ch / push ebx / mov ebx,ecx / push esi / lea ecx,[esp+18h] / mov esi,eax. The call [import] that follows stays outside (absolute address).
     static const unsigned char kLineSig[] = {0x83, 0xEC, 0x2C, 0x53, 0x8B, 0xD9, 0x56, 0x8D, 0x4C, 0x24, 0x18, 0x8B, 0xF0};
     if (!ReadableMem(target, sizeof kSig) || std::memcmp(target, kSig, sizeof kSig) != 0) {
         host.Log("Qualitaets-Tooltip: Funktion bei Game.dll+0xA3DF0 hat nicht die erwarteten Bytes (andere Spielversion?) - nicht eingehaengt");
@@ -653,10 +653,10 @@ void InstallQualityTooltip(HMODULE game, ScriptHost& host) {
     host.Log(std::string("Qualitaets-Tooltip (Lebensraub): ") + (ok ? "eingehaengt" : "FEHLER beim Einhaengen"));
 }
 
-// ---- Laden/Speichern: Quests und Infos werden beim Laden neu aus den ini-Dateien aufgebaut; eigene (per Skript angelegte) Quests/Infos muessen schon DA sein,
-// bevor das Spiel die gespeicherten Laufzeitdaten (Status, Questlog) einliest. Die Hooks melden das Ende des Aufbaus an die Skripte:
-//   OnQuestsLoaded()  nach gCQuestManager_PS::LoadQuestsFromInis        OnInfosLoaded()  nach gCInfoManager_PS::LoadInfosFromInis
-// und protokollieren die Reihenfolge (Lesen/Schreiben der Quest-Laufzeitdaten) zur Fehlersuche.
+// ---- Load and save: at a load, the game makes the quests and infos again from the ini files. Own quests and infos (made by script) must already be THERE
+// before the game reads the saved run-time data (status, quest log). The hooks report the end of the setup to the scripts:
+//   OnQuestsLoaded()  after gCQuestManager_PS::LoadQuestsFromInis        OnInfosLoaded()  after gCInfoManager_PS::LoadInfosFromInis
+// and log the sequence (read and write of the quest run-time data) for troubleshooting.
 typedef bool(__thiscall* BoolMethod)(void*);
 typedef void(__thiscall* VoidMethodT)(void*);
 typedef int(__thiscall* RuntimeFn)(void*, void*);
@@ -684,13 +684,13 @@ bool __fastcall HLoadQuests(void* self, void*) {
         std::snprintf(tb, sizeof tb, "Laden: LoadQuestsFromInis fertig -> OnQuestsLoaded (Thread %lu)", static_cast<unsigned long>(GetCurrentThreadId()));
         LogLine(tb);
     }
-    SetQuestManagerOverride(self);   // Bindings arbeiten jetzt auf dem Manager, der gerade aufgebaut wurde
+    SetQuestManagerOverride(self);   // the bindings now work on the manager that the game just made
     g_host->CallEvent("void OnQuestsLoaded()", nullptr, 0);
     SetQuestManagerOverride(nullptr);
     return r;
 }
 bool __fastcall HLoadInfos(void* self, void*) {
-    // LoadInfosFromInis leert nur die Info-Liste, nicht die Namens-Tabelle: eigene Infos vorher austragen, sonst gelten ihre Namen danach als belegt
+    // LoadInfosFromInis empties only the info list, not the name table: remove own infos first, if not their names count as in use after it
     const int forgot = ForgetCreatedInfos(self);
     const bool r = o_loadInfos(self);
     {
@@ -706,7 +706,7 @@ bool __fastcall HLoadInfos(void* self, void*) {
 typedef bool(__thiscall* ReadCompiledFn)(void*, const void*);
 ReadCompiledFn o_readCompiled = nullptr;
 bool __fastcall HReadCompiled(void* self, void*,
-                              const void* path) {   // so laedt das Spiel die Infos beim Laden (kompiliert), nicht aus ini
+                              const void* path) {   // the game loads the infos in this way at a load (compiled), not from ini
     const bool r = o_readCompiled(self, path);
     LogLine("Laden: ReadCompiledInfoManager fertig -> OnInfosLoaded");
     SetInfoManagerOverride(self);
@@ -744,9 +744,9 @@ int __fastcall HReadInfoSave(void* self, void*, void* stream) {
     return o_readInfoSave(self, stream);
 }
 
-// ---- Speichern: gCWorld::SaveGameWorld(Name, Bild, Zeiger, DWORD) laeuft genau einmal je Speichern (Menue und Schnellspeichern), im selben Thread wie das Laden
-// (gemessen 2026-11-08). Davor OnBeforeSave(Name), danach OnAfterSave(Name, ok): Mods koennen dauerhafte Zustaende vor dem Schreiben entfernen und danach wiederherstellen.
-// (gCWorld::CreateSaveGame gehoert nicht zum Speichern: es kam beim Speichern nie vor.)
+// ---- Save: gCWorld::SaveGameWorld(name, image, pointer, DWORD) runs exactly 1 time for each save (menu and quick save), in the same thread as the load
+// (measured 2026-11-08). Before it OnBeforeSave(name), after it OnAfterSave(name, ok): mods can remove permanent conditions before the write and restore them after it.
+// (gCWorld::CreateSaveGame is not part of the save: it never occurred during a save.)
 typedef bool(__thiscall* SaveWorldFn)(void*, const void*, void*, void*, DWORD);
 SaveWorldFn o_saveWorld = nullptr;
 long g_saveDepth = 0;
@@ -759,7 +759,7 @@ void LogSave(const char* phase, const void* name, long depth, int result) {
 }
 bool __fastcall HSaveWorld(void* self, void*, const void* name, void* img, void* p, DWORD k) {
     const long d = InterlockedIncrement(&g_saveDepth);
-    const bool outer = d == 1;   // verschachtelte Aufrufe (nie gemessen) melden keine Ereignisse
+    const bool outer = d == 1;   // nested calls (never measured) report no events
     if (!name) NoteNull("OnBeforeSave/OnAfterSave: Name des Spielstands");
     LogSave("Beginn", name, d, 0);
     if (outer) {
@@ -804,7 +804,7 @@ void InstallSaveHooks(HMODULE game, ScriptHost& host) {
 
 void SetGameHookOptions(bool navEvents) { g_navEvents = navEvents; }
 
-// Haengt die Spielereignisse ein (einmal, nachdem Game.dll geladen ist). Rueckgabe: Zahl der aktiven Hooks.
+// Installs the game events (1 time, after Game.dll is loaded). Return value: the number of active hooks.
 int InstallGameHooks(ScriptHost& host) {
     static bool done = false;
     if (done) return 0;
@@ -871,7 +871,7 @@ int InstallGameHooks(ScriptHost& host) {
     InstallScriptCallHooks(host);
     InstallDrawHooks(host);
     InstallMoreEventHooks(host);
-    InstallAiTrace(host);   // nur mit ini [g3asm] aitrace=1
+    InstallAiTrace(host);   // only with ini [g3asm] aitrace=1
     return n;
 }
 

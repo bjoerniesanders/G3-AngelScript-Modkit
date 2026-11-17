@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 #pragma once
-// AngelScript-Host von G3ASM: Engine, Bindings der Genome-Grundtypen (ueber die geladene SharedBase), Laden der Mod-Skripte,
-// Ereignisse und Overrides fuer Skripte, Neuladen bei Dateiaenderung.
+// AngelScript host of G3ASM: engine, bindings of the Genome base types (through the loaded SharedBase), load of the mod scripts,
+// events and overrides for scripts, reload when a file changes.
 //
-// Die Skript-Schnittstelle (Typen, Funktionen, Ereignisse, Override-Hooks, Version G3ASM_SCRIPT_API_VERSION) ist in docs/modkit/
-// (api-reference.md, events.md, hooks.md) beschrieben; hier stehen nur die C++-Schnittstellen.
+// docs/modkit/ (api-reference.md, events.md, hooks.md) describes the script interface (types, functions, events, override hooks, version
+// G3ASM_SCRIPT_API_VERSION). This file gives only the C++ interfaces.
 #include <functional>
 #include <map>
 #include <unordered_map>
@@ -23,10 +23,10 @@ struct HINSTANCE__;
 
 namespace g3asm {
 
-// Argument eines Spiel-Ereignisses fuer Skripte (siehe ScriptHost::CallEvent)
+// argument of a game event for scripts (see ScriptHost::CallEvent)
 struct EvArg {
     enum Kind { Entity, Text, UInt } kind;
-    const void* ptr;   // Entity: eCEntity*; Text: Zeiger auf ein bCString-Objekt
+    const void* ptr;   // Entity: eCEntity*; text: pointer to a bCString object
     unsigned value;    // UInt
     static EvArg Ent(const void* e) { return {Entity, e, 0}; }
     static EvArg Str(const void* s) { return {Text, s, 0}; }
@@ -34,41 +34,41 @@ struct EvArg {
 };
 
 void SetPrintToGameLog(bool on);   // ini [g3asm] printgame
-void SetLoadDefaultOffMods(bool on);   // auch Mods mit mod.ini enabled=0 laden (Testprogramm)
+void SetLoadDefaultOffMods(bool on);   // also load mods with mod.ini enabled=0 (test program)
 
 class ScriptHost {
 public:
     using LogFn = std::function<void(const std::string&)>;
     bool Init(LogFn log);
     void Shutdown();
-    // Einzelnes Skript als Mod "main" laden und alle anderen Mods verwerfen (Tests); false bei Uebersetzungsfehlern
+    // load a single script as the mod "main" and discard all other mods (tests); false for compile errors
     bool Load(const std::string& path);
-    // Mod hinzufuegen (bzw. neu laden, wenn der Name schon existiert); false bei Uebersetzungsfehlern (Meldungen im Protokoll)
+    // add a mod (or reload it if the name already exists); false for compile errors (messages in the log)
     bool AddScript(const std::string& name, const std::string& path);
-    // Mod-Ordner: <dir>\<Name>\main.as je Mod, eigenes Modul je Mod. <dir>\load_order.txt (optional): ein Modname je Zeile in
-    // Ladereihenfolge, '#' = Kommentar, '-Name' = Mod abgeschaltet; nicht genannte Mods folgen alphabetisch.
+    // Mod folder: <dir>\<name>\main.as for each mod, a separate module for each mod. <dir>\load_order.txt (optional): one mod name on each line in the
+    // load order, '#' = comment, '-name' = mod off. Mods that are not in the list come after them in alphabetical sequence.
     void SetModsDir(const std::string& dir) { modsDir_ = dir; }
-    int ScanMods();   // neue/entfernte Mods einarbeiten, Reihenfolge anwenden; Rueckgabe: Zahl neu geladener Mods
+    int ScanMods();   // add new mods and remove removed mods, apply the sequence; return value: the number of mods loaded again
     bool Loaded() const;
     int ModCount() const { return int(mods_.size()); }
-    void CallMain();   // main() aller Mods, die es noch nicht hatten
+    void CallMain();   // main() of all mods that did not have it yet
     void CallFrame(float dt);
-    void CallKey(int vk, bool down);   // void OnKey(int vk, bool down), falls vorhanden; Wiederholungen werden nicht gemeldet
-    // Spiel-Ereignis mit Argumenten an alle Mods, z. B. "void OnNPCKilled(Entity)" (Entity als Wert, Text als const bCString &in)
+    void CallKey(int vk, bool down);   // void OnKey(int vk, bool down), if it exists; repeats are not reported
+    // game event with arguments to all mods, for example "void OnNPCKilled(Entity)" (Entity as a value, text as const bCString &in)
     void CallEvent(const char* decl, const EvArg* args, int n);
-    void CallSimple(const char* decl);   // "void OnWorldActivate()" usw. in allen Mods, falls vorhanden
-    // Override-Hooks (ab Version 17): ersetzt eine Mod eine Spielfunktion (Skriptfunktion "bool Override_<Name>(...)"), laeuft sie statt des Originals; ueber Super()
-    // ruft die Mod das Original (bzw. die naechste Mod der Kette) auf. HasHandler: definiert irgendein Mod diese Funktion?
+    void CallSimple(const char* decl);   // "void OnWorldActivate()" and similar functions in all mods, if they exist
+    // Override hooks (from version 17): if a mod replaces a game function (script function "bool Override_<Name>(...)"), it runs in place of the original. Through Super(),
+    // the mod calls the original (or the next mod of the chain). HasHandler: does any mod define this function?
     bool HasHandler(const char* decl);
-    // true = eine Mod hat uebernommen: *result ist das Ergebnis fuer das Spiel, *originalCalled sagt, ob das Original gelaufen ist; false = niemand hat die Funktion
-    // original(args): das Original der Spielfunktion; bekommt die Argumente der Kette (eine Mod kann sie mit SetOverrideArg veraendert haben)
+    // true = a mod took over: *result is the result for the game, *originalCalled tells if the original ran; false = no mod has the function
+    // original(args): the original of the game function; it gets the arguments of the chain (a mod can have changed them with SetOverrideArg)
     bool CallOverride(const char* decl, const EvArg* args, int n, std::function<bool(const EvArg*)> original, bool* result,
-                      bool* originalCalled, EvArg* finalArgs = nullptr);   // finalArgs: Argumente nach der Kette (n Stueck)
-    // Argument der gerade laufenden Override-Kette setzen (nur Zahlen: Kind UInt); Super() reicht den neuen Wert an die naechste Mod und das Original weiter
+                      bool* originalCalled, EvArg* finalArgs = nullptr);   // finalArgs: arguments after the chain (n items)
+    // set an argument of the override chain that runs at this time (only numbers: kind UInt); Super() gives the new value to the next mod and to the original
     bool SetOverrideArg(int index, unsigned value);
     bool GetOverrideArg(int index, unsigned* value) const;
-    bool ChainSuper();   // fuer die Skriptfunktion Super()
-    // Neuladen geaenderter Mods und Mod-Ordner pruefen (hoechstens einmal je Sekunde); true = etwas neu geladen
+    bool ChainSuper();   // for the script function Super()
+    // check for changed mods and mod folders to reload (maximum 1 time each second); true = something reloaded
     bool CheckReload();
     int Failures() const { return failures_; }
     int Checks() const { return checks_; }
@@ -76,17 +76,17 @@ public:
         if (log_) log_(s);
     }
     const char* CurrentMod() const { return curMod_.c_str(); }
-    // Mod-Ordner (leer im Einzelskript-Betrieb) und Ordner einer geladenen Mod (Verzeichnis ihrer main.as; leer, wenn unbekannt)
+    // mod folder (empty in single-script mode) and the folder of a loaded mod (directory of its main.as; empty if not known)
     const std::string& ModsDir() const { return modsDir_; }
     std::string ModDir(const std::string& mod) const;
-    // Zwischen Mods (ab Version 44): "bCString <func>(const bCString &in)" in der Mod <mod> aufrufen. false, wenn Mod oder Funktion fehlt, bei Skriptfehler
-    // oder zu tiefer Verschachtelung (hoechstens 8). out (SStr*) bekommt den Rueckgabetext. HasModTextFunction: gibt es die Funktion dort?
+    // Between mods (from version 44): call "bCString <func>(const bCString &in)" in the mod <mod>. false if the mod or the function is missing, for a script error
+    // or for too deep nesting (maximum 8). out (SStr*) gets the return text. HasModTextFunction: does the function exist there?
     bool CallModText(const std::string& mod, const std::string& func, const void* arg, void* out);
     bool HasModTextFunction(const std::string& mod, const std::string& func);
-    // "void OnModMessage(const bCString &in sender, const bCString &in topic, const bCString &in data)" in allen anderen Mods; Rueckgabe: Zahl der Empfaenger
+    // "void OnModMessage(const bCString &in sender, const bCString &in topic, const bCString &in data)" in all other mods; return value: the number of receivers
     int SendModMessage(const void* topic, const void* data);
 
-    // fuer die Bindings
+    // for the bindings
     static ScriptHost* s_current;
     void Check(bool ok, const char* msg);
     float (*frameTime)() = nullptr;
@@ -98,22 +98,22 @@ private:
         unsigned long long mtime = 0;
         bool mainDone = false;
         asIScriptFunction *fMain = nullptr, *fFrame = nullptr, *fKey = nullptr;
-        std::unordered_map<std::string, asIScriptFunction*> fnCache;   // Deklaration -> Funktion (auch nullptr gemerkt)
+        std::unordered_map<std::string, asIScriptFunction*> fnCache;   // declaration -> function (nullptr is also kept)
     };
     struct Chain {
         const char* decl;
         EvArg args[8];
         int n = 0;
-        size_t next = 0;   // naechste Mod, die in der Kette dran ist
+        size_t next = 0;   // next mod in the chain
         std::function<bool(const EvArg*)> original;
         bool originalCalled = false;
     };
     std::vector<Chain> chain_;
     asIScriptFunction* FindFn(Mod& m, const char* decl);
     bool Execute(void* func, float* argFloat, const int* argInt = nullptr, const bool* argBool = nullptr, const EvArg* ev = nullptr,
-                 int nev = 0, bool* retBool = nullptr, void* retText = nullptr);   // retText: SStr* fuer Funktionen mit bCString-Rueckgabe
+                 int nev = 0, bool* retBool = nullptr, void* retText = nullptr);   // retText: SStr* for functions with a bCString return value
     int modCallDepth_ = 0;
-    bool Build(Mod& m);   // (neu) uebersetzen; vorher OnShutdown + Verwerfen des alten Moduls
+    bool Build(Mod& m);   // compile (again); first OnShutdown and discard the old module
     void Unload(Mod& m);
     Mod* Find(const std::string& name);
     void CallIn(Mod& m, const char* decl);
@@ -127,93 +127,93 @@ private:
     bool busyKey_ = false;
 };
 
-// Registrierung bei AngelScript pruefen: bei einem Fehler (r < 0) ins Protokoll schreiben und ok auf false setzen
+// check a registration with AngelScript: if there is an error (r < 0), write to the log and set ok to false
 inline void CheckRegistration(int r, const char* what, bool& ok) {
     if (r >= 0) return;
     ok = false;
     if (ScriptHost::s_current) ScriptHost::s_current->Log("Registrierung fehlgeschlagen (" + std::to_string(r) + "): " + what);
 }
-// Aufrufstelle: G3ASM_REG(engine->RegisterGlobalFunction(...)); braucht eine Variable "bool ok" im Gueltigkeitsbereich und gibt den Aufrufausdruck als Text mit aus
+// call site: G3ASM_REG(engine->RegisterGlobalFunction(...)); needs a variable "bool ok" in the scope and also writes the call expression as text
 #define G3ASM_REG(call) ::g3asm::CheckRegistration((call), #call, ok)
 
-// Eigenen Text fuer eine Text-ID registrieren (quest_bindings.cpp; installiert bei Bedarf die eCLocString-Hooks)
+// register your own text for a text ID (quest_bindings.cpp; installs the eCLocString hooks when necessary)
 void RegisterTextForId(const std::string& id, const std::string& text);
-void RegisterTextWide(const std::string& id, const std::wstring& text);   // Unicode; speichert immer, Hooks werden bei Bedarf nachgeholt
-bool EnsureTextHooks();                                                   // true, sobald die Text-Hooks aktiv sind
-std::string CurrentGameLanguage();   // "English", "German", ...; leer, solange das Spiel nicht bereit ist
-// Beim Laden: Manager, der gerade neu aufgebaut wird, fuer die Bindings vorruebergehend als "aktueller" Manager setzen (nullptr = zurueck)
+void RegisterTextWide(const std::string& id, const std::wstring& text);   // Unicode; always saves, the hooks are installed later when necessary
+bool EnsureTextHooks();                                                   // true when the text hooks are active
+std::string CurrentGameLanguage();   // "English", "German", ...; empty while the game is not ready
+// During a load: set the manager that the game makes again temporarily as the "current" manager for the bindings (nullptr = back)
 void SetQuestManagerOverride(void* mgr);
 void SetInfoManagerOverride(void* mgr);
-// vor gCInfoManager_PS::LoadInfosFromInis: per Skript angelegte Infos austragen (sonst bleiben ihre Namen in der Namens-Tabelle belegt); Rueckgabe = Anzahl
+// before gCInfoManager_PS::LoadInfosFromInis: remove infos that scripts made (if not, their names stay in use in the name table); return value = count
 int ForgetCreatedInfos(void* mgr);
-// Hook auf gCInfoManager_PS::OnInfoScriptFinished -> Skript-Ereignis OnInfoFinished (dialog_bindings.cpp)
+// hook on gCInfoManager_PS::OnInfoScriptFinished -> script event OnInfoFinished (dialog_bindings.cpp)
 void InstallInfoHook(ScriptHost& host);
 
-// Name der Template-Entity (z. B. Item) zu einer Property-ID (GUID); leer, wenn unbekannt (engine_bindings.cpp)
+// name of the template entity (for example an item) for a property ID (GUID); empty if not known (engine_bindings.cpp)
 std::string TemplateNameForId(const void* propertyId);
-// Mod-Namen in Ladereihenfolge (load_order.txt, abgeschaltete weggelassen) - script_host.cpp
+// mod names in the load order (load_order.txt, without the mods that are off) - script_host.cpp
 std::vector<std::string> DiscoverModNames(const std::string& modsDir);
-// Datei-Patches (file_patches.cpp): <Mod>\ScriptPatches\*.patch (Unified Diff) auf Datendateien des Spiels anwenden; Rueckgabe = Zahl gepatchter Dateien
+// File patches (file_patches.cpp): apply <mod>\ScriptPatches\*.patch (unified diff) to data files of the game; return value = number of patched files
 int ApplyScriptPatches(const std::string& gameDir, const std::string& modsDir, const std::function<void(const std::string&)>& log);
-// Gepackte Mods (packed_mods.cpp): <Spiel>\Data\G3ASM.mod/.m00/... nach <modsDir>\<Mod>\ entpacken (mit Markierung .g3asm_packed), veraltete
-// entpackte Mods entfernen; lose Ordner ohne Markierung bleiben unangetastet und gewinnen. Rueckgabe = Zahl der gepackten Mods, die jetzt bereitliegen
+// Packed mods (packed_mods.cpp): unpack <game>\Data\G3ASM.mod/.m00/... to <modsDir>\<mod>\ (with the marker .g3asm_packed), remove old
+// unpacked mods. Loose folders without a marker stay without changes and have priority. Return value = number of packed mods that are now ready
 int ExtractPackedMods(const std::string& gameDir, const std::string& modsDir, const std::function<void(const std::string&)>& log);
-// Namen einer Info (Info, Besitzer, Quest) fuer den Override-Hook (dialog_bindings.cpp)
+// names of an info (info, owner, quest) for the override hook (dialog_bindings.cpp)
 bool InfoNames(const void* info, std::string* name, std::string* owner, std::string* quest);
-// Optionen der Spielereignisse: Nav_*-Bereiche (interne Navigationszonen der NPCs) an OnEnter/OnLeave melden? (Standard: nein)
+// Options of the game events: report Nav_* areas (internal navigation zones of the NPCs) to OnEnter/OnLeave? (default: no)
 void SetGameHookOptions(bool navEvents);
 
-// Held-Treffer: Spielfigur erkennen, Lebenspunkte-Attribut aendern (engine_bindings.cpp)
+// hero hit: detect the player character, change the hit point attribute (engine_bindings.cpp)
 bool IsPlayerEntity(const void* p);
-// Aktueller Gegner eines NPCs/Helden (gCNPC_PS::CurrentAttackerEntity); nullptr, wenn keiner oder kein NPC (game_hooks.cpp)
+// current opponent of an NPC or the hero (gCNPC_PS::CurrentAttackerEntity); nullptr if there is none or no NPC (game_hooks.cpp)
 void* CurrentAttackerOf(void* ent);
-// Item (eCEntity*) im Ausruestungs-Slot eines Entity oder nullptr (game_hooks.cpp)
+// item (eCEntity*) in the equipment slot of an entity, or nullptr (game_hooks.cpp)
 void* SlotItemOf(void* ent, int slot);
-void SetScriptHurt(bool on);   // HurtHitPoints: der Schaden-Hook meldet den naechsten Abzug ohne Angreifer
+void SetScriptHurt(bool on);   // HurtHitPoints: the damage hook reports the next decrease without an attacker
 bool AdjustHeroHitPoints(const void* ent, int delta);
 
-// Spielereignisse (game_hooks.cpp): Hooks auf Game.dll einhaengen; Rueckgabe = Zahl aktiver Hooks
+// Game events (game_hooks.cpp): install hooks on Game.dll; return value = number of active hooks
 int InstallGameHooks(ScriptHost& host);
-// Spielskripte nach Namen (script_calls.cpp): Hooks auf gCScriptAdmin::RunScript/RunScriptFromScript, Bindings CallScript/WatchScript/...
-int InstallScriptCallHooks(ScriptHost& host);   // nach InstallGameHooks (Game.dll geladen, MinHook bereit)
+// Game scripts by name (script_calls.cpp): hooks on gCScriptAdmin::RunScript/RunScriptFromScript, bindings CallScript/WatchScript/...
+int InstallScriptCallHooks(ScriptHost& host);   // after InstallGameHooks (Game.dll loaded, MinHook ready)
 void SetScriptCallOptions(bool stats);   // ini [g3asm] scriptlog
-void ScriptCallsFrame();                 // einmal je Bild im Spiel-Thread
+void ScriptCallsFrame();                 // 1 time for each frame in the game thread
 void ScriptCallsReport();
-// Zeichen-API (draw_api.cpp): Hook auf GFC CFFGFCWnd::OnPaint -> Ereignis OnDraw(); DrawFrameTick einmal je Spielbild
+// Drawing API (draw_api.cpp): hook on GFC CFFGFCWnd::OnPaint -> event OnDraw(); DrawFrameTick 1 time for each game frame
 int InstallDrawHooks(ScriptHost& host);
 void DrawFrameTick();
-// Laeuft der Aufrufer im Spiel-Thread (dem Thread von OnFrame)? false, solange noch kein Bild lief (script_calls.cpp)
+// Does the caller run in the game thread (the thread of OnFrame)? false while no frame ran yet (script_calls.cpp)
 bool OnGameThread();
-bool OnForeignThread();   // Spiel-Thread bekannt und der Aufrufer ist ein anderer
-// Ereignisse 7.3 (more_events.cpp): Konsole, Quest-Status
+bool OnForeignThread();   // game thread known, and the caller is a different thread
+// Events 7.3 (more_events.cpp): console, quest status
 int InstallMoreEventHooks(ScriptHost& host);
 void MoreEventsFrame();
-// Einstellungen je Mod (mod_settings.cpp, ab Version 44): Bindings; ModSettingsForget beim Neuladen einer Mod (Zwischenspeicher verwerfen)
+// Settings for each mod (mod_settings.cpp, from version 44): bindings; ModSettingsForget when a mod reloads (discard the cache)
 bool RegisterModSettingsBindings(asIScriptEngine* e);
 void ModSettingsForget(const std::string& mod);
-// Abschnitt einer ini-Datei (Schluessel klein geschrieben, Werte getrimmt; UTF-8-BOM erlaubt); leer, wenn Datei/Abschnitt fehlt
+// section of an ini file (keys in lower case, values trimmed; UTF-8 BOM permitted); empty if the file or the section is missing
 std::map<std::string, std::string> ReadIniSection(const std::string& path, const std::string& section);
-// KI-Tracer (ai_trace.cpp): nur Protokoll, ini [g3asm] aitrace/aitracefilter/aitracemax; InstallAiTrace haengt nur ein, wenn eingeschaltet
+// AI tracer (ai_trace.cpp): only log, ini [g3asm] aitrace/aitracefilter/aitracemax; InstallAiTrace installs only if turned on
 void SetAiTraceOptions(bool enabled, const char* filter, int maxLines);
 void SetAniSpeedLog(bool enabled);   // ini [g3asm] anispeedlog: Messung SetPlaySpeed/GetPlaySpeed (Roadmap 6.3)
 int InstallAiTrace(ScriptHost& host);
-// Eingriffe mitten in Spielskripten (combat_patches.cpp, Originalbytes geprueft): Override_MonsterDamage; bei jeder Weltaktivierung aufrufen (einmalig wirksam)
-int InstallScriptGamePatches(ScriptHost& host);   // einmal je Bild (Spiel-Takt): OnTouch-Handler, Verwandlungs-Hooks, Messung
-// Script.dll-Entity-Objekt (0xA8 Byte, gemessen) per Konstruktor der Script.dll bauen; Puffer mit kScriptEntityBytes, Ausrichtung 8
+// Changes in the middle of game scripts (combat_patches.cpp, original bytes checked): Override_MonsterDamage; call at each world activation (effect only 1 time)
+int InstallScriptGamePatches(ScriptHost& host);   // 1 time for each frame (game cycle): OnTouch handler, transformation hooks, measurement
+// build a Script.dll entity object (0xA8 bytes, measured) with the constructor of Script.dll; buffer with kScriptEntityBytes, alignment 8
 constexpr unsigned kScriptEntityBytes = 0x100;
-bool MakeScriptEntity(void* buf, void* ent);                // Messung jetzt schreiben (beim Entladen einer Welt)
-int CallGameScript(const char* name, void* self, void* other, int arg);   // Spielskript nach Namen (script_calls.cpp), 0 wenn nicht moeglich
+bool MakeScriptEntity(void* buf, void* ent);                // write the measurement now (when a world unloads)
+int CallGameScript(const char* name, void* self, void* other, int arg);   // game script by name (script_calls.cpp), 0 if not possible
 
-// Spielfenster (groesstes sichtbares Hauptfenster des Prozesses), nullptr falls noch keins
+// game window (largest visible main window of the process), nullptr if there is none yet
 HWND__* GameWindow();
-// Ist [p, p + n) lesbar (eingecheckter Speicher, Leseschutz)? Prueft per VirtualQuery ohne Ausnahme. Dient dazu, geratene Zeiger vorab zu verwerfen, statt den
-// Zugriffsfehler per SEH abzufangen (jede abgefangene Ausnahme erscheint im Absturzprotokoll des Proxys als "ABSTURZ-Kandidat" und kostet Zeit).
+// Is [p, p + n) readable (committed memory, read protection)? Checks with VirtualQuery without an exception. Use it to discard guessed pointers first, in place of
+// catching the access violation with SEH (each caught exception shows in the crash log of the proxy as "ABSTURZ-Kandidat" (crash candidate) and costs time).
 bool ReadableMem(const void* p, size_t n);
-// Text eines bCString (SharedBase), fallback bei Nullzeiger, unlesbarem Speicher oder Ausnahme. Der Zeiger gilt nur, solange der bCString lebt.
+// text of a bCString (SharedBase); fallback for a null pointer, unreadable memory or an exception. The pointer is valid only while the bCString exists.
 const char* SafeStrText(const void* s, const char* fallback);
-// Exportierte Funktion sym aus Modul m per MinHook umleiten und einschalten; Fehler (Export fehlt, Einhaengen fehlgeschlagen) stehen im Protokoll.
+// redirect the exported function sym from module m with MinHook and turn it on; errors (export missing, install failed) are in the log.
 bool HookExport(HINSTANCE__* m, const char* sym, void* detour, void** orig, ScriptHost& host);
-// Unerwarteter Nullzeiger aus der Engine in einem Hook: einmal je Stelle protokollieren ("where" muss ein fester Text sein, er dient als Schluessel).
+// unexpected null pointer from the engine in a hook: log it 1 time for each location ("where" must be a fixed text, it is the key).
 void NoteNull(const char* where);
 
 }   // namespace g3asm

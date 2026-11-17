@@ -1,12 +1,12 @@
-// Mess-Mod Lernkosten (ab API 42), Vorbild: Plugin LearningThresholdTweaks.
-// Halbiert bei Lehrern die Lernpunkte (aufgerundet) und das Gold fuer Attribute. Ist im Spiel "Alternative Balance" an und das Attribut schon 250, hat das
-// Spiel beides verdoppelt (lp = 2 * amount); diese Verdopplung nimmt die Mod zuerst zurueck, wie der Modus NoThreshold des Plugins.
+// Measurement mod for learn costs (from API 42), model: plugin LearningThresholdTweaks.
+// At teachers, halves the learn points (rounded up) and the gold for attributes. If "Alternative Balance" is on in the game and the attribute is already 250, the
+// game has doubled the two (lp = 2 * amount). The mod first removes this doubling, as the mode NoThreshold of the plugin does.
 int g_logged = 0;
 
 bool Override_LearnCost(const bCString &in info, const bCString &in attrib, int amount, int lp, int gold) {
     int baseLp = lp;
     int baseGold = gold;
-    if (amount > 0 && lp == 2 * amount) {   // Schwelle des Spiels aktiv
+    if (amount > 0 && lp == 2 * amount) {   // threshold of the game active
         baseLp = amount;
         baseGold = gold / 2;
     }

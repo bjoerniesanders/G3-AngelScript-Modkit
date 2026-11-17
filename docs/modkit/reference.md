@@ -1,9 +1,11 @@
 # Referenz: Werte, Namen und Konstanten
 
-Alle Angaben hier sind **geprüft**. Jede Tabelle nennt ihre Quelle:
+**Deutsch** | [English](../en/modkit/reference.md)
 
-- **SDK**: Aufzählung aus dem Gothic-3-SDK (`GameEnum.h`), von uns übernommen.
-- **gemessen**: im Spiel beobachtet (Protokolle von G3ASM).
+Alle Angaben auf dieser Seite sind **geprüft**. Jede Tabelle nennt ihre Quelle:
+
+- **SDK**: Aufzählung aus dem Gothic-3-SDK (`GameEnum.h`), in G3ASM übernommen.
+- **Gemessen**: im Spiel beobachtet (Protokolle von G3ASM).
 - **Dump**: mit der Mod `probe_reference` aus dem laufenden Spiel gelesen (Abschnitt 9).
 
 Was hier nicht steht, ist nicht belegt. Listen aus dem Netz mit Namen wie `Spell_Fireball`, `DamageType_Edge` oder `Strength` stimmen nicht mit dem
@@ -20,58 +22,62 @@ Spiel überein. Die richtigen Namen:
 
 ## 1. Schadensarten (`type` in `Override_Damage` und `OnDamage`)
 
-Quelle: SDK `gEDamageType`; die Zuordnung zu Waffen ist gemessen. Die Art wird aus dem **angreifenden Item** gelesen (`gCDamage_PS`), nicht aus dem Opfer.
+Quelle: SDK `gEDamageType`. Die Zuordnung zu Waffen ist gemessen. Das Modkit liest die Art aus dem **Item des Angreifers** (`gCDamage_PS`), nicht aus
+dem Opfer.
 
-| Wert | Name | gemessen |
+| Wert | Name | Gemessen |
 |---|---|---|
 | 0 | None | Rückfall: kein Item lesbar (Sturz, Schaden über Zeit, Zauber-Item `It_Spell_*`) |
 | 1 | Impact | Keule `It_1H_Club_01`, Tierangriffe (`Fist`) |
 | 2 | Blade | Schwerter (`It_1H_OrcSlayer_01`, `It_1H_Broadsword_01`), Hellebarde `It_Halberd_01`, Speer `It_Staff_Spear_01` |
 | 3 | Missile | Pfeil `Arrow` (auch das Munitions-Item im Köcher) |
 | 4 | Fire | Feuerball `Mis_Fireball` |
-| 5 | Ice | nicht gemessen |
-| 6 | Lightning | nicht gemessen |
-| 7 | Physics | nicht gemessen |
+| 5 | Ice | Nicht gemessen |
+| 6 | Lightning | Nicht gemessen |
+| 7 | Physics | Nicht gemessen |
 
 ## 2. Statuseffekte (`Entity.HasStatusEffect`, `OnStatusEffect`)
 
 Quelle: SDK `gEStatusEffect` (Bitmaske am `gCNPC_PS`). Konstanten im Skript: `STATUS_*`.
 
-| Bit | Konstante | Bedeutung | gemessen |
+| Bit | Konstante | Bedeutung | Gemessen |
 |---|---|---|---|
-| 1 | `STATUS_BURNING` | brennend | nicht gemessen |
-| 2 | `STATUS_FROZEN` | gefroren | nicht gemessen |
-| 4 | `STATUS_POISONED` | vergiftet | nicht gemessen |
-| 8 | `STATUS_DISEASED` | krank | vom Waran übertragen (zweimal gemessen), das Ereignis kam im selben Moment wie der erste Biss. Danach blieb die Ausdauer `SP` 25 Sekunden lang bei 1 bis 2 (Messung im Kampf, ein Ruhetest fehlt noch) |
-| 16 | `STATUS_TRANSFORMED` | verwandelt | nicht gemessen |
-| 64 | `STATUS_IN_FOG` | im Nebel | nicht gemessen |
-| 128 | `STATUS_GHOST` | Geist | nicht gemessen |
-| 256 | `STATUS_IN_MAGIC_BARRIER` | in Magiebarriere | nicht gemessen |
-| 512 | `STATUS_SOULTRAVEL` | Seelenreise aktiv | nicht gemessen |
+| 1 | `STATUS_BURNING` | Brennend | Nicht gemessen |
+| 2 | `STATUS_FROZEN` | Gefroren | Nicht gemessen |
+| 4 | `STATUS_POISONED` | Vergiftet | Nicht gemessen |
+| 8 | `STATUS_DISEASED` | Krank | Vom Waran übertragen (zweimal gemessen). Das Ereignis kam im selben Moment wie der erste Biss. Danach blieb die Ausdauer `SP` 25 Sekunden lang bei 1 bis 2 (Messung im Kampf, ein Ruhetest fehlt noch) |
+| 16 | `STATUS_TRANSFORMED` | Verwandelt | Nicht gemessen |
+| 64 | `STATUS_IN_FOG` | Im Nebel | Nicht gemessen |
+| 128 | `STATUS_GHOST` | Geist | Nicht gemessen |
+| 256 | `STATUS_IN_MAGIC_BARRIER` | In Magiebarriere | Nicht gemessen |
+| 512 | `STATUS_SOULTRAVEL` | Seelenreise aktiv | Nicht gemessen |
 
-Zustände wie „zu Boden geschlagen“, „besiegt“ oder „tot“ sind **keine** Statuseffekte, sie laufen über KI-Modi (Abschnitt 6).
+Zustände wie „zu Boden geschlagen“, „besiegt“ oder „tot“ sind **keine** Statuseffekte. Sie laufen über KI-Modi (Abschnitt 6).
 
 ## 3. Item-Qualität (`Entity.GetSlotQuality`, `SetSlotQuality`)
 
-Quelle: SDK `gEItemQuality` (Bitmaske am Inventarstapel, bei `gCItem_PS` Offset `0x18`, beim Stapel `0x40`). Konstanten im Skript: `QUALITY_*`.
+Quelle: SDK `gEItemQuality` (Bitmaske am Inventarstapel, bei `gCItem_PS` am Offset `0x18`, beim Stapel am Offset `0x40`). Konstanten im Skript:
+`QUALITY_*`.
 
 | Bit | Konstante | Anzeige in der Waffenbeschreibung (Textschlüssel) |
 |---|---|---|
-| 2 | `QUALITY_DISEASED` | keine |
+| 2 | `QUALITY_DISEASED` | Keine |
 | 4 | `QUALITY_POISONED` | `HUD_Quality_Poison` (Symbol 0) |
-| 8 | `QUALITY_BURNING` | keine |
-| 16 | `QUALITY_FROZEN` | keine |
+| 8 | `QUALITY_BURNING` | Keine |
+| 16 | `QUALITY_FROZEN` | Keine |
 | 32 | `QUALITY_SHARP` | `HUD_Quality_Sharp` (Symbol 1) |
 | 64 | `QUALITY_BLESSED` | `HUD_Quality_Blessed` (Symbol 2) |
 | 128 | `QUALITY_FORGED` | `HUD_Quality_Selfmade` (Symbol 3) |
 | 256 | `QUALITY_WORN` | `HUD_Quality_Worn` (Symbol 4) |
-| **512** | `QUALITY_LIFESTEAL` | eigenes Bit dieses Modkits; `HUD_Quality_Lifesteal` aus der Mod-Stringtabelle |
+| **512** | `QUALITY_LIFESTEAL` | Eigenes Bit dieses Modkits. `HUD_Quality_Lifesteal` aus der Mod-Stringtabelle |
 
-Die Anzeige (gemessen im Assembler, `Game.dll+0xA3DF0`) kennt nur die Bits 4, 32, 64, 128 und 256. Die Präfixe der Zeilen sind `(+10)` bei Scharf, Gesegnet und Selbstgeschmiedet, leer bei Vergiftet und Abgenutzt.
+Die Anzeige (gemessen im Assembler, `Game.dll+0xA3DF0`) kennt nur die Bits 4, 32, 64, 128 und 256. Die Präfixe der Zeilen sind `(+10)` bei Scharf,
+Gesegnet und Selbstgeschmiedet und leer bei Vergiftet und Abgenutzt.
 
 ## 4. Ausrüstungs-Slots (`Entity.GetSlotQuality(slot)`)
 
-Quelle: SDK `gESlot`. Gemessen: Eine gezogene Waffe liegt in der rechten Hand, ein gezogener Bogen in der linken, weggesteckte Waffen auf dem Rücken, ein weggesteckter Bogen im Slot 7. Der Stapel (und damit die Qualität) wandert mit der Waffe zwischen den Slots.
+Quelle: SDK `gESlot`. Gemessen: Eine gezogene Waffe liegt in der rechten Hand, ein gezogener Bogen in der linken. Weggesteckte Waffen liegen auf dem
+Rücken, ein weggesteckter Bogen im Slot 7. Der Stapel (und damit die Qualität) wandert mit der Waffe zwischen den Slots.
 
 | Wert | Name | Konstante im Skript |
 |---|---|---|
@@ -87,7 +93,7 @@ Quelle: SDK `gESlot`. Gemessen: Eine gezogene Waffe liegt in der rechten Hand, e
 | 9 | Armor | |
 | 10 | Belt | |
 | 11 | Amulet | |
-| 12 / 13 | Ring1 / Ring2 | |
+| 12, 13 | Ring1, Ring2 | |
 | 14 | Ammo | `SLOT_AMMO` |
 | 15 | Hair | |
 | 16 | Head | |
@@ -100,21 +106,21 @@ Quelle: SDK `gEItemCategory` und `gEUseType` (Auszug zu Waffen und Ausrüstung).
 
 | Kategorie | Wert |
 |---|---|
-| None / Weapon / Armor / Artefact / Alchemy | 0 / 1 / 2 / 3 / 4 |
-| Misc / Written / Spellbook / Skill | 6 / 7 / 9 / 10 |
+| None, Weapon, Armor, Artefact, Alchemy | 0, 1, 2, 3, 4 |
+| Misc, Written, Spellbook, Skill | 6, 7, 9, 10 |
 
 | Nutzungsart `gEUseType` | Wert |
 |---|---|
-| 1H / 2H | 2 / 3 |
-| Arrow / Bow / CrossBow / Bolt | 4 / 5 / 6 / 7 |
-| Fist / Shield / Armor / Helmet / Staff | 8 / 9 / 10 / 11 / 12 |
-| Amulet / Ring / Cast | 13 / 14 / 15 |
-| Potion / Plant / Meat / Fruit / Bread | 16 / 17 / 18 / 19 / 20 |
-| Halberd / Axe | 51 / 52 |
+| 1H, 2H | 2, 3 |
+| Arrow, Bow, CrossBow, Bolt | 4, 5, 6, 7 |
+| Fist, Shield, Armor, Helmet, Staff | 8, 9, 10, 11, 12 |
+| Amulet, Ring, Cast | 13, 14, 15 |
+| Potion, Plant, Meat, Fruit, Bread | 16, 17, 18, 19, 20 |
+| Halberd, Axe | 51, 52 |
 
 ## 6. KI-Modi
 
-Quelle: SDK `gEAIMode` (`gCScriptRoutine_PS`). Zustände wie „besiegt“ und „tot“ stehen hier.
+Quelle: SDK `gEAIMode` (`gCScriptRoutine_PS`). Hier stehen Zustände wie „besiegt“ und „tot“.
 
 | Wert | Modus |
 |---|---|
@@ -133,15 +139,16 @@ Quelle: SDK `gEAIMode` (`gCScriptRoutine_PS`). Zustände wie „besiegt“ und �
 
 Quelle: Doku des Modkits (`api-reference.md`) und Messung. Kennungen sind Zeichenketten wie `"STR"`.
 
-| Kennung | Bedeutung | gemessen |
+| Kennung | Bedeutung | Gemessen |
 |---|---|---|
 | `HP` | Lebenspunkte | Held und NPCs |
-| `SP` | **Ausdauer** | Held: Maximum 150, sinkt im Kampf (150 → 78) und regeneriert danach wieder; bei Krankheit blieb sie im Kampf bei 1 bis 2 |
+| `SP` | **Ausdauer** | Held: Maximum 150. Sinkt im Kampf (150 → 78) und regeneriert danach wieder. Bei Krankheit blieb sie im Kampf bei 1 bis 2 |
 | `STR`, `DEX`, `INT`, `ALC`, `THF` | Attribute und Fertigkeiten, die Quests vergeben | Dump (Abschnitt 9): von Quests als Belohnung vergeben |
-| `SMT` | Schmiedekunst | wird von 13 Quests vergeben (Dump). Das früher dokumentierte `SMI` liefert beim Helden 0; ob es eine gültige Kennung ist, ist nicht geklärt |
-| `MP`, `XP`, `LP` | Mana, Erfahrung, Lernpunkte | Held liefert Werte (`MP` 100/100, `XP` 0, `LP` 0 im Dump-Spielstand); Bedeutung nach den Namen angenommen |
+| `SMT` | Schmiedekunst | 13 Quests vergeben es (Dump). Das früher dokumentierte `SMI` liefert beim Helden 0. Ob es eine gültige Kennung ist, ist nicht geklärt |
+| `MP`, `XP`, `LP` | Mana, Erfahrung, Lernpunkte | Der Held liefert Werte (`MP` 100/100, `XP` 0, `LP` 0 im Dump-Spielstand). Die Bedeutung ist nach den Namen angenommen |
 
-Operationen von `gCPlayerMemory_PS::ApplyMod` (SDK `EAttribModOperation`): 0 AddToVal, 1 AddToMax, 2 AddPercentageToVal, 3 AddPercentageToMax, 4 SetVal, 5 SetMax, 6 SetValToPercentage, 7 SetMaxToPercentage, 8 SetValToMax.
+Operationen von `gCPlayerMemory_PS::ApplyMod` (SDK `EAttribModOperation`): 0 AddToVal, 1 AddToMax, 2 AddPercentageToVal, 3 AddPercentageToMax,
+4 SetVal, 5 SetMax, 6 SetValToPercentage, 7 SetMaxToPercentage, 8 SetValToMax.
 
 ## 8. Beispiel: eine Waffe im Detail (`It_1H_OrcSlayer_01`)
 
@@ -151,25 +158,27 @@ Quelle: gemessen mit `ListProperties` (Mod `demo_properties`) im laufenden Spiel
 |---|---|---|
 | `Item.GoldValue` | 600 | Handelswert |
 | `Item.Category` | 1 (`Weapon`) | Kategorie |
-| `Item.ReqAttrib1Tag` / `Op` / `Value` | `STR`, `ValGreaterEqual`, 100 | Voraussetzung: Stärke mindestens 100 |
+| `Item.ReqAttrib1Tag`, `Op`, `Value` | `STR`, `ValGreaterEqual`, 100 | Voraussetzung: Stärke mindestens 100 |
 | `Item.RequiredSkill1` | `Perk_1H_1` | Voraussetzung: Talent „Einhandkampf“ der Stufe 1 |
-| **`Item.ActivateSkill1`** | **`Perk_OrcSlayer`** | **„Bonustalent“: Solange die Waffe geführt wird, gilt das Talent (in der Beschreibung „Bonustalent Orktöter“)** |
-| `Item.ModAttrib1…6` | leer | keine Attributänderung |
+| **`Item.ActivateSkill1`** | **`Perk_OrcSlayer`** | **„Bonustalent“: Solange der Held die Waffe führt, gilt das Talent (in der Beschreibung „Bonustalent Orktöter“)** |
+| `Item.ModAttrib1…6` | Leer | Keine Attributänderung |
 | `Damage.DamageType` | 2 (`Blade`) | Klingenschaden |
 | `Damage.DamageAmount` | 50 | Grundschaden |
 | `Interaction.UseType` | 2 (`1H`) | Einhandwaffe |
 
-`RequiredSkill` ist die Voraussetzung zum Führen, `ActivateSkill` das Talent, das die Waffe dazugibt. Der Wert ist der Name der Talent-Vorlage und ihre ID, `Perk_OrcSlayer` ist ein eigenes Talent (`gCSkill_PS`, Tag `OrcSlayer`, Voraussetzung `STR`), zu dem es das Lern-Item `It_Perk_Orcslayer` gibt.
-Im Spiel sind `ReqAttrib2…4Op` in den Eigenschaftsdaten fälschlich als `ReqAttrib1Op` benannt (Fehler des Spiels, steht auch im SDK); `ListProperties` zeigt deshalb mehrfach `ReqAttrib1Op`.
+`RequiredSkill` ist die Voraussetzung zum Führen. `ActivateSkill` ist das Talent, das die Waffe dazugibt. Der Wert ist der Name der Talent-Vorlage und
+ihre ID. `Perk_OrcSlayer` ist ein eigenes Talent (`gCSkill_PS`, Tag `OrcSlayer`, Voraussetzung `STR`). Dazu gibt es das Lern-Item
+`It_Perk_Orcslayer`. Im Spiel heißen `ReqAttrib2…4Op` in den Eigenschaftsdaten fälschlich `ReqAttrib1Op`. Das ist ein Fehler des Spiels und steht auch
+im SDK. `ListProperties` zeigt deshalb mehrfach `ReqAttrib1Op`.
 
 ## 9. Namen aus dem Spiel (Dump)
 
-**Wichtig zur Suche:** `FindTemplateNames` findet Namen, die mit dem Suchtext **beginnen**; Groß- und Kleinschreibung zählt nicht. Die Gruppe
+**Wichtig zur Suche:** `FindTemplateNames` findet Namen, die mit dem Suchtext **beginnen**. Groß- und Kleinschreibung zählt nicht. Die Gruppe
 `Teleport` enthält deshalb `Teleport_Ardea`, aber nicht `Spl_Teleport_Ardea`. Die Gruppe `Spl_` stammt aus einem älteren Dump mit höchstens 200
 Treffern und kann unvollständig sein.
 
-Die Mod `probe_reference` (Ziffernblock `/`) schreibt Attribute und Vorlagen-Gruppen ins Protokoll (`g3asm.log`, Zeilen `[probe_reference] …`). Der Text zwischen den Markierungen
-wird von `tools/reference_from_log.py` aus dem Protokoll erzeugt und nicht von Hand gepflegt.
+Die Mod `probe_reference` (Ziffernblock `/`) schreibt Attribute und Vorlagen-Gruppen ins Protokoll (`g3asm.log`, Zeilen `[probe_reference] …`). Den
+Text zwischen den Markierungen erzeugt `tools/reference_from_log.py` aus dem Protokoll. Er wird nicht von Hand gepflegt.
 
 <!-- DUMP-ANFANG -->
 Quelle: Dump der Mod `probe_reference` aus dem laufenden Spiel, erzeugt mit `tools/reference_from_log.py`. `FindTemplateNames` liefert die meisten Namen mehrfach; unten stehen eindeutige Namen.

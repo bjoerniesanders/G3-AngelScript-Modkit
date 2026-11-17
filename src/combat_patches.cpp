@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Eingriffe mitten in Spielskripten der Script_Game.dll (Skript-Schnittstelle ab Version 42). Anders als die uebrigen Hooks haengen sie nicht an einem
-// Export, sondern an einer festen Stelle: Vor dem Umleiten werden die Originalbytes Byte fuer Byte verglichen. Passt eine Stelle nicht (andere Version der
-// Script_Game.dll, oder eine Script-DLL wie Script_MonsterDamage.dll hat sie schon geaendert), bleibt sie unberuehrt und das Protokoll sagt es.
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// Changes in the middle of game scripts of Script_Game.dll (script interface from version 42). Different from the other hooks, they are not connected to an
+// export, but to a fixed location: before the redirection, the code compares the original bytes byte for byte. If a location does not agree (different version of
+// Script_Game.dll, or a script DLL such as Script_MonsterDamage.dll already changed it), it stays without changes, and the log tells this.
 //
-// Monsterschaden (AssessHit, Script_Game.dll RVA 0x2C05F, gemessen am Assembler 2026-11-10):
-//   Trifft ein Nicht-Humanoider (Monster, Tier) einen Humanoiden und ist keiner der beiden der Held, teilt AssessHit den Schaden durch 10, bei beschworenen
-//   Angreifern (PSParty::PartyMemberType == 5) durch 2 (eingefuehrt mit Patch 1.12). Danach rechnet AssessHit weiter (Verdopplung, Ruestung, Untergrenzen).
-//   An der Stelle steht der Schaden in esi, der Typ des Angreifers in eax; die Script.dll-Entities liegen im Stapelrahmen: Opfer [esp+30h], Angreifer [esp+198h]
-//   (erstes Feld je eCEntity*). Ersetzt werden die 31 Byte von "cmp eax,5" bis vor "mov esi,eax" (RVA 0x2C07E), dort geht es mit dem Ergebnis in eax weiter.
-//   bool Override_MonsterDamage(Entity victim, Entity attacker, int damage, int divisor): Super() teilt damage durch divisor (Argumente mit SetOverrideArg
-//   aenderbar, divisor <= 1 = keine Teilung); ohne Super() bekommt das Spiel damage ungeteilt.
+// Monster damage (AssessHit, Script_Game.dll RVA 0x2C05F, measured in the assembler code 2026-11-10):
+//   If a non-humanoid (monster, animal) hits a humanoid, and neither of the two is the hero, AssessHit divides the damage by 10. For summoned
+//   attackers (PSParty::PartyMemberType == 5), it divides by 2 (added with patch 1.12). After this, AssessHit continues the calculation (doubling, armor, lower limits).
+//   At the location, the damage is in esi and the type of the attacker in eax. The Script.dll entities are in the stack frame: victim [esp+30h], attacker [esp+198h]
+//   (first field of each is eCEntity*). The code replaces the 31 bytes from "cmp eax,5" to before "mov esi,eax" (RVA 0x2C07E). There, the code continues with the result in eax.
+//   bool Override_MonsterDamage(Entity victim, Entity attacker, int damage, int divisor): Super() divides damage by divisor (arguments can be changed with SetOverrideArg,
+//   divisor <= 1 = no division). Without Super(), the game gets damage without division.
 #include <windows.h>
 
 #include <cstdio>
@@ -55,10 +55,10 @@ void* EntityAt(const char* frame, unsigned off) {
 }
 
 int Divide(int damage, int divisor) {
-    return divisor > 1 ? damage / divisor : damage;   // wie das Original: Teilung mit Abschneiden Richtung 0
+    return divisor > 1 ? damage / divisor : damage;   // as the original: division with truncation toward 0
 }
 
-// Aufruf aus dem Stub: raw = Schaden vor der Teilung, partyType = Typ des Angreifers, frame = esp an der Stelle
+// call from the stub: raw = damage before the division, partyType = type of the attacker, frame = esp at the location
 int __cdecl MonsterDamage(int raw, int partyType, const char* frame) {
     const int divisor = partyType == 5 ? 2 : 10;
     if (!g_host || !OnGameThread() || !g_host->HasHandler(kMdDecl)) return Divide(raw, divisor);
@@ -92,7 +92,7 @@ __declspec(naked) void MonsterDamageStub() {
     __asm {
         push ecx
         push edx
-        lea edx, [esp + 8]   // esp an der Stelle
+        lea edx, [esp + 8]   // esp at the location
         push edx
         push eax
         push esi
@@ -126,7 +126,7 @@ bool PatchAt(unsigned char* at, const unsigned char* orig, size_t n, void* stub,
     FlushInstructionCache(GetCurrentProcess(), at, n);
     return true;
 }
-// Stelle wieder auf die Originalbytes setzen (wenn von mehreren zusammengehoerenden Stellen eine nicht umleitbar war)
+// set the location back to the original bytes (if one of more than one related location could not be redirected)
 void UnpatchAt(unsigned char* at, const unsigned char* orig, size_t n) {
     DWORD old = 0;
     if (!VirtualProtect(at, n, PAGE_EXECUTE_READWRITE, &old)) return;
@@ -135,16 +135,16 @@ void UnpatchAt(unsigned char* at, const unsigned char* orig, size_t n) {
     FlushInstructionCache(GetCurrentProcess(), at, n);
 }
 
-// ---------------------------------------------------------------- Lernkosten (Game.dll, gCInfo_PS, gemessen am Assembler 2026-11-10)
-// Eine Lehr-Info (ConditionType Teach = 16, Feld +0x28) mit TeachAttrib (+0x88, z. B. "STR") erhoeht das Attribut um TeachAttribValue (+0x8C) und kostet
-// ebenso viele Lernpunkte, dazu GoldCost (+0x34) Gold. Mit dem Schalter "Alternative Balance" der Community-Patches (eSSetupEngine +0x1EA) verdoppeln sich
-// Lernpunkte und Gold, wenn STR/DEX/INT schon 250 erreicht haben. Die Werte stehen nicht an einer Stelle, sondern werden dreimal ausgerechnet:
-//   Execute (Pruefung LP: [esp+18h] an 0x1C0C2B, ebp = Info; Pruefung und Bezahlung Gold: [esp+18h] an 0x1C0F35),
-//   OnEndInfo (Bezahlung LP: LP = [ebp+58h] - [ebx+8Ch] an 0x1C1B48, bei Verdopplung vorher ein zweites Mal an 0x1C1B2F; ebx = Info),
-//   GetDialogDescription (Anzeige LP: [esp+10h] an 0x1C637C, Info [esp+18h], Verdopplung Byte [esp+3Ch]; Anzeige Gold an 0x1C647B verdoppelt bzw. 0x1C64CF).
-// An allen sieben Stellen fragt der Hook dieselbe Kette: bool Override_LearnCost(info, attrib, amount, lp, gold) - lp und gold sind die Werte des Spiels
-// (mit Verdopplung), SetOverrideArg(3/4, ..) aendert sie. Nur Lehr-Infos fuer Attribute (TeachAttrib gesetzt, keine TeachSkill-Vorlage). Die Stellen werden
-// nur alle zusammen umgeleitet (sonst zeigte der Dialog einen anderen Preis als bezahlt wird).
+// ---------------------------------------------------------------- Learn costs (Game.dll, gCInfo_PS, measured in the assembler code 2026-11-10)
+// A teach info (ConditionType Teach = 16, field +0x28) with TeachAttrib (+0x88, for example "STR") increases the attribute by TeachAttribValue (+0x8C) and costs
+// the same number of learn points, and GoldCost (+0x34) gold. With the switch "Alternative Balance" of the Community Patches (eSSetupEngine +0x1EA), the game doubles
+// learn points and gold when STR/DEX/INT is already at 250. The values are not at one location. The game calculates them three times:
+//   Execute (check LP: [esp+18h] at 0x1C0C2B, ebp = info; check and payment gold: [esp+18h] at 0x1C0F35),
+//   OnEndInfo (payment LP: LP = [ebp+58h] - [ebx+8Ch] at 0x1C1B48; with doubling, first a second time at 0x1C1B2F; ebx = info),
+//   GetDialogDescription (display LP: [esp+10h] at 0x1C637C, info [esp+18h], doubling byte [esp+3Ch]; display gold at 0x1C647B doubled, or 0x1C64CF).
+// At all seven locations, the hook asks the same chain: bool Override_LearnCost(info, attrib, amount, lp, gold) - lp and gold are the values of the game
+// (with doubling), SetOverrideArg(3/4, ..) changes them. Only teach infos for attributes (TeachAttrib set, no TeachSkill template). The code redirects the locations
+// only all together (if not, the dialog would show a different price than the price that the player pays).
 constexpr unsigned kLcCount = 7;
 struct LcSite {
     unsigned rva, len;
@@ -164,12 +164,12 @@ const char* const kLcDecl = "bool Override_LearnCost(const bCString &in, const b
 typedef bool(__thiscall* ProxyValidFn)(const void*);
 ProxyValidFn g_proxyValid = nullptr;
 int g_lcLogged = 0;
-bool g_lcPayDouble = false;   // OnEndInfo: erste (zusaetzliche) Zahlung ausgelassen, die zweite zahlt den verdoppelten Preis
+bool g_lcPayDouble = false;   // OnEndInfo: the first (additional) payment is skipped, the second pays the doubled price
 
 int ReadInt(const char* p, unsigned off) {
     return ReadableMem(p + off, 4) ? *reinterpret_cast<const int*>(p + off) : 0;
 }
-// Lehr-Info fuer ein Attribut?
+// teach info for an attribute?
 bool IsAttribTeach(const char* info) {
     if (!info || !ReadableMem(info, 0x90)) return false;
     if (ReadInt(info, 0x28) != 16) return false;
@@ -177,7 +177,7 @@ bool IsAttribTeach(const char* info) {
     if (!a || !*a) return false;
     return !(g_proxyValid && g_proxyValid(info + 0x7C));
 }
-// which: 0 = Lernpunkte, 1 = Gold; doubled: Verdopplung des Spiels aktiv. Rueckgabe: Wert fuer das Spiel
+// which: 0 = learn points, 1 = gold; doubled: doubling of the game active. Return value: value for the game
 int LearnCost(const char* info, int which, bool doubled, int site) {
     const int amount = ReadInt(info, 0x8C);
     const int gold = ReadInt(info, 0x34);
@@ -200,14 +200,14 @@ int LearnCost(const char* info, int which, bool doubled, int site) {
     }
     return v;
 }
-// Execute: Wert im Stapel (LP oder Gold, evtl. verdoppelt); Verdopplung erkennt man am Verhaeltnis zum Feld
+// Execute: value on the stack (LP or gold, possibly doubled); the ratio to the field shows the doubling
 void __cdecl LcExecute(const char* info, int which, int* slot) {
     const int base = ReadInt(info, which ? 0x34 : 0x8C);
     const bool doubled = base != 0 && *slot == 2 * base;
-    if (!doubled && *slot != base) return;   // nicht der Attributweg (z. B. Talent): unveraendert
+    if (!doubled && *slot != base) return;   // not the attribute path (for example a skill): no change
     *slot = LearnCost(info, which, doubled, which ? 2 : 1);
 }
-// OnEndInfo: Betrag, der von den LP abgezogen wird; first = zusaetzliche Zahlung der Verdopplung
+// OnEndInfo: amount that is subtracted from the LP; first = additional payment of the doubling
 int __cdecl LcPay(const char* info, int first) {
     const int amount = ReadInt(info, 0x8C);
     if (!g_host || !g_host->HasHandler(kLcDecl) || !IsAttribTeach(info)) {
@@ -230,8 +230,8 @@ int __cdecl LcDescGold(const char* info, int doubled) {
     return LearnCost(info, 1, doubled != 0, 5);
 }
 
-// Stubs: jeweils die ueberschriebenen Befehle nachbilden und hinter die Stelle zurueckspringen
-__declspec(naked) void LcStub0() {   // Execute LP: [esp+18h] Kosten, ebp Info
+// stubs: each one does the overwritten instructions again and jumps back to after the location
+__declspec(naked) void LcStub0() {   // Execute LP: [esp+18h] cost, ebp info
     __asm {
         push eax
         push ecx
@@ -269,7 +269,7 @@ __declspec(naked) void LcStub1() {   // Execute Gold: [esp+18h] Gold, ebp Info
         jmp dword ptr [g_lcBack + 4]
     }
 }
-__declspec(naked) void LcStub2() {   // OnEndInfo zusaetzliche Zahlung: eax = LP - Betrag, ebx Info, ebp Spielergedaechtnis
+__declspec(naked) void LcStub2() {   // OnEndInfo additional payment: eax = LP - amount, ebx info, ebp player memory
     __asm {
         push ecx
         push edx
@@ -372,7 +372,7 @@ int InstallLearnCost(ScriptHost& host) {
     for (unsigned i = 0; i < kLcCount; ++i) g_lcBack[i] = base + kLc[i].rva + kLc[i].len;
     for (unsigned i = 0; i < kLcCount; ++i) {
         if (PatchAt(base + kLc[i].rva, kLc[i].orig, kLc[i].len, kLcStubs[i], "Lernkosten")) continue;
-        // alle oder keine: eine halb umgeleitete Kette zeigte im Dialog einen anderen Preis, als bezahlt wird
+        // all or none: a half-redirected chain would show a different price in the dialog than the price that the player pays
         for (unsigned j = 0; j < i; ++j) UnpatchAt(base + kLc[j].rva, kLc[j].orig, kLc[j].len);
         return 0;
     }
@@ -385,7 +385,7 @@ int InstallScriptGamePatches(ScriptHost& host) {
     static bool done = false;
     if (done) return 0;
     HMODULE sg = GetModuleHandleA("Script_Game.dll");
-    if (!sg) return 0;   // laedt erst nach main(); naechste Weltaktivierung erneut
+    if (!sg) return 0;   // loads only after main(); try again at the next world activation
     done = true;
     g_host = &host;
     unsigned char* base = reinterpret_cast<unsigned char*>(sg);

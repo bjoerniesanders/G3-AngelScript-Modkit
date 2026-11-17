@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Zeichen-API (Skript-Schnittstelle ab Version 34, Bilder ab 38, Zeichnen ueber dem HUD ab 39, Roadmap 7.2).
-// Gemessen 2026-11-09:
-//  - eCGUIAdmin::EndFrame (Export) laeuft im Spiel praktisch nie; eCGUIAdmin::CreateTexture(Farbe) und eCGUIRenderer::DrawRect sind leere Rumpfe
-//    -> keine einfarbigen Rechtecke.
-//  - Die Kameramatrix (eCCameraBase::GetWorldToScreenMatrix, Zeilenvektor * M, / w) liefert Pixel des Spielfensters.
-//  - Geraetekontext der GFC-Fenster (CFFGFCWnd::GetDC): die Fenster sammeln ihre Zeichenbefehle und geben sie beim eigenen Malen aus. Gezeichnet beim
-//    ersten Fenster eines Bildes (OnPaint) liegt alles UNTER dem HUD; am Bildende hat der Kontext gar keine Wirkung mehr.
-//  - eCGUIRenderer::EndFrame laeuft 2-mal je Bild auf zwei Renderern; der zweite ist der Haupt-Renderer (eCGUIAdmin::GetRenderer), der zuletzt auch
-//    Mauszeiger und Kompassnadel malt (deren Transformation gilt noch: vor dem Zeichnen zuruecksetzen). Direkt ueber ihn kurz vor seinem EndFrame
-//    gezeichnet liegt alles UEBER allen Fenstern (auch ueber dem Inventar).
-// Darum: OnDraw() laeuft am Bildende des Haupt-Renderers; DrawText/TextWidth gehen an eCGUIRenderer::DrawTextA/CalcTextRect, DrawImage an
-// eCGUIRenderer::DrawSprite (Textur + Ausschnitt aus eCGUIAdmin::LoadBitmapA). Die GUI-Flaeche (GetScreenWidth/Height, z. B. 1365x768) bringt der
-// Renderer selbst auf das Fenster (sein Zeichen-Massstab, gemessen 1,875; eine eigene Skalierung ueber die Transformation verdoppelt ihn).
-// Kommt das Bildende einmal nicht (2 Bilder lang), zeichnet das Modkit wie frueher beim ersten Fenster ueber den Geraetekontext des Desktops (CFFGFCDeviceContext::DrawTextA/CalcTextRect/DrawBitmap).
-// Schriften legt eCGUIAdmin::CreateFontA an (Name, Hoehe, Breite, -, fett, kursiv; fett = Gewicht 700); beide Wege benutzen dieselben Nummern.
-// Bilder: Namen wie in g3.gui.res ("\data\gui\icons\hud\v3\icons\misc\g3_hud_icon_misc_compass.tga") oder nur der Dateiname. Rueckfallweg: CFFGFCBitmap
-// (8 Byte: vtable, IFFGUIBitmap*) ::Create(Name); CFFGFCDeviceContext::DrawBitmap(Bild, bCRect*, Flags, Winkel im Bogenmass - so dreht Game.dll die
-// Kompassnadel).
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// Drawing API (script interface from version 34, images from 38, drawing above the HUD from 39, roadmap 7.2).
+// Measured 2026-11-09:
+//  - eCGUIAdmin::EndFrame (export) almost never runs in the game. eCGUIAdmin::CreateTexture(color) and eCGUIRenderer::DrawRect are empty bodies
+//    -> no rectangles with only one color.
+//  - The camera matrix (eCCameraBase::GetWorldToScreenMatrix, row vector * M, / w) gives pixels of the game window.
+//  - Device context of the GFC windows (CFFGFCWnd::GetDC): the windows collect their drawing commands and send them when they paint. If you draw at the
+//    first window of a frame (OnPaint), everything is BELOW the HUD. At the end of the frame, the context has no effect at all.
+//  - eCGUIRenderer::EndFrame runs 2 times for each frame on two renderers. The second one is the main renderer (eCGUIAdmin::GetRenderer), which also paints
+//    the mouse pointer and the compass needle last (their transformation still applies: reset it before you draw). If you draw directly through it immediately before its EndFrame,
+//    everything is ABOVE all windows (also above the inventory).
+// Thus: OnDraw() runs at the end of the frame of the main renderer. DrawText/TextWidth go to eCGUIRenderer::DrawTextA/CalcTextRect, DrawImage goes to
+// eCGUIRenderer::DrawSprite (texture + part from eCGUIAdmin::LoadBitmapA). The renderer itself scales the GUI area (GetScreenWidth/Height, for example 1365x768) to the
+// window (its drawing scale, measured 1.875; an own scaling through the transformation doubles it).
+// If the end of the frame does not come (for 2 frames), the modkit draws as before at the first window through the device context of the desktop (CFFGFCDeviceContext::DrawTextA/CalcTextRect/DrawBitmap).
+// eCGUIAdmin::CreateFontA makes fonts (name, height, width, -, bold, italic; bold = weight 700). The two paths use the same numbers.
+// Images: names as in g3.gui.res ("\data\gui\icons\hud\v3\icons\misc\g3_hud_icon_misc_compass.tga") or only the file name. Fallback path: CFFGFCBitmap
+// (8 bytes: vtable, IFFGUIBitmap*) ::Create(name); CFFGFCDeviceContext::DrawBitmap(image, bCRect*, flags, angle in radians - Game.dll turns the
+// compass needle in this way).
 #include <windows.h>
 
 #include <angelscript.h>
@@ -46,7 +46,7 @@ struct Mat4 {
 struct Vec3 {
     float x, y, z;
 };
-struct FColor {   // bCFloatAlphaColor: vtable, r, g, b, a (20 Byte, SDK); per Konstruktor der SharedBase gebaut
+struct FColor {   // bCFloatAlphaColor: vtable, r, g, b, a (20 bytes, SDK); built with the constructor of SharedBase
     void* vt;
     float r, g, b, a;
 };
@@ -104,23 +104,23 @@ struct Api {
 ScriptHost* g_host = nullptr;
 PaintFn o_paint = nullptr;
 EndFrameFn o_endFrame = nullptr;
-// Waehrend OnDraw: genau einer der beiden Wege ist gesetzt
-void* g_dc = nullptr;     // Rueckfall: Geraetekontext des Desktops
-void* g_rend = nullptr;   // Haupt-Renderer am Bildende
-float g_rendScale = 0.0f;   // Zeichen-Massstab des Renderers (nur fuers Protokoll; er skaliert selbst)
+// during OnDraw: exactly one of the two paths is set
+void* g_dc = nullptr;     // fallback: device context of the desktop
+void* g_rend = nullptr;   // main renderer at the end of the frame
+float g_rendScale = 0.0f;   // drawing scale of the renderer (only for the log; it scales itself)
 bool g_inDraw = false;
 DWORD g_gameThread = 0;
-int g_screenW = 0, g_screenH = 0;   // Zeichenflaeche (Client-Rechteck des Desktops)
-int g_clientW = 0, g_clientH = 0;   // Spielfenster in Pixeln (darin rechnet die Kameramatrix)
+int g_screenW = 0, g_screenH = 0;   // drawing area (client rectangle of the desktop)
+int g_clientW = 0, g_clientH = 0;   // game window in pixels (the camera matrix calculates in it)
 std::map<std::string, unsigned> g_fonts;
 bool g_outsideLogged = false;
 
-// Bilderkennung: je Spielbild (DrawFrameTick aus HProcess) hoechstens einmal OnDraw
+// frame detection: maximum 1 OnDraw for each game frame (DrawFrameTick from HProcess)
 unsigned g_tick = 0, g_drawnTick = ~0u;
-unsigned g_rendTick = ~0u;   // letztes Bild, in dem der Renderer-Weg gezeichnet hat
-void* g_desk = nullptr;      // Desktop-Fenster (aus OnPaint gemerkt)
+unsigned g_rendTick = ~0u;   // last frame in which the renderer path drew
+void* g_desk = nullptr;      // desktop window (kept from OnPaint)
 void* g_mainRend = nullptr;
-// Messung der ersten 20 s im Spiel
+// measurement of the first 20 s in the game
 unsigned g_paints = 0, g_draws = 0, g_rendDraws = 0, g_endFrames = 0;
 DWORD g_measureStart = 0;
 bool g_measured = false;
@@ -163,7 +163,7 @@ void Resolve() {
 }
 bool RendererReady() { return g_a.rText && g_a.rCalc && g_a.rXform && g_a.adminRenderer; }
 
-// ---- rohe Aufrufe mit SEH
+// ---- raw calls with SEH
 void* SafeAdmin() {
     __try {
         void* gm = g_a.guiModule ? g_a.guiModule() : nullptr;
@@ -260,7 +260,7 @@ Mat4 Identity() {
     m.m[0][0] = m.m[1][1] = m.m[2][2] = m.m[3][3] = 1.0f;
     return m;
 }
-Mat4 Mul(const Mat4& a, const Mat4& b) {   // Zeilenvektoren: erst a, dann b
+Mat4 Mul(const Mat4& a, const Mat4& b) {   // row vectors: first a, then b
     Mat4 r = {};
     for (int i = 0; i < 4; ++i)
         for (int j = 0; j < 4; ++j)
@@ -331,7 +331,7 @@ void SizesOncePerSecond() {
     }
 }
 
-// Rueckfall: OnDraw ueber den Geraetekontext des Desktops beim ersten Fenster eines Bildes (liegt unter dem HUD)
+// fallback: OnDraw through the device context of the desktop at the first window of a frame (below the HUD)
 void __fastcall HPaint(void* wnd, void*) {
     o_paint(wnd);
     if (!g_host || !g_a.desktop || !g_a.getDC || g_inDraw) return;
@@ -343,7 +343,7 @@ void __fastcall HPaint(void* wnd, void*) {
         if (!g_measureStart) g_measureStart = GetTickCount();
         ++g_paints;
     }
-    if (g_rendTick != ~0u && g_tick - g_rendTick <= 2u) return;   // der Renderer-Weg zeichnet
+    if (g_rendTick != ~0u && g_tick - g_rendTick <= 2u) return;   // the renderer path draws
     if (g_drawnTick == g_tick) return;
     void* dc = SafeDC(desk);
     if (!dc) return;
@@ -357,12 +357,12 @@ void __fastcall HPaint(void* wnd, void*) {
     CountDraw(false);
 }
 
-// Bildende des Haupt-Renderers: OnDraw ueber allen Fenstern
+// end of the frame of the main renderer: OnDraw above all windows
 bool __fastcall HEndFrame(void* r, void*, bool flag) {
     if (g_host && !g_inDraw && g_desk && RendererReady() && (!g_gameThread || GetCurrentThreadId() == g_gameThread)) {
-        g_mainRend = SafeMainRenderer();   // jedes Mal: das Spiel kann den Renderer neu anlegen (Geraet zurueckgesetzt, Aufloesung)
+        g_mainRend = SafeMainRenderer();   // each time: the game can make the renderer again (device reset, resolution)
         if (r == g_mainRend && g_rendTick != g_tick) {
-            g_rendTick = g_tick;   // Renderer-Weg verfuegbar (auch wenn dieses Bild schon ueber den Rueckfall gezeichnet wurde)
+            g_rendTick = g_tick;   // renderer path available (also if this frame was already drawn through the fallback)
         }
         if (r == g_mainRend && g_drawnTick != g_tick) {
             if (!g_measured && g_measureStart) ++g_endFrames;
@@ -376,7 +376,7 @@ bool __fastcall HEndFrame(void* r, void*, bool flag) {
                     std::snprintf(b, sizeof b, "Zeichnen: Haupt-Renderer %p, Zeichen-Massstab des Renderers %.3f x %.3f", r, sc.x, sc.y);
                     g_host->Log(b);
                 }
-                const Mat4 id0 = Identity();   // der Renderer rechnet seinen Zeichen-Massstab selbst ein (gemessen: sonst doppelt)
+                const Mat4 id0 = Identity();   // the renderer includes its drawing scale itself (measured: if not, doubled)
                 SafeRXform(r, &id0);
                 g_drawnTick = g_tick;
                 g_rend = r;
@@ -402,25 +402,25 @@ bool CanDraw(const char* what) {
     return false;
 }
 
-// Bilder: je Name einmal geladen (bleiben bis zum Spielende, wie die Bilder des Spiels)
+// images: loaded 1 time for each name (they stay until the end of the game, as the images of the game)
 struct Bitmap {   // CFFGFCBitmap
     void* vt;
     void* handle;   // IFFGUIBitmap*
 };
 struct Image {
-    Bitmap* gfc = nullptr;   // Rueckfallweg
-    // SFFGUIBitmap aus eCGUIAdmin::LoadBitmapA (gemessen am Assembler 2026-11-09): +0 Textur-Nummer, +4 bCRect Ausschnitt, +0x18..+0x24 vier Floats,
-    // +0x28 bCString Name
+    Bitmap* gfc = nullptr;   // fallback path
+    // SFFGUIBitmap from eCGUIAdmin::LoadBitmapA (measured in the assembler code 2026-11-09): +0 texture number, +4 bCRect part, +0x18..+0x24 four floats,
+    // +0x28 bCString name
     alignas(8) unsigned char info[0x60] = {};
     bool infoOk = false, strReady = false, gfcOnlyLogged = false;
     std::string name;
-    DWORD nextTry = 0;   // naechster Versuch fuer LoadBitmapA (nur GFC geladen)
+    DWORD nextTry = 0;   // next try for LoadBitmapA (only GFC loaded)
     unsigned tex() const { return *reinterpret_cast<const unsigned*>(info); }
     const Rect* src() const { return reinterpret_cast<const Rect*>(info + 4); }
 };
-std::map<std::string, int> g_imageIds;      // nur erfolgreich geladene Bilder
-std::map<std::string, DWORD> g_imageRetry;  // fehlgeschlagene Namen: naechster Versuch (GUI-Daten koennen anfangs noch fehlen)
-std::vector<Image*> g_images;   // Index = Bild-Nummer - 1
+std::map<std::string, int> g_imageIds;      // only images that loaded successfully
+std::map<std::string, DWORD> g_imageRetry;  // names that failed: next try (the GUI data can be missing at first)
+std::vector<Image*> g_images;   // index = image number - 1
 bool SafeBmpCreate(Bitmap* b, const SStr& name) {
     __try {
         g_a.bmpCtor(b);
@@ -438,7 +438,7 @@ bool SafeLoadInfo(void* admin, const SStr& name, unsigned char* info) {
         return g_a.loadBmp(admin, &name, info);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// Textur und Ausschnitt fuer den Renderer-Weg holen (eCGUIAdmin::LoadBitmapA); der bCString im SFFGUIBitmap wird nur einmal angelegt
+// get the texture and the part for the renderer path (eCGUIAdmin::LoadBitmapA); the bCString in the SFFGUIBitmap is made only 1 time
 void TryInfo(Image* img, const SStr& name) {
     if (img->infoOk || !g_a.loadBmp) return;
     void* admin = SafeAdmin();
@@ -463,8 +463,8 @@ int CreateFontScript(const SStr& face, int height, bool bold, bool italic) {
     std::snprintf(key, sizeof key, "%s|%d|%d|%d", face.c_str(), height, bold ? 1 : 0, italic ? 1 : 0);
     auto it = g_fonts.find(key);
     if (it != g_fonts.end()) return int(it->second);
-    // Ein Fehlschlag (0, z. B. in main(), solange die GUI noch nicht bereit ist) wird nicht fuer immer gemerkt: neuer Versuch hoechstens alle 2 s,
-    // im Protokoll steht nur der erste Fehlschlag je Schrift.
+    // A failure (0, for example in main() while the GUI is not ready) is not kept forever: a new try maximum each 2 s.
+    // The log shows only the first failure for each font.
     static std::map<std::string, DWORD> retry;
     const DWORD now = GetTickCount();
     auto rt = retry.find(key);
@@ -504,8 +504,8 @@ int TextWidthScript(int font, const SStr& text) {
         SafeDcCalc(g_dc, unsigned(font), text.c_str(), &r, kNoClip);
     return r.right - r.left;
 }
-// Bild laden (gecacht je Name): Nummer > 0, 0 = (noch) nicht ladbar. Nur im Spiel-Thread; ein fehlgeschlagener Name wird hoechstens alle 2 s erneut
-// versucht (in main() fehlen die GUI-Daten oft noch), im Protokoll steht nur der erste Fehlschlag.
+// Load an image (cached for each name): number > 0, 0 = cannot be loaded (yet). Only in the game thread. A name that failed is tried again maximum each 2 s
+// (in main(), the GUI data is frequently still missing). The log shows only the first failure.
 int LoadImageScript(const SStr& name) {
     auto it = g_imageIds.find(name.c_str());
     if (it != g_imageIds.end()) return it->second;
@@ -532,7 +532,7 @@ int LoadImageScript(const SStr& name) {
         g_imageRetry.erase(img->name);
     } else {
         g_imageRetry[img->name] = now + 2000u;
-        delete img;   // bCString im Puffer bleibt angelegt (wenige Byte je Fehlschlag)
+        delete img;   // the bCString in the buffer stays (a few bytes for each failure)
         img = nullptr;
     }
     if (ScriptHost::s_current && (id || firstTry)) {
@@ -553,7 +553,7 @@ bool DrawImageScript(int image, int x, int y, int w, int h, float angle) {
     if (!CanDraw("DrawImage") || image <= 0 || image > int(g_images.size()) || w <= 0 || h <= 0) return false;
     Image* img = g_images[image - 1];
     if (g_rend) {
-        if (!img->infoOk && int(GetTickCount() - img->nextTry) >= 0) {   // nur ueber GFC geladen: Renderer-Daten hoechstens alle 2 s erneut holen
+        if (!img->infoOk && int(GetTickCount() - img->nextTry) >= 0) {   // loaded only through GFC: get the renderer data again maximum each 2 s
             img->nextTry = GetTickCount() + 2000u;
             SStr n(img->name.c_str());
             TryInfo(img, n);
@@ -564,13 +564,13 @@ bool DrawImageScript(int image, int x, int y, int w, int h, float angle) {
         }
         if (!img->infoOk || !g_a.rSprite) return false;
         const Rect* s = img->src();
-        // Ausschnitt auf w x h bringen, um die Mitte drehen, an (x, y) setzen, dann GUI-Flaeche -> Fenster
+        // scale the part to w x h, turn it around the center, put it at (x, y), then GUI area -> window
         Mat4 m = Scale(float(w) / float(s->right - s->left), float(h) / float(s->bottom - s->top));
         m = Mul(m, Translate(-0.5f * w, -0.5f * h));
         if (angle != 0.0f) m = Mul(m, Rotate(angle));
         m = Mul(m, Translate(float(x) + 0.5f * w, float(y) + 0.5f * h));
         const bool ok = SafeRSprite(g_rend, img->tex(), s, &m);
-        const Mat4 back = Identity();   // DrawSprite setzt die Transformation; fuer folgenden Text zuruecksetzen
+        const Mat4 back = Identity();   // DrawSprite sets the transformation; reset it for the text that follows
         SafeRXform(g_rend, &back);
         return ok;
     }
@@ -581,7 +581,7 @@ bool DrawImageScript(int image, int x, int y, int w, int h, float angle) {
 int ScreenWidth() { return g_screenW; }
 int ScreenHeight() { return g_screenH; }
 
-// Weltpunkt -> Zeichenflaeche; false, wenn der Punkt hinter der Kamera liegt oder keine Kamera da ist
+// world point -> drawing area; false if the point is behind the camera or if there is no camera
 bool WorldToScreenScript(const SVec3& p, float& sx, float& sy) {
     Mat4 m;
     if (!SafeW2S(&m) || g_clientW <= 0 || g_clientH <= 0) return false;
@@ -615,7 +615,7 @@ bool RegisterDrawBindings(asIScriptEngine* e) {
     return ok;
 }
 
-// einmal je Spielbild aus HProcess (Spiel-Thread): Bildzaehler fuer "hoechstens einmal OnDraw je Bild"
+// 1 time for each game frame from HProcess (game thread): frame counter for "maximum 1 OnDraw for each frame"
 void DrawFrameTick() {
     if (!g_gameThread) g_gameThread = GetCurrentThreadId();
     ++g_tick;

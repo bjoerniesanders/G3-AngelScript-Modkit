@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Engine-/Game-Bindings von G3ASM (Skript-Schnittstelle ab Version 2): Typ Entity (Held, Spieler, Entity nach Namen),
-// Name, Position, Rotation, Abstand, Position setzen.
-// Alle Funktionen werden bei der ersten Benutzung aus Engine.dll/Game.dll aufgeloest (die DLLs laden nach dem Proxy).
-// Sicherheit: Entity ist ein Wert mit rohem Zeiger. Vor jedem Zugriff wird geprueft, dass der Zeiger lesbar ist und seine vtable in
-// Engine.dll/Game.dll/Gothic3.exe liegt; jeder Aufruf laeuft unter __try (ungueltige/geloeschte Entities liefern Standardwerte statt
-// eines Absturzes). Skripte sollen Entities nicht ueber Weltwechsel hinweg aufbewahren (bei Bedarf neu holen).
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// Engine and game bindings of G3ASM (script interface from version 2): type Entity (hero, player, entity by name),
+// name, position, rotation, distance, set the position.
+// The code resolves all functions from Engine.dll and Game.dll at the first use (the DLLs load after the proxy).
+// Safety: Entity is a value with a raw pointer. Before each access, the code makes sure that the pointer is readable and that its vtable is in
+// Engine.dll, Game.dll or Gothic3.exe. Each call runs under __try (entities that are not valid or deleted give default values in place
+// of a crash). Scripts must not keep entities across a world change (get them again when necessary).
 #include <windows.h>
 
 #include <angelscript.h>
@@ -54,7 +54,7 @@ struct EngineApi {
     RefGetFn getName = nullptr, getWorldPos = nullptr, getWorldMat = nullptr, getTplId = nullptr, getTreeBox = nullptr, getParent = nullptr;
     RotFn getWorldRot = nullptr;
     DistFn distance = nullptr;
-    int setPosSlot = -1;   // Index von SetWorldPosition in der eCEntity-vtable
+    int setPosSlot = -1;   // index of SetWorldPosition in the eCEntity vtable
     void* sceneAdmin = nullptr;
 } g_e;
 
@@ -69,7 +69,7 @@ bool Resolve() {
     if (g_e.ok) return true;
     g_e.engine = GetModuleHandleA("Engine.dll");
     g_e.game = GetModuleHandleA("Game.dll");
-    if (!g_e.engine || !g_e.game) return false;   // spaeter erneut versuchen (z. B. im Testprogramm nie vorhanden)
+    if (!g_e.engine || !g_e.game) return false;   // try again later (for example never available in the test program)
     auto E = [](const char* n) { return reinterpret_cast<void*>(GetProcAddress(g_e.engine, n)); };
     auto G = [](const char* n) { return reinterpret_cast<void*>(GetProcAddress(g_e.game, n)); };
     g_e.sessionInstance = reinterpret_cast<InstFn>(G("?GetInstance@gCSession@@SGAAV1@XZ"));
@@ -105,16 +105,16 @@ bool Resolve() {
     return g_e.ok;
 }
 
-// Gueltigkeit: lesbarer Zeiger, vtable in einem Spielmodul
+// validity: readable pointer, vtable in a game module
 bool Valid(const void* p) {
     if (!ReadableMem(p, sizeof(void*))) return false;
     __try {
-        const void* vt = *static_cast<void* const*>(p);   // NOLINT(clang-analyzer-core.NullDereference): ReadableMem oben, dazu SEH
+        const void* vt = *static_cast<void* const*>(p);   // NOLINT(clang-analyzer-core.NullDereference): ReadableMem above, and SEH
         return InModule(g_e.engine, vt) || InModule(g_e.game, vt) || InModule(GetModuleHandleA(nullptr), vt);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
-// ---- rohe, SEH-geschuetzte Aufrufe (ohne C++-Objekte mit Destruktor im __try-Block)
+// ---- raw calls with SEH protection (without C++ objects with a destructor in the __try block)
 void* SafeHero(bool player) {
     __try {
         void* s = g_e.sessionInstance();
@@ -195,14 +195,14 @@ bool SafeMat(const void* p, SMat4* out) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-SMat4 EntWorldMatrix(const Entity& e) {   // Einheitsmatrix bei Fehler
+SMat4 EntWorldMatrix(const Entity& e) {   // identity matrix if there is an error
     SMat4 m;
     std::memset(&m, 0, sizeof m);
     m.m[0] = m.m[5] = m.m[10] = m.m[15] = 1.0f;
     if (EntIsValid(e) && g_e.getWorldMat) SafeMat(e.p, &m);
     return m;
 }
-// ---- Bauwerke/Objekte erkennen: Vorlagenname, Huellquader (Welt, samt Kindern), Elternobjekt (das Fadenkreuz trifft oft Teilobjekte)
+// ---- detect buildings and objects: template name, bounding box (world, with children), parent object (the crosshair frequently hits parts of objects)
 struct SBox {
     SVec3 min, max;
 };
@@ -263,9 +263,9 @@ float EntDist(const Entity& a, const Entity& b) {
 bool EntSetPos(Entity& e, const SVec3& v) { return EntIsValid(e) && g_e.setPosSlot >= 0 && SafeSetPos(e.p, &v); }
 bool EntEquals(const Entity& a, const Entity& b) { return a.p == b.p; }
 
-// ---- Attribute (API 3): gCPlayerMemory_PS der Entity (Held/NPC), Kennungen wie im Spiel: "STR", "DEX", "INT", "HP", "MP", "SP",
-// "XP", "LP", "ALC", "SMI", "THF" usw. Weg wie Script.dll PSPlayerMemory::AddStrength: PSPlayerMemory(eCEntity*) holt das
-// Eigenschafts-Set, dann gCPlayerMemory_PS::Get/Set/AddBaseValue(bCString). Uhr: gCWorld::GetCurrentWorld()->GetWorldEntity() -> PSClock.
+// ---- Attributes (API 3): gCPlayerMemory_PS of the entity (hero or NPC), tags as in the game: "STR", "DEX", "INT", "HP", "MP", "SP",
+// "XP", "LP", "ALC", "SMI", "THF" and others. Path as Script.dll PSPlayerMemory::AddStrength: PSPlayerMemory(eCEntity*) gets the
+// property set, then gCPlayerMemory_PS::Get/Set/AddBaseValue(bCString). Clock: gCWorld::GetCurrentWorld()->GetWorldEntity() -> PSClock.
 typedef void*(__thiscall* PSCtorFn)(void*, void*);
 typedef int(__thiscall* PMGetFn)(const void*, const void*);
 typedef bool(__thiscall* PMSetFn)(void*, const void*, int);
@@ -358,8 +358,8 @@ bool SafeClockSet(ClockSetFn f, void* holder, int v) {
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
-// ---- Spielereignis-Flags: kleine Schalter (Text), die das Spiel im Spielstand speichert (PlayerMemory des Helden). Fuer Mods, die ueber Speichern/Laden
-// hinweg wissen muessen, wie weit der Spieler ist. Script.dll PSPlayerMemory: this = das Huellobjekt (erstes Feld = gCPlayerMemory_PS*)
+// ---- Game event flags: small switches (text) that the game saves in the saved game (PlayerMemory of the hero). For mods that must know across save and load
+// how far the player is. Script.dll PSPlayerMemory: this = the wrapper object (first field = gCPlayerMemory_PS*)
 typedef bool(__thiscall* EventFn)(void*, const void*);
 EventFn g_evSet = nullptr, g_evClear = nullptr, g_evIs = nullptr;
 bool ResolveEvents() {
@@ -373,7 +373,7 @@ bool ResolveEvents() {
 }
 bool SafeEvent(EventFn fn, void* ent, const void* name, bool* out) {
     __try {
-        void* wrapper[4] = {nullptr, nullptr, nullptr, nullptr};   // Huellobjekt, genug Platz
+        void* wrapper[4] = {nullptr, nullptr, nullptr, nullptr};   // wrapper object, sufficient space
         g_s.pmCtor(wrapper, ent);
         *out = fn(wrapper, name);
         return true;
@@ -408,8 +408,8 @@ bool EntAddAttrBase(Entity& e, const SStr& tag, int v) { return AttrSet(e, tag, 
 bool EntSetAttr(Entity& e, const SStr& tag, int v) { return AttrSet(e, tag, v, &StatsApi::setValue); }
 bool EntAddAttr(Entity& e, const SStr& tag, int v) { return AttrSet(e, tag, v, &StatsApi::addValue); }
 
-// ---- Inventar (API 7): gCInventory_PS der Entity (Script.dll PSInventory(eCEntity*) liefert das Eigenschafts-Set), Items nach Name
-// der Template-Entity ("It_Wolf_Fur"): Anzahl lesen, entfernen. Stapel werden ueber FindStackIndex(bCString) gefunden.
+// ---- Inventory (API 7): gCInventory_PS of the entity (Script.dll PSInventory(eCEntity*) gives the property set), items by the name
+// of the template entity ("It_Wolf_Fur"): read the quantity, remove. The code finds stacks through FindStackIndex(bCString).
 typedef int(__thiscall* InvFindFn)(const void*, const void*, int, unsigned, int);
 typedef int(__thiscall* InvCountFn)(const void*);
 typedef void*(__thiscall* InvGetStackFn)(void*, int);
@@ -420,15 +420,15 @@ typedef int(__thiscall* CountPartFn)(void*, const void*, int);
 typedef void*(__thiscall* ByPartFn)(void*, const void*, int, int);
 typedef void*(__thiscall* TplCloneFn)(const void*);           // eCNode::Clone() const
 typedef void(__thiscall* TplSetNameFn)(void*, const void*);   // eCTemplateEntity::SetName(const bCString&)
-typedef bool(__thiscall* RegTplFn)(void*, void*);   // eCSceneAdmin::RegisterTemplateEntity(eCTemplateEntity*) (geschuetzt, aber exportiert)
+typedef bool(__thiscall* RegTplFn)(void*, void*);   // eCSceneAdmin::RegisterTemplateEntity(eCTemplateEntity*) (protected, but exported)
 typedef const void*(__thiscall* NodeIdFn)(const void*);   // eCNode::GetID() const -> const bCPropertyID&
 struct PropIdVal {
     unsigned char core[16];
     unsigned count;
-};                                                           // bCPropertyID (20 Byte) als Wertparameter
-typedef void(__thiscall* SetIdFn)(void*, PropIdVal);         // eCNode::SetID(bCPropertyID): meldet alte ID ab, setzt neue, RegisterNodeID
-typedef void(__thiscall* IdFromStrFn)(void*, const void*);   // bCPropertyID::CreateFromString(const bCString&): MD5 des Textes
-typedef void*(__thiscall* IdTextFn)(const void*, void*);     // bCPropertyID::GetText() -> bCString (Rueckgabe per Zeiger)
+};                                                           // bCPropertyID (20 bytes) as a value parameter
+typedef void(__thiscall* SetIdFn)(void*, PropIdVal);         // eCNode::SetID(bCPropertyID): unregisters the old ID, sets the new one, RegisterNodeID
+typedef void(__thiscall* IdFromStrFn)(void*, const void*);   // bCPropertyID::CreateFromString(const bCString&): MD5 of the text
+typedef void*(__thiscall* IdTextFn)(const void*, void*);     // bCPropertyID::GetText() -> bCString (return value through a pointer)
 struct InvApi {
     bool tried = false, ok = false;
     PSCtorFn ctor = nullptr;
@@ -493,7 +493,7 @@ void* SafeInventory(void* ent) {
         return holder;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-// Gesamtmenge des Items ueber alle Stapel mit diesem Namen
+// total quantity of the item across all stacks with this name
 bool SafeItemCount(void* inv, const void* name, int* out) {
     __try {
         int total = 0, idx = -1;
@@ -507,12 +507,12 @@ bool SafeItemCount(void* inv, const void* name, int* out) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// Entfernt bis zu n Stueck (stapelweise); Rueckgabe in *removed
+// removes up to n items (stack by stack); return value in *removed
 bool SafeRemoveItems(void* inv, const void* name, int n, int* removed) {
     __try {
         int left = n;
         for (int guard = 0; guard < 256 && left > 0; ++guard) {
-            const int idx = g_i.find(inv, name, 0, 0, -1);   // nach dem Loeschen koennen Indizes rutschen: immer neu suchen
+            const int idx = g_i.find(inv, name, 0, 0, -1);   // after a delete, indexes can move: always search again
             if (idx < 0) break;
             void* st = g_i.getStack(inv, idx);
             const int have = st ? g_i.amount(st) : 0;
@@ -525,9 +525,9 @@ bool SafeRemoveItems(void* inv, const void* name, int n, int* removed) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// Items erzeugen: Template-Entity ueber den Namen holen, gCInventory_PS::CreateItems(Template, Qualitaet 0, Menge)
-// Rueckgabe: >= 0 Ergebnis von CreateItems, -2 Template nicht gefunden, -3 Ausnahme
-// Template-Entity nach Name; erst GetTemplateEntityByName, dann Teilnamensuche mit exaktem Namensvergleich. nullptr = unbekannt
+// Make items: get the template entity through the name, gCInventory_PS::CreateItems(template, quality 0, quantity)
+// Return value: >= 0 result of CreateItems, -2 template not found, -3 exception
+// template entity by name; first GetTemplateEntityByName, then a search by part of the name with an exact name comparison. nullptr = not known
 void* SafeFindTemplate(void* admin, const void* name, const char* wanted) {
     __try {
         void* tpl = g_i.tplByName(admin, name);
@@ -542,22 +542,22 @@ void* SafeFindTemplate(void* admin, const void* name, const char* wanted) {
         return tpl;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-// Items erzeugen: Template-Entity ueber den Namen holen, gCInventory_PS::CreateItems(Template, Qualitaet 0, Menge)
-// Rueckgabe: >= 0 Ergebnis von CreateItems, -2 Template nicht gefunden, -3 Ausnahme
+// Make items: get the template entity through the name, gCInventory_PS::CreateItems(template, quality 0, quantity)
+// Return value: >= 0 result of CreateItems, -2 template not found, -3 exception
 int SafeCreateItems(void* inv, void* admin, const void* name, const char* wanted, int count) {
     void* tpl = SafeFindTemplate(admin, name, wanted);
     if (!tpl) return -2;
     __try {
-        // Aufrufreihenfolge laut Disassembly von CreateItems(Vorlage, Qualitaet, Menge): der DRITTE Wert ist die Menge (muss > 0 sein)
+        // call sequence in accordance with the disassembly of CreateItems(template, quality, quantity): the THIRD value is the quantity (must be > 0)
         return g_i.create(inv, tpl, 0u, unsigned(count));
     } __except (EXCEPTION_EXECUTE_HANDLER) { return -3; }
 }
-// Vorlage im Speicher klonen: eCNode::Clone (wie das Spiel: DoClone, Create, Knoten-ID registrieren, CopyFrom, an die Wurzel haengen),
-// SetName (die Engine traegt den Namen selbst in die Namenstabelle ein) und - wichtig - RegisterTemplateEntity: Clone() meldet den Klon nur als
-// Knoten an, nicht in der Vorlagentabelle. Ohne diesen Eintrag findet das Inventar die Vorlage ueber ihre ID nicht (Proxy ohne ID -> Absturz im Vergleich).
-// RegisterTemplateEntity vergibt bei doppelter ID selbst eine neue.
-// Rueckgabe: 0 angelegt, 1 war schon da, -2 Basis unbekannt, -3 Ausnahme, -6 Klon fehlgeschlagen, -7 Name nach SetName nicht auffindbar,
-//            -8 Klon ueber seine ID nicht auffindbar. *idBase/*idClone: ID-Zeiger zur Protokollierung (nur gueltig, solange die Vorlagen leben).
+// Clone a template in memory: eCNode::Clone (as the game does: DoClone, Create, register the node ID, CopyFrom, attach to the root),
+// SetName (the engine itself puts the name into the name table) and - important - RegisterTemplateEntity: Clone() registers the clone only as a
+// node, not in the template table. Without this entry, the inventory does not find the template through its ID (proxy without an ID -> crash in the comparison).
+// For a duplicate ID, RegisterTemplateEntity itself gives a new one.
+// Return value: 0 made, 1 already existed, -2 base not known, -3 exception, -6 clone failed, -7 name not found after SetName,
+//               -8 clone not found through its ID. *idBase/*idClone: ID pointers for the log (valid only while the templates exist).
 int SafeCloneTemplate(void* admin, const void* baseName, const char* baseWanted, const void* newName, const char* newWanted,
                       const void** idBase, const void** idClone, int* regOk, const PropIdVal* fixedId) {
     if (SafeFindTemplate(admin, newName, newWanted)) return 1;
@@ -567,14 +567,14 @@ int SafeCloneTemplate(void* admin, const void* baseName, const char* baseWanted,
     __try {
         clone = g_i.clone(base);
         if (!clone) return -6;
-        if (fixedId && g_i.setId) g_i.setId(clone, *fixedId);   // feste ID (aus dem Namen): gleiche Vorlage in jedem Spielstart
+        if (fixedId && g_i.setId) g_i.setId(clone, *fixedId);   // fixed ID (from the name): the same template at each game start
         g_i.setName(clone, newName);
         if (g_i.nodeId) {
             *idBase = g_i.nodeId(base);
             *idClone = g_i.nodeId(clone);
         }
         *regOk = g_i.regTpl ? (g_i.regTpl(admin, clone) ? 1 : 0) : -1;
-        if (g_i.nodeId) *idClone = g_i.nodeId(clone);   // nach dem Eintrag neu lesen (bei doppelter ID neu vergeben)
+        if (g_i.nodeId) *idClone = g_i.nodeId(clone);   // read again after the entry (a new ID is given for a duplicate ID)
     } __except (EXCEPTION_EXECUTE_HANDLER) { return -3; }
     if (SafeFindTemplate(admin, newName, newWanted) != clone) return -7;
     void* byId = nullptr;
@@ -588,7 +588,7 @@ bool SafeIdFromString(PropIdVal* out, const void* key) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// bCPropertyID als Text (fuer das Protokoll)
+// bCPropertyID as text (for the log)
 bool SafeIdText(const void* id, void** text) {
     __try {
         g_i.idText(id, text);
@@ -610,7 +610,7 @@ int EntItemCount(const Entity& e, const SStr& name) {
     return inv && SafeItemCount(inv, &name, &n) ? n : -1;
 }
 int EntAddItems(Entity& e, const SStr& name, int count) {
-    // Rueckgabe: >= 0 ok; -1 Inventar nicht lesbar; -4 Funktionen fehlen; -5 Szenenverwaltung fehlt; -2 Item unbekannt; -3 Ausnahme
+    // return value: >= 0 ok; -1 inventory not readable; -4 functions missing; -5 scene management missing; -2 item not known; -3 exception
     void* inv = InventoryOf(e);
     int rc;
     if (!inv || count <= 0)
@@ -634,9 +634,9 @@ int EntAddItems(Entity& e, const SStr& name, int count) {
     }
     return rc;
 }
-// ---- Talente (API 30): Das Inventar des Helden kennt gelernte Talente und fuehrt je Talent einen Aktivierungszaehler (Waffen mit ActivateSkill1/2 zaehlen ihn
-// hoch, solange sie gefuehrt werden). gCInventory_PS::LearnSkill/ActivateSkill/DeactivateSkill/HasLearnedSkill/IsSkillActive/GetSkillActivationCount
-// nehmen die Talent-Vorlage (eCTemplateEntity). Ersatz fuer das nicht schreibbare ActivateSkill2 (Referenzen lassen sich nicht per Text setzen).
+// ---- Skills (API 30): the inventory of the hero knows learned skills and has an activation counter for each skill (weapons with ActivateSkill1/2 increase it
+// while the hero uses them). gCInventory_PS::LearnSkill/ActivateSkill/DeactivateSkill/HasLearnedSkill/IsSkillActive/GetSkillActivationCount
+// take the skill template (eCTemplateEntity). Replacement for ActivateSkill2, which cannot be written (references cannot be set as text).
 typedef bool(__thiscall* SkillBoolFn)(void*, const void*);
 typedef int(__thiscall* SkillCountFn)(const void*, const void*);
 struct SkillApi {
@@ -658,7 +658,7 @@ bool ResolveSkills() {
     g_sk.count = reinterpret_cast<SkillCountFn>(G("?GetSkillActivationCount@gCInventory_PS@@QBEHPBVeCTemplateEntity@@@Z"));
     return g_sk.learn && g_sk.activate && g_sk.deactivate && g_sk.hasLearned && g_sk.isActive && g_sk.count;
 }
-// op: 0 lernen, 1 aktivieren, 2 deaktivieren, 3 gelernt?, 4 aktiv?, 5 Aktivierungszaehler. Rueckgabe -1 Fehler/unbekannt (auch Ausnahme)
+// op: 0 learn, 1 activate, 2 deactivate, 3 learned?, 4 active?, 5 activation counter. Return value -1 error or not known (also exception)
 int SafeSkillOp(void* inv, const void* tpl, int op) {
     __try {
         switch (op) {
@@ -687,8 +687,8 @@ bool EntDeactivateSkill(const Entity& e, const SStr& s) { return SkillOp(e, s, 2
 bool EntHasLearnedSkill(const Entity& e, const SStr& s) { return SkillOp(e, s, 3) == 1; }
 bool EntIsSkillActive(const Entity& e, const SStr& s) { return SkillOp(e, s, 4) == 1; }
 int EntSkillActivationCount(const Entity& e, const SStr& s) { return SkillOp(e, s, 5); }
-// Globale Skriptfunktion: CloneTemplate("It_Wolf_Fur", "G3ASM_Fell") -> 0 angelegt, 1 vorhanden, <0 Fehler (Protokoll). Danach hero.AddItems("G3ASM_Fell", n).
-// Die Kopie lebt nur im Speicher (nicht im Spielstand) und wird bei jedem Start neu angelegt; ihre ID ist fest (aus dem Namen, siehe unten).
+// Global script function: CloneTemplate("It_Wolf_Fur", "G3ASM_Fell") -> 0 made, 1 exists, <0 error (log). Then hero.AddItems("G3ASM_Fell", n).
+// The copy exists only in memory (not in the saved game), and the code makes it again at each start. Its ID is fixed (from the name, see below).
 int CloneTemplate(const SStr& base, const SStr& newName) {
     int rc;
     if (!ResolveInv())
@@ -705,7 +705,7 @@ int CloneTemplate(const SStr& base, const SStr& newName) {
         PropIdVal fixedId = {};
         bool haveFixed = false;
         if (g_i.idFromStr &&
-            g_i.setId) {   // ID = MD5("OG3Clone:" + Name) -> bleibt ueber Neustarts gleich (Spielstand findet die Vorlage wieder)
+            g_i.setId) {   // ID = MD5("OG3Clone:" + name) -> stays the same across new starts (the saved game finds the template again)
             const SStr key(std::string("OG3Clone:") + newName.c_str());
             haveFixed = SafeIdFromString(&fixedId, &key);
         }
@@ -725,9 +725,9 @@ int CloneTemplate(const SStr& base, const SStr& newName) {
     }
     return rc;
 }
-// ---- NPCs/Entities aus einer Vorlage erzeugen (API 18). Ablauf wie in gCSession (Spiel-Hilfsfunktion bei Game.dll+0x173070, Konsolenbefehl "spawn"):
-// gCWorld::GetCurrentWorld() -> CreateDynamicEntity() (leeres dynamisches Entity im Systemlayer) -> eCEntity::CreateFromTemplate(Vorlage) -> Position.
-// Rueckgabe: gueltiges Entity oder ungueltig (Grund im Protokoll). Der NPC bekommt ueber die Vorlage alle Eigenschaftssets des Spiels.
+// ---- Make NPCs or entities from a template (API 18). Sequence as in gCSession (game helper function at Game.dll+0x173070, console command "spawn"):
+// gCWorld::GetCurrentWorld() -> CreateDynamicEntity() (empty dynamic entity in the system layer) -> eCEntity::CreateFromTemplate(template) -> position.
+// Return value: a valid entity, or not valid (reason in the log). Through the template, the NPC gets all property sets of the game.
 typedef void*(__stdcall* WorldCurFn)();
 typedef void*(__thiscall* WorldCreateDynFn)(void*);
 typedef bool(__thiscall* EntFromTplFn)(void*, const void*);
@@ -736,7 +736,7 @@ typedef void*(__stdcall* SectorForEntFn)(const void*);         // gCWorld::GetSe
 typedef void*(__thiscall* WorldSysSectorFn)(void*);            // gCWorld::GetSystemSector() -> gCSector&
 typedef void(__thiscall* SetLocalRotFn)(void*, const void*);   // eCEntity::SetLocalRotation(const bCQuaternion&)
 std::map<void*, void*>
-    g_spawned;   // von SpawnNPC erzeugte Entities -> Welt, in der sie erzeugt wurden (nur diese darf DestroyNPC entfernen)
+    g_spawned;   // entities made by SpawnNPC -> the world in which they were made (DestroyNPC can remove only these)
 struct SpawnApi {
     bool tried = false;
     WorldCurFn current = nullptr;
@@ -763,7 +763,7 @@ bool ResolveSpawn() {
     g_sp.setLocalRot = reinterpret_cast<SetLocalRotFn>(GetProcAddress(g_e.engine, "?SetLocalRotation@eCEntity@@QAEXABVbCQuaternion@@@Z"));
     return g_sp.current && g_sp.createDyn && g_sp.fromTpl;
 }
-// Rueckgabe: 0 ok (*out = Entity), -2 Vorlage unbekannt, -3 Ausnahme, -5 keine Welt, -6 Entity nicht erzeugt, -7 CreateFromTemplate fehlgeschlagen
+// return value: 0 ok (*out = entity), -2 template not known, -3 exception, -5 no world, -6 entity not made, -7 CreateFromTemplate failed
 int SafeSpawn(void* admin, const void* name, const char* wanted, const SVec3* pos, void** out, void** outWorld) {
     void* tpl = SafeFindTemplate(admin, name, wanted);
     if (!tpl) return -2;
@@ -783,7 +783,7 @@ int SafeSpawn(void* admin, const void* name, const char* wanted, const SVec3* po
             reinterpret_cast<SetPosFn>(vt[g_e.setPosSlot])(ent, pos);
         }
         *out = ent;
-        *outWorld = world;   // die Liste g_spawned fuehrt der Aufrufer (kein std::map-Zugriff unter __try)
+        *outWorld = world;   // the caller keeps the list g_spawned (no std::map access under __try)
         return 0;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return -3; }
 }
@@ -812,8 +812,8 @@ Entity SpawnNPC(const SStr& tplName, const SVec3& pos) {
     }
     return result;
 }
-// ---- Fokus-Entity (API 20): das Entity, das der Spieler gerade anvisiert (Fokusname/Interaktion). gCGUIManager::GetFocus() holt den Spieler, dessen
-// gCFocus_PS (Eigenschaftsset 0x3B) und ruft GetFocusEntity(0, 0) - this wird dabei nicht benutzt (Disassembly Game.dll+0x7C290).
+// ---- Focus entity (API 20): the entity that the player targets at this time (focus name, interaction). gCGUIManager::GetFocus() gets the player, its
+// gCFocus_PS (property set 0x3B) and calls GetFocusEntity(0, 0) - this is not used (disassembly Game.dll+0x7C290).
 typedef void*(__thiscall* FocusGetFn)(const void*);
 struct FocusApi {
     bool tried = false;
@@ -835,8 +835,8 @@ void* SafeFocused() {
         return gm ? g_f.focus(gm) : nullptr;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-// gCFocus_PS des Spielers: eCEntity::GetPropertySet(0x3B) ueber die vtable (Slot 0xEC / 4 = 59, wie in gCGUIManager::GetFocus), dann
-// GetCrossHairEntity() (Entity unter dem Fadenkreuz) und GetCurrentPickPosition() (Weltpunkt, auf den der Spieler zielt)
+// gCFocus_PS of the player: eCEntity::GetPropertySet(0x3B) through the vtable (slot 0xEC / 4 = 59, as in gCGUIManager::GetFocus), then
+// GetCrossHairEntity() (entity below the crosshair) and GetCurrentPickPosition() (world point at which the player aims)
 typedef void*(__thiscall* PSGetFn)(void*, int);
 typedef void*(__thiscall* FocusEntFn)(void*);
 typedef const void*(__thiscall* FocusPosFn)(const void*);
@@ -879,8 +879,8 @@ Entity GetCrosshairEntity() {
     if (p && Valid(p)) r.p = p;
     return r;
 }
-// Fadenkreuz des Spielers ein-/ausschalten (API 46): HUD gCGUIManager::ShowCrossHair(bool) (SDK ge_guimanager.h), dazu wie bisher
-// gCFocus_PS::SetDrawCrossHair. Rueckgabe: true, wenn ShowCrossHair aufgerufen wurde.
+// Turn the crosshair of the player on or off (API 46): HUD gCGUIManager::ShowCrossHair(bool) (SDK ge_guimanager.h), and as before
+// gCFocus_PS::SetDrawCrossHair. Return value: true if ShowCrossHair was called.
 typedef void(__thiscall* ShowCrossFn)(void*, bool);
 ShowCrossFn g_showCross = nullptr;
 bool SafeShowCross(bool on) {
@@ -901,7 +901,7 @@ bool SetCrosshairVisible(bool on) {
     }
     return g_showCross && SafeShowCross(on);
 }
-// Ungueltiges Entity, wenn nichts anvisiert wird oder kein Spiel laeuft
+// entity that is not valid if nothing is targeted or if no game runs
 Entity GetFocusedEntity() {
     Entity r{nullptr};
     if (ResolveFocus()) {
@@ -910,9 +910,9 @@ Entity GetFocusedEntity() {
     }
     return r;
 }
-// ---- Bildschirm-Picking (API 22): eCPhysicsScene::PickEntity(x, y, maxDistanz, bCVector& Trefferpunkt) baut aus dem Bildschirmpixel einen Strahl der aktuellen
-// Kamera und ruft TraceRayNearestHit (Hints 0x1083 = statische + dynamische Shapes, Trefferpunkt, Distanz ohne Richtungslaenge; Disassembly Engine.dll+0x174540).
-// Rueckgabe: das getroffene Entity (oder 0) und der exakte Weltpunkt des Treffers. Der Mittelpunkt des Spielfensters entspricht dem Fadenkreuz.
+// ---- Screen picking (API 22): eCPhysicsScene::PickEntity(x, y, maxDistance, bCVector& hitPoint) builds a ray of the current camera from the screen pixel
+// and calls TraceRayNearestHit (hints 0x1083 = static + dynamic shapes, hit point, distance without the length of the direction; disassembly Engine.dll+0x174540).
+// Return value: the entity that was hit (or 0) and the exact world point of the hit. The center of the game window agrees with the crosshair.
 typedef void*(__stdcall* PhysInstFn)();
 typedef void*(__thiscall* PickEntFn)(void*, int, int, float, void*);
 PhysInstFn g_physInst = nullptr;
@@ -925,9 +925,9 @@ void* SafePickEntity(int x, int y, float maxDist, SVec3* hit) {
         return scene ? g_pickEnt(scene, x, y, maxDist, hit) : nullptr;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-// Eigener Strahl mit ausgeschlossenem Helden: PickEntity uebergibt kein auszuschliessendes Entity, aus der Verfolgerkamera trifft der Strahl deshalb zuerst den
-// Helden (Spieltest: 'PC_Hero', Abstand 0). Ablauf wie PickEntity: eCCameraBase::PointToRay(Pixel) -> eCPhysicsScene::TraceRayNearestHit(Ursprung, Richtung,
-// Ausschluss = Held, Hints 0x1083) -> Trefferentity bei Bericht+4, Trefferpunkt bei Bericht+0x68 (Bericht = Zeiger bei Szene+0xAC).
+// Own ray with the hero excluded: PickEntity gives no entity to exclude, thus from the follow camera the ray first hits the
+// hero (game test: 'PC_Hero', distance 0). Sequence as PickEntity: eCCameraBase::PointToRay(pixel) -> eCPhysicsScene::TraceRayNearestHit(origin, direction,
+// exclusion = hero, hints 0x1083) -> hit entity at report+4, hit point at report+0x68 (report = pointer at scene+0xAC).
 typedef void*(__stdcall* AppInstFn)();
 typedef void*(__thiscall* AppCamFn)(void*);
 typedef void(__thiscall* PtToRayFn)(const void*, const void*, void*);
@@ -977,7 +977,7 @@ bool ResolvePick() {
             reinterpret_cast<PickEntFn>(GetProcAddress(g_e.engine, "?PickEntity@eCPhysicsScene@@QAEPAVeCEntity@@HHMAAVbCVector@@@Z"));
     return g_physInst && g_pickEnt;
 }
-// Entity unter dem Bildschirmpixel (x, y), in Pixeln der Client-Flaeche des Spielfensters; der Trefferpunkt steht danach in GetPickPoint()
+// entity below the screen pixel (x, y), in pixels of the client area of the game window; GetPickPoint() then gives the hit point
 Entity PickScreen(int x, int y, float maxDist) {
     Entity r{nullptr};
     g_lastPickHit = false;
@@ -986,7 +986,7 @@ Entity PickScreen(int x, int y, float maxDist) {
     const float md = maxDist > 0 ? maxDist : 100000.0f;
     void* p = nullptr;
     if (g_appInst && g_appCam && g_ptToRay && g_traceNear && g_physInst)
-        p = SafePickExcluding(x, y, SafeHero(false), md, &hit);   // Held ausgeschlossen
+        p = SafePickExcluding(x, y, SafeHero(false), md, &hit);   // hero excluded
     else
         p = SafePickEntity(x, y, md, &hit);
     if (p && Valid(p)) {
@@ -996,7 +996,7 @@ Entity PickScreen(int x, int y, float maxDist) {
     }
     return r;
 }
-// Entity im Mittelpunkt des Spielfensters (= unter dem Fadenkreuz)
+// entity at the center of the game window (= below the crosshair)
 Entity PickCenter(float maxDist) {
     RECT rc{};
     HWND w = GameWindow();
@@ -1008,8 +1008,8 @@ Entity PickCenter(float maxDist) {
 }
 SVec3 GetPickPoint() { return g_lastPickHit ? g_lastPick : SVec3{0, 0, 0}; }
 bool HasPickPoint() { return g_lastPickHit; }
-// Von SpawnNPC erzeugtes Entity wieder entfernen (gCWorld::DestroyDynamicEntity). Rueckgabe: true = entfernt; der Griff im Skript bleibt, ein zweiter Aufruf wird abgelehnt.
-// Fremde Entities (Welt-NPCs, Held) werden abgelehnt, ebenso Entities einer inzwischen anderen Welt.
+// Remove an entity that SpawnNPC made (gCWorld::DestroyDynamicEntity). Return value: true = removed. The handle in the script stays; a second call is refused.
+// Entities of other sources (world NPCs, hero) are refused, and also entities of a world that is now different.
 bool SafeDestroy(void* world, void* ent) {
     __try {
         return g_sp.destroyDyn(world, ent);
@@ -1020,7 +1020,7 @@ void* SafeCurrentWorld() {
         return g_sp.current();
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-// Gehoert das Entity zum Systemsektor der Welt (dort landen per SpawnNPC erzeugte Entities, auch nach Speichern und Laden)? Held/Spieler zaehlen nie.
+// Does the entity belong to the system sector of the world (entities made by SpawnNPC go there, also after a save and a load)? Hero and player never count.
 bool SafeInSystemSector(void* world, void* ent, void** sector, void** sysSector) {
     __try {
         *sector = g_sp.sectorFor(ent);
@@ -1028,7 +1028,7 @@ bool SafeInSystemSector(void* world, void* ent, void** sector, void** sysSector)
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// Hat das Entity ein gCNPC_PS (ist es ein NPC)? Script.dll PSNpc(eCEntity*) liefert das Eigenschaftsset oder 0
+// Does the entity have a gCNPC_PS (is it an NPC)? Script.dll PSNpc(eCEntity*) gives the property set or 0
 typedef void(__thiscall* PSNpcCtorFn)(void*, void*);
 PSNpcCtorFn g_psNpc = nullptr;
 bool SafeHasNpcSet(void* ent) {
@@ -1046,8 +1046,8 @@ bool IsNpc(void* ent) {
     return g_psNpc && ent && SafeHasNpcSet(ent);
 }
 bool IsNPCScript(const Entity& e) { return EntIsValid(e) && IsNpc(e.p); }
-// Grobe Einordnung nach Namensmustern, die im Spieltest beobachtet wurden (G3_Myrtana_House_*, G3_Object_Interact_*, G3_Myrtana_Landscape_*, G3_World_Border_*).
-// Ergebnis: "NPC", "Building", "Object", "Landscape", "Border", "Unnamed" (kein Name: Baeume, Steine, Kleinteile - nicht naeher bestimmbar), "Other", "" (ungueltig)
+// General classification by name patterns that were seen in the game test (G3_Myrtana_House_*, G3_Object_Interact_*, G3_Myrtana_Landscape_*, G3_World_Border_*).
+// Result: "NPC", "Building", "Object", "Landscape", "Border", "Unnamed" (no name: trees, stones, small parts - not more specific), "Other", "" (not valid)
 SStr EntCategory(const Entity& e) {
     if (!EntIsValid(e)) return SStr();
     if (IsNpc(e.p)) return SStr("NPC");
@@ -1062,9 +1062,9 @@ SStr EntCategory(const Entity& e) {
     return SStr("Other");
 }
 Entity EntCurrentAttacker(const Entity& e) { return {EntIsValid(e) ? CurrentAttackerOf(e.p) : nullptr}; }
-// ---- Statuseffekte (API 27): gCNPC_PS des NPCs (der Halter aus PSNpc(eCEntity*) ist das Eigenschaftsset, wie bei den Attributen). gEStatusEffect ist eine Bitmaske:
-// 1 Burning, 2 Frozen, 4 Poisoned, 8 Diseased, 16 Transformed, 64 Nebel, 128 Geist, 256 Magiebarriere, 512 Seelenreise. Krankheit/Gift werden auch ueber PSNpc::EnableDiseased/
-// EnablePoisoned gesetzt (Zeitstempel TimeStampDiseased/Poisoned im Set); hier wird nur die Bitmaske gelesen und geschrieben.
+// ---- Status effects (API 27): gCNPC_PS of the NPC (the holder from PSNpc(eCEntity*) is the property set, as for the attributes). gEStatusEffect is a bit mask:
+// 1 burning, 2 frozen, 4 poisoned, 8 diseased, 16 transformed, 64 fog, 128 ghost, 256 magic barrier, 512 soul travel. Disease and poison are also set through PSNpc::EnableDiseased/
+// EnablePoisoned (time stamp TimeStampDiseased/Poisoned in the set). Here, the code only reads and writes the bit mask.
 typedef bool(__thiscall* HasSEFn)(void*, int);
 typedef void(__thiscall* EnableSEFn)(void*, int, bool);
 typedef const unsigned long&(__thiscall* MaskSEFn)(const void*);
@@ -1109,7 +1109,7 @@ bool SafeEnableSE(void* ps, int effect, bool on) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// Bitmaske der Statuseffekte (0 bei ungueltigem Entity oder Nicht-NPC)
+// bit mask of the status effects (0 for an entity that is not valid or not an NPC)
 unsigned EntStatusMask(const Entity& e) {
     void* ps = NpcSetOf(e);
     unsigned m = 0;
@@ -1121,10 +1121,10 @@ bool EntSetStatus(Entity& e, int effect, bool on) {
     return ps && effect > 0 && SafeEnableSE(ps, effect, on);
 }
 
-// ---- Item-Qualitaet (API 28): Bitmaske des Inventarstapels in einem Ausruestungs-Slot (gCInventory_PS::FindStack(gESlot), gCInventoryStack::Get/SetQuality).
-// Bits: 2 Krank, 4 Vergiftet, 8 Brennend, 16 Gefroren, 32 Scharf, 64 Gesegnet, 128 Selbstgeschmiedet, 256 Abgenutzt; 512 = Lebensraub (eigenes Bit dieses Modkits, wird von der Beschreibung
-// der Waffe angezeigt, siehe game_hooks.cpp). Die Qualitaet gehoert zum Stapel: verschiedene Qualitaeten sind verschiedene Stapel und werden mit dem Spielstand gespeichert.
-// Slots (gESlot): 1 rechte Hand, 2 linke Hand, 5 Ruecken links, 6 Ruecken rechts, 7 Bogen, 14 Munition.
+// ---- Item quality (API 28): bit mask of the inventory stack in an equipment slot (gCInventory_PS::FindStack(gESlot), gCInventoryStack::Get/SetQuality).
+// Bits: 2 diseased, 4 poisoned, 8 burning, 16 frozen, 32 sharp, 64 blessed, 128 self-made, 256 worn; 512 = life steal (a bit of this modkit; the description
+// of the weapon shows it, see game_hooks.cpp). The quality belongs to the stack: different qualities are different stacks, and the game saves them with the saved game.
+// Slots (gESlot): 1 right hand, 2 left hand, 5 back left, 6 back right, 7 bow, 14 ammunition.
 typedef void*(__thiscall* PSGetFn2)(void*, int);
 typedef const void*(__thiscall* FindStackSlotFn)(const void*, int);
 typedef const int&(__thiscall* StackGetQFn)(const void*);
@@ -1149,7 +1149,7 @@ bool ResolveQuality() {
     if (ScriptHost::s_current) ScriptHost::s_current->Log(std::string("Qualitaets-Bindings ") + (g_qa.ok ? "bereit" : "fehlen"));
     return g_qa.ok;
 }
-// Stapel im Slot (nullptr, wenn leer); SEH, ohne C++-Objekte
+// stack in the slot (nullptr if empty); SEH, without C++ objects
 void* SafeSlotStack(void* ent, int slot) {
     __try {
         void* inv = g_qa.getPS(ent, 31);   // eEPropertySetType_Inventory
@@ -1180,9 +1180,9 @@ bool EntSetSlotQuality(Entity& e, int slot, unsigned bits) {
     return st && SafeSetStackQuality(st, static_cast<int>(bits));
 }
 Entity EntSlotItem(const Entity& e, int slot) { return {EntIsValid(e) ? SlotItemOf(e.p, slot) : nullptr}; }
-// ---- Eigenschaften lesen (API 29): allgemeiner Eigenschaftszugriff der Engine (SharedBase bCAccessorProperty, 12 Byte) auf das Eigenschaftsset eines Entities
-// (eCEntity::GetPropertySet(eEPropertySetType)). Der Accessor laeuft ueber alle Eigenschaften des Sets und seiner Basisklassen (++), ConvertValueToString liefert den Wert als Text.
-// Nur Lesen. Alle Aufrufe in die Engine sind mit SEH gekapselt; Accessor-Objekte liegen in Puffern und werden von Hand zerstoert.
+// ---- Read properties (API 29): general property access of the engine (SharedBase bCAccessorProperty, 12 bytes) on the property set of an entity
+// (eCEntity::GetPropertySet(eEPropertySetType)). The accessor goes through all properties of the set and of its base classes (++). ConvertValueToString gives the value as text.
+// Read only. All calls into the engine have SEH wrappers. Accessor objects are in buffers and are destroyed by hand.
 struct PsName {
     const char* name;
     int id;
@@ -1325,7 +1325,7 @@ struct PropApi {
     AccIncFn inc = nullptr;
     PsGetFn3 getPS = nullptr;
     PsGetByNameFn getPSByName = nullptr;   // optional
-    AccConvStrFn convStr = nullptr;        // optional (Schreiben)
+    AccConvStrFn convStr = nullptr;        // optional (write)
 } g_pa;
 bool ResolveProps() {
     if (g_pa.tried) return g_pa.ok;
@@ -1346,7 +1346,7 @@ bool ResolveProps() {
     if (ScriptHost::s_current) ScriptHost::s_current->Log(std::string("Eigenschaften-Bindings ") + (g_pa.ok ? "bereit" : "fehlen"));
     return g_pa.ok;
 }
-// Name eines Eigenschaftssets -> eEPropertySetType: "Item", "gCItem_PS", "eCRigidBody_PS" (Gross-/Kleinschreibung egal), -1 = unbekannt
+// name of a property set -> eEPropertySetType: "Item", "gCItem_PS", "eCRigidBody_PS" (no case sensitivity), -1 = not known
 int PsTypeId(const char* text) {
     std::string n = text ? text : "";
     for (char& c : n) c = char(tolower(static_cast<unsigned char>(c)));
@@ -1369,13 +1369,13 @@ void* SafePropSetByName(void* ent, const void* nameStr) {
         return g_pa.getPSByName(ent, nameStr);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-// Eigenschaftsset eines Entities: Typname aus eEPropertySetType ("Item", "gCItem_PS") oder, wenn der nicht bekannt ist, der Klassenname ("gCSkill_PS", ...) ueber GetPropertySet(bCString)
+// property set of an entity: type name from eEPropertySetType ("Item", "gCItem_PS") or, if that is not known, the class name ("gCSkill_PS", ...) through GetPropertySet(bCString)
 void* PropSetFor(const Entity& e, const SStr& set) {
     const int id = PsTypeId(g_sb.strGetText(&set));
     if (id >= 0) return SafePropSet(e.p, id);
     return g_pa.getPSByName ? SafePropSetByName(e.p, &set) : nullptr;
 }
-// Wert einer Eigenschaft als Text; 1 gelesen, 0 Eigenschaft unbekannt, -1 Fehler
+// value of a property as text; 1 read, 0 property not known, -1 error
 int SafePropOne(void* ps, const void* nameStr, std::string* out) {
     char acc[32] = {}, sub[32] = {}, ret[32] = {};
     __try {
@@ -1394,7 +1394,7 @@ int SafePropOne(void* ps, const void* nameStr, std::string* out) {
         return r;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
 }
-// Liste: Accessor anlegen / Schritt (aktuelle Eigenschaft anhaengen und weiter) / aufraeumen
+// list: make the accessor / step (append the current property and continue) / clean up
 bool SafePropStart(void* ps, void* acc) {
     __try {
         g_pa.ctor(acc, ps);
@@ -1406,7 +1406,7 @@ bool SafePropValid(void* acc) {
         return g_pa.valid(acc);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// Name der aktuellen Eigenschaft in einen Puffer kopieren
+// copy the name of the current property into a buffer
 bool SafePropName(void* acc, char* buf, size_t n) {
     buf[0] = 0;
     __try {
@@ -1417,7 +1417,7 @@ bool SafePropName(void* acc, char* buf, size_t n) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { buf[0] = 0; return false; }
 }
-// Wert der aktuellen Eigenschaft als Text in einen Puffer (abgeschnitten)
+// value of the current property as text into a buffer (truncated)
 bool SafePropValue(void* acc, char* buf, size_t n) {
     char ret[32] = {};
     buf[0] = 0;
@@ -1448,7 +1448,7 @@ std::string PropClean(std::string s, size_t maxlen) {
     if (s.size() > maxlen) s.resize(maxlen);
     return s;
 }
-// Wert aus Text schreiben (ConvertStringToValue, Zuweisen); 1 geschrieben, 0 Eigenschaft unbekannt, -1 Fehler
+// write a value from text (ConvertStringToValue, assign); 1 written, 0 property not known, -1 error
 int SafePropWrite(void* ps, const void* nameStr, const void* valueStr) {
     char acc[32] = {}, sub[32] = {};
     __try {
@@ -1472,14 +1472,14 @@ SStr GetPropertyText(const Entity& e, const SStr& set, const SStr& prop) {
     if (r.size() > 3000) r.resize(3000);
     return SStr(r);
 }
-// Eigenschaft aus Text setzen. Aendert Spieldaten: nur fuer Vorlagen und Entities verwenden, die die Mod selbst angelegt hat. Eine falsche Textform kann zu falschen Werten fuehren.
+// Set a property from text. Changes game data: use it only for templates and entities that the mod made itself. An incorrect text form can cause incorrect values.
 bool SetPropertyText(const Entity& e, const SStr& set, const SStr& prop, const SStr& value) {
     if (!EntIsValid(e) || !ResolveProps() || !g_pa.convStr) return false;
     void* ps = PropSetFor(e, set);
     return ps && SafePropWrite(ps, &prop, &value) == 1;
 }
-// Verweis-Eigenschaft (eCTemplateEntityProxy, z. B. Item.ActivateSkill2, Item.Skill, gCSkill_PS.ReqSkill1) auf eine Vorlage setzen. Per Text (ConvertStringToValue) geht das nicht
-// (Formtest 2026-11-06). Statt dessen: gCxxx_PS::Access<Eigenschaft>() liefert den Proxy, eCTemplateEntityProxy::SetEntity(eCTemplateEntity const*) setzt das Ziel.
+// Set a reference property (eCTemplateEntityProxy, for example Item.ActivateSkill2, Item.Skill, gCSkill_PS.ReqSkill1) to a template. This is not possible as text (ConvertStringToValue)
+// (form test 2026-11-06). In place of that: gCxxx_PS::Access<property>() gives the proxy, and eCTemplateEntityProxy::SetEntity(eCTemplateEntity const*) sets the target.
 typedef void*(__thiscall* AccessProxyFn)(void*);
 typedef void(__thiscall* ProxySetEntityFn)(void*, const void*);
 bool SafeSetRef(void* ps, AccessProxyFn access, ProxySetEntityFn setEntity, const void* tpl) {
@@ -1491,9 +1491,9 @@ bool SafeSetRef(void* ps, AccessProxyFn access, ProxySetEntityFn setEntity, cons
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 bool SetTemplateRefScript(const Entity& e, const SStr& set, const SStr& prop, const SStr& target) {
-    if (!EntIsValid(e) || !ResolveInv() || !ResolveProps()) return false;   // ResolveProps: PropSetFor braucht die Eigenschafts-Funktionen
+    if (!EntIsValid(e) || !ResolveInv() || !ResolveProps()) return false;   // ResolveProps: PropSetFor needs the property functions
     char mangled[200];
-    // set ist hier der Klassenname (gCItem_PS, gCSkill_PS, gCArmorSet_PS ...)
+    // set is the class name here (gCItem_PS, gCSkill_PS, gCArmorSet_PS ...)
     std::snprintf(mangled, sizeof mangled, "?Access%s@%s@@QAEAAVeCTemplateEntityProxy@@XZ", prop.c_str(), set.c_str());
     auto access = reinterpret_cast<AccessProxyFn>(GetProcAddress(g_e.game, mangled));
     auto setEntity = reinterpret_cast<ProxySetEntityFn>(GetProcAddress(g_e.engine, "?SetEntity@eCTemplateEntityProxy@@QAEXPBVeCTemplateEntity@@@Z"));
@@ -1507,7 +1507,7 @@ bool SetTemplateRefScript(const Entity& e, const SStr& set, const SStr& prop, co
     void* tpl = g_e.sceneAdmin ? SafeFindTemplate(g_e.sceneAdmin, &target, target.c_str()) : nullptr;
     return tpl && SafeSetRef(ps, access, setEntity, tpl);
 }
-// Entity-Verweis (eCEntityProxy, z. B. gCInteraction_PS.Owner) auf ein Entity setzen: gCxxx_PS::Access<Eigenschaft>() liefert den Proxy, eCEntityProxy::SetEntity(eCEntity const*) setzt das Ziel.
+// set an entity reference (eCEntityProxy, for example gCInteraction_PS.Owner) to an entity: gCxxx_PS::Access<property>() gives the proxy, eCEntityProxy::SetEntity(eCEntity const*) sets the target.
 bool SetEntityRefScript(const Entity& e, const SStr& set, const SStr& prop, const Entity& target) {
     if (!EntIsValid(e) || !EntIsValid(target) || !ResolveInv() || !ResolveProps()) return false;
     char mangled[200];
@@ -1518,9 +1518,9 @@ bool SetEntityRefScript(const Entity& e, const SStr& set, const SStr& prop, cons
     void* ps = PropSetFor(e, set);
     return ps && SafeSetRef(ps, access, setEntity, target.p);
 }
-// Gruppe/Begleiter (API 33): gCParty_PS (Game.dll). Die Mitglieder stehen beim ANFUEHRER (GetMembers: bTObjArray<eCEntityProxy>, Feld 0 Zeiger,
-// Feld 1 Anzahl; eCEntityProxy 0x1C Byte, SDK), jedes Mitglied verweist mit PartyLeaderEntity auf ihn. Teleport ueber Script.dll Entity::Teleport(Entity const &)
-// mit echten Script.dll-Entities (MakeScriptEntity).
+// Group and companions (API 33): gCParty_PS (Game.dll). The members are at the LEADER (GetMembers: bTObjArray<eCEntityProxy>, field 0 pointer,
+// field 1 count; eCEntityProxy 0x1C bytes, SDK). Each member refers to the leader with PartyLeaderEntity. Teleport through Script.dll Entity::Teleport(Entity const &)
+// with real Script.dll entities (MakeScriptEntity).
 typedef const void*(__thiscall* PartyMembersFn)(const void*);
 typedef const void*(__thiscall* PartyLeaderFn)(const void*);
 typedef void(__thiscall* PartySetWaitFn)(void*, const bool*);
@@ -1546,7 +1546,7 @@ PartyApi& Party() {
         a.getWait = reinterpret_cast<PartyGetWaitFn>(GetProcAddress(g_e.game, "?GetWaiting@gCParty_PS@@QBEAB_NXZ"));
         a.proxyEnt = reinterpret_cast<ProxyEntFn>(GetProcAddress(g_e.engine, "?GetEntity@eCEntityProxy@@QAEPAVeCEntity@@XZ"));
     }
-    if (!a.teleport)   // Script.dll laedt erst nach main(): bis dahin erneut suchen
+    if (!a.teleport)   // Script.dll loads only after main(): until then, search again
         if (HMODULE script = GetModuleHandleA("Script.dll"))
             a.teleport = reinterpret_cast<TeleportFn>(GetProcAddress(script, "?Teleport@Entity@@QAE_NABV1@@Z"));
     return a;
@@ -1556,7 +1556,7 @@ void* PartyPS(const Entity& e) {
     SStr set("Party");
     return PropSetFor(e, set);
 }
-// Mitglied i (i < 0: nur zaehlen); Rueckgabe Anzahl oder -1
+// member i (i < 0: count only); return value count or -1
 int SafePartyMember(void* ps, int i, void** out) {
     PartyApi& a = Party();
     if (!a.members || !a.proxyEnt) return -1;
@@ -1625,24 +1625,24 @@ bool EntTeleportTo(const Entity& e, const Entity& target) {
     if (!MakeScriptEntity(a, e.p) || !MakeScriptEntity(b, target.p)) return false;
     return SafeTeleport(a, b);
 }
-// NPC toeten (API 46, Ersatz fuer DoDamage): Rezept aus dem Plugin Chszonszcze (statische Analyse 2026-11-08):
-//   PSDamageReceiver.DamageAmount = 0, PSNpc::SetLastAttacker/SetCurrentAttacker(Taeter), Spielskript SetHitPoints(Opfer, None, 0),
+// Kill an NPC (API 46, replacement for DoDamage): recipe from the plugin Chszonszcze (static analysis 2026-11-08):
+//   PSDamageReceiver.DamageAmount = 0, PSNpc::SetLastAttacker/SetCurrentAttacker(killer), game script SetHitPoints(victim, None, 0),
 //   PSRoutine::FullStop, PSRoutine::SetTask("ZS_RagDollDead").
-// Script.dll-Entity (SDK gs_entity.h): +0 eCEntity*, danach je 4 Byte die Property-Set-Huellen in Deklarationsreihenfolge: Routine +0x04, NPC +0x34,
-// DamageReceiver +0x4C. Eigenschaften (GS_PROPERTY) arbeiten mit this = Adresse der Huelle. SetTask nimmt den bCString als Wert (die Funktion zerstoert ihn).
+// Script.dll entity (SDK gs_entity.h): +0 eCEntity*, then for each 4 bytes the property set wrappers in the sequence of declaration: Routine +0x04, NPC +0x34,
+// DamageReceiver +0x4C. Properties (GS_PROPERTY) work with this = address of the wrapper. SetTask takes the bCString by value (the function destroys it).
 struct KillApi {
     bool tried = false;
     void*(__thiscall* dmgAssign)(void*, const long*) = nullptr;
     void(__thiscall* setLast)(void*, const void*) = nullptr;
     void(__thiscall* setCur)(void*, const void*) = nullptr;
     void(__thiscall* fullStop)(void*) = nullptr;
-    void(__thiscall* setTask)(void*, void*) = nullptr;   // eigentlich (bCString als Wert): 4 Byte roher bCString, den die Funktion freigibt
+    void(__thiscall* setTask)(void*, void*) = nullptr;   // really (bCString by value): 4 bytes of raw bCString that the function frees
 };
 KillApi& Kills() {
     static KillApi a;
     if (!a.tried) {
         HMODULE script = GetModuleHandleA("Script.dll");
-        if (!script) return a;   // Script.dll laedt spaet: spaeter erneut versuchen
+        if (!script) return a;   // Script.dll loads late: try again later
         a.tried = true;
         a.dmgAssign = reinterpret_cast<void*(__thiscall*)(void*, const long*)>(GetProcAddress(script, "??4PropertyDamageAmount@PSDamageReceiver@@QAEAAV01@ABJ@Z"));
         a.setLast = reinterpret_cast<void(__thiscall*)(void*, const void*)>(GetProcAddress(script, "?SetLastAttacker@PSNpc@@QAEXABVEntity@@@Z"));
@@ -1652,7 +1652,7 @@ KillApi& Kills() {
     }
     return a;
 }
-// Schritte 1 und 2 (vor dem Skriptaufruf); k = Script-Entity des Taeters oder nullptr
+// steps 1 and 2 (before the script call); k = script entity of the killer or nullptr
 bool SafeKillPrepare(KillApi& a, unsigned char* v, const void* k) {
     __try {
         const long zero = 0;
@@ -1679,7 +1679,7 @@ bool EntKill(const Entity& victim, const Entity& killer) {
     const bool hasKiller = EntIsValid(killer) && MakeScriptEntity(k, killer.p);
     if (!SafeKillPrepare(a, v, hasKiller ? k : nullptr)) return false;
     CallGameScript("SetHitPoints", victim.p, nullptr, 0);
-    void* rawTask = nullptr;   // eigene Kopie fuer die Funktion, die ihren Wert-Parameter zerstoert
+    void* rawTask = nullptr;   // own copy for the function that destroys its value parameter
     SStr task("ZS_RagDollDead");
     g_sb.strCopy(&rawTask, &task);
     const bool ok = SafeKillFinish(a, v, rawTask);
@@ -1693,8 +1693,8 @@ bool EntKill(const Entity& victim, const Entity& killer) {
     return ok;
 }
 bool EntKillNoKiller(const Entity& victim) { return EntKill(victim, Entity{nullptr}); }
-// Effekte (API 30): Script.dll EffectSystem::ExistsEffect(Name) und StartEffect(Name, Entity) starten einen benannten Effekt (z. B. "eff_magic_summonlightning_target_01", der Blitz
-// des Zaubers "Blitz beschwoeren") am Entity. Der Effekt-Handle (Effect, 4 Byte, Rueckgabe per Zeiger) wird nicht aufbewahrt; die Effektverwaltung beendet ihn selbst.
+// Effects (API 30): Script.dll EffectSystem::ExistsEffect(name) and StartEffect(name, entity) start a named effect (for example "eff_magic_summonlightning_target_01", the lightning
+// of the spell "Blitz beschwoeren", summon lightning) at the entity. The code does not keep the effect handle (Effect, 4 bytes, return value through a pointer). The effect management ends it itself.
 typedef bool(__stdcall* EffectExistsFn)(const void*);
 typedef void*(__stdcall* EffectStartFn)(void*, const void*, const void*);
 bool SafeEffectExists(EffectExistsFn fn, const void* name) {
@@ -1732,11 +1732,11 @@ bool EffectExistsScript(const SStr& name) {
 bool StartEffectScript(const SStr& name, const Entity& at) {
     EffectApi& a = Effects();
     if (!a.start || !a.exists || !EntIsValid(at) || !SafeEffectExists(a.exists, &name)) return false;
-    alignas(8) unsigned char se[kScriptEntityBytes];   // echtes Script.dll-Entity (0xA8 Byte) statt nur des Zeigers
+    alignas(8) unsigned char se[kScriptEntityBytes];   // real Script.dll entity (0xA8 bytes) in place of only the pointer
     if (!MakeScriptEntity(se, at.p)) return false;
     return SafeEffectStart(a.start, &name, se);
 }
-// Vorlage (Template-Entity) nach genauem Namen; ungueltig, wenn es sie nicht gibt. Ihre Eigenschaftssets lassen sich wie bei einem Entity lesen (und fuer eigene Vorlagen schreiben)
+// template (template entity) by exact name; not valid if it does not exist. Its property sets can be read as for an entity (and written for own templates)
 Entity GetTemplateEntityScript(const SStr& name) {
     if (!ResolveInv()) return {nullptr};
     if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
@@ -1745,7 +1745,7 @@ Entity GetTemplateEntityScript(const SStr& name) {
     }
     return {g_e.sceneAdmin ? SafeFindTemplate(g_e.sceneAdmin, &name, name.c_str()) : nullptr};
 }
-// "Name=Wert; Name=Wert; ..." fuer alle Eigenschaften des Sets (und seiner Basisklassen), hoechstens max Stueck; ';' in Werten wird zu Leerzeichen
+// "name=value; name=value; ..." for all properties of the set (and of its base classes), maximum max items; ';' in values becomes a space
 SStr ListPropertyTexts(const Entity& e, const SStr& set, int maxn) {
     if (!EntIsValid(e) || !ResolveProps()) return SStr();
     void* ps = PropSetFor(e, set);
@@ -1766,7 +1766,7 @@ SStr ListPropertyTexts(const Entity& e, const SStr& set, int maxn) {
     return SStr(all);
 }
 bool EntIsBuilding(const Entity& e) { return std::strcmp(EntCategory(e).c_str(), "Building") == 0; }
-// Im Systemsektor liegen auch Welt-Objekte (z. B. G3_World_Border_001): deshalb zusaetzlich NPC-Pflicht.
+// the system sector also contains world objects (for example G3_World_Border_001): thus the NPC requirement too.
 bool IsDynamicSpawn(const Entity& e) {
     if (!EntIsValid(e) || !ResolveSpawn() || !g_sp.sectorFor || !g_sp.sysSector) return false;
     if (!IsNpc(e.p)) return false;
@@ -1775,14 +1775,14 @@ bool IsDynamicSpawn(const Entity& e) {
     void *sec = nullptr, *sys = nullptr;
     return world && SafeInSystemSector(world, e.p, &sec, &sys) && sec && sec == sys;
 }
-// Entfernt ein per SpawnNPC erzeugtes Entity: eines dieser Sitzung (Liste) oder eines im Systemsektor (nach Laden eines Spielstands).
-// Entities aus normalen Sektoren (Welt-NPCs), Held und Spieler werden abgelehnt. Rueckgabe: true = entfernt.
+// Removes an entity that SpawnNPC made: one of this session (list) or one in the system sector (after the load of a saved game).
+// Entities from normal sectors (world NPCs), hero and player are refused. Return value: true = removed.
 bool DestroyNPC(const Entity& e) {
     char whyBuf[120];
     const char* why = nullptr;
     bool ok = false;
     auto it = g_spawned.find(e.p);
-    if (!EntIsValid(e))   // auch ein schon entfernter Eintrag aus g_spawned (Zeiger zeigt nicht mehr auf ein Spielobjekt)
+    if (!EntIsValid(e))   // also an entry from g_spawned that was already removed (the pointer does not point to a game object anymore)
         why = "Entity ungueltig";
     else if (!ResolveSpawn() || !g_sp.destroyDyn)
         why = "Funktion fehlt";
@@ -1813,7 +1813,7 @@ bool DestroyNPC(const Entity& e) {
     }
     return ok;
 }
-// Entities nach Teilname suchen (Zaehlen + Index): z. B. alle "Diego"
+// find entities by part of the name (count + index): for example all "Diego"
 void* SceneAdminNow() {
     if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
         SStr mod("eCSceneAdmin");
@@ -1843,7 +1843,7 @@ Entity GetEntityByPart(const SStr& part, int index) {
     if (admin) r.p = SafeByPart(admin, &part, index);
     return r;
 }
-// Drehung: SetLocalRotation (fuer Entities direkt unter der Welt = Weltdrehung). Quaternion (x, y, z, w), Y ist oben.
+// rotation: SetLocalRotation (for entities directly below the world = world rotation). Quaternion (x, y, z, w), Y is up.
 bool SafeSetRot(void* ent, const SQuat* q) {
     __try {
         g_sp.setLocalRot(ent, q);
@@ -1851,7 +1851,7 @@ bool SafeSetRot(void* ent, const SQuat* q) {
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 bool EntSetRotation(Entity& e, const SQuat& q) { return EntIsValid(e) && ResolveSpawn() && g_sp.setLocalRot && SafeSetRot(e.p, &q); }
-// Blickrichtung zu einem Ziel (nur um die Hochachse): Gier = atan2(dx, dz) in Grad plus Versatz (Standard 0; falls der NPC vom Ziel weg schaut: 180)
+// view direction to a target (only around the vertical axis): yaw = atan2(dx, dz) in degrees plus offset (default 0; if the NPC looks away from the target: 180)
 bool EntLookAt(Entity& e, const Entity& target, float yawOffsetDeg) {
     if (!EntIsValid(e) || !EntIsValid(target)) return false;
     SVec3 a{0, 0, 0}, b{0, 0, 0};
@@ -1862,7 +1862,7 @@ bool EntLookAt(Entity& e, const Entity& target, float yawOffsetDeg) {
     const SQuat q{0.0f, std::sin(yaw * 0.5f), 0.0f, std::cos(yaw * 0.5f)};
     return EntSetRotation(e, q);
 }
-// Vorlagennamen suchen (Teilname, Gross-/Kleinschreibung egal): "Name1;Name2;..." (hoechstens max Treffer, leer = keine)
+// find template names (part of the name, no case sensitivity): "Name1;Name2;..." (maximum max results, empty = none)
 bool SafeTemplateNames(void* admin, const void* part, int maxn, std::string* out) {
     __try {
         const int n = g_i.countPart(admin, part, 2);
@@ -1877,7 +1877,7 @@ bool SafeTemplateNames(void* admin, const void* part, int maxn, std::string* out
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// Anzahl der Vorlagen, deren Name mit part beginnt (billig, ohne die Namen zu lesen); -1 ohne Spiel
+// number of templates whose name starts with part (cheap, without reading the names); -1 without the game
 int SafeCountTemplates(void* admin, const void* part) {
     __try {
         return g_i.countPart(admin, part, 2);
@@ -1902,14 +1902,14 @@ SStr FindTemplateNames(const SStr& part, int maxn) {
     }
     return SStr(r);
 }
-int EntRemoveItems(Entity& e, const SStr& name, int count) {   // Rueckgabe: Zahl entfernter Stuecke (-1 bei Fehler)
+int EntRemoveItems(Entity& e, const SStr& name, int count) {   // return value: number of removed items (-1 if there is an error)
     void* inv = InventoryOf(e);
     int r = 0;
     return inv && count > 0 && SafeRemoveItems(inv, &name, count, &r) ? r : -1;
 }
 
-// Entfernt alle Stapel mit diesem Namen samt dem Stapel selbst (gCInventory_PS::DeleteStack). RemoveItems verringert nur die Menge; bei dauerhaften Items
-// (Permanent, z. B. Lern-Items von Talenten) bleibt dann ein leerer Stapel stehen. Rueckgabe: Zahl entfernter Stapel, -1 bei Fehler
+// Removes all stacks with this name, with the stack itself (gCInventory_PS::DeleteStack). RemoveItems decreases only the quantity. For permanent items
+// (Permanent, for example learn items of skills), an empty stack then stays. Return value: number of removed stacks, -1 if there is an error
 typedef bool(__thiscall* InvDeleteStackFn)(void*, int);
 bool SafeDeleteStacks(void* inv, const void* name, int* removed) {
     static InvDeleteStackFn del = reinterpret_cast<InvDeleteStackFn>(GetProcAddress(g_e.game, "?DeleteStack@gCInventory_PS@@QAE_NH@Z"));
@@ -1930,8 +1930,8 @@ int EntDeleteItemStack(Entity& e, const SStr& name) {
     return inv && SafeDeleteStacks(inv, &name, &r) ? r : -1;
 }
 
-// Entity::DoDamage entfernt mit API 46 (veraltet seit 39, verdreht: this war das Opfer). Ersatz: Entity::Kill, HurtHitPoints.
-// Warnung fuer veraltete Funktionen: einmal je Mod und Funktion
+// Entity::DoDamage removed with API 46 (deprecated since 39, reversed: this was the victim). Replacement: Entity::Kill, HurtHitPoints.
+// warning for deprecated functions: 1 time for each mod and function
 void WarnDeprecatedOnce(const char* what, const char* hint) {
     static std::set<std::string> warned;
     ScriptHost* h = ScriptHost::s_current;
@@ -1941,17 +1941,17 @@ void WarnDeprecatedOnce(const char* what, const char* hint) {
     h->Log(std::string("[") + h->CurrentMod() + "] VERALTET: " + what + " - " + hint);
 }
 
-// Lebenspunkte eines NPC direkt aendern (API 30): gCDamageReceiver_PS::GetHitPoints/SetHitPoints. Das ist die Stelle, an der das Spiel Schaden anwendet; unser Schaden-Hook
-// sitzt auf SetHitPoints, die Aenderung erscheint also als normaler Treffer in OnDamage (owner dann ohne Angreifer-Kontext). Rueckgabe: neue HP, -1 bei Fehler
+// Change the hit points of an NPC directly (API 30): gCDamageReceiver_PS::GetHitPoints/SetHitPoints. This is the location where the game applies damage. The damage hook of the modkit
+// is on SetHitPoints, thus the change shows as a normal hit in OnDamage (owner then without attacker context). Return value: new HP, -1 if there is an error
 typedef const long&(__thiscall* GetHPFn)(const void*);
 typedef void(__thiscall* SetHPFn)(void*, const long&);
 int SafeHurt(void* ps, GetHPFn get, SetHPFn set, int amount, int minHp) {
     __try {
         long hp = get(ps);
-        if (hp <= minHp) return int(hp);   // schon an oder unter der Untergrenze: nichts schreiben (sonst wuerde das Anheben auf minHp heilen)
+        if (hp <= minHp) return int(hp);   // already at or below the lower limit: write nothing (if not, the increase to minHp would heal)
         long neu = hp - amount;
         if (neu < minHp) neu = minHp;
-        SetScriptHurt(true);   // der Schaden-Hook meldet diesen Abzug ohne Angreifer (LastInflictor am Opfer ist hier ein alter Wert)
+        SetScriptHurt(true);   // the damage hook reports this decrease without an attacker (LastInflictor on the victim is an old value here)
         set(ps, neu);
         SetScriptHurt(false);
         return int(neu);
@@ -1996,9 +1996,9 @@ bool SetGameTime(int day, int hour, int minute) {
     return (day < 0 || SafeClockSet(g_s.setDay, c, day)) && SafeClockSet(g_s.setHour, c, hour) && SafeClockSet(g_s.setMinute, c, minute);
 }
 
-// ---- Zeitrate (API 36): eCApplication::Get/SetTimeScaling (Engine; Ablauf der ganzen Simulation wie die Zeitlupe des Spiels, nicht im Spielstand) und
-// gCClock_PS::Get/SetFactor (Game; Geschwindigkeit der Spieluhr, Eigenschaft der Weltuhr und damit IM Spielstand). Die Huelle aus WorldClock() ist das
-// PSClock-Objekt der Script.dll, ihr erstes Feld der gCClock_PS-Zeiger (wie bei PSPlayerMemory).
+// ---- Time rate (API 36): eCApplication::Get/SetTimeScaling (engine; speed of the full simulation as the slow motion of the game, not in the saved game) and
+// gCClock_PS::Get/SetFactor (game; speed of the game clock, a property of the world clock and thus IN the saved game). The wrapper from WorldClock() is the
+// PSClock object of Script.dll. Its first field is the gCClock_PS pointer (as for PSPlayerMemory).
 typedef float(__thiscall* AppScaleGetFn)(const void*);
 typedef void(__thiscall* AppScaleSetFn)(void*, float);
 typedef const float*(__thiscall* FactorGetFn)(const void*);
@@ -2069,7 +2069,7 @@ bool SetClockFactorScript(float v) {
     return SafeFactor(&c, true, &v);
 }
 
-// ---- Haendlerware (API 37): gCInventory_PS::GenerateTradeInvFromTreasureSets laeuft ueber den Hook in more_events.cpp (Override_TradeGenerate)
+// ---- Trader goods (API 37): gCInventory_PS::GenerateTradeInvFromTreasureSets goes through the hook in more_events.cpp (Override_TradeGenerate)
 typedef bool(__thiscall* GenTradeFn)(void*);
 bool SafeGenTrade(GenTradeFn f, void* inv, bool* ok) {
     __try {
@@ -2089,16 +2089,16 @@ int EntStackCount(const Entity& e) {
     return inv && g_i.stackCount && SafeStackCount(inv, &n) ? n : -1;
 }
 bool EntGenerateTradeGoods(const Entity& e) {
-    void* inv = InventoryOf(e);   // loest auch g_e.game auf
+    void* inv = InventoryOf(e);   // also resolves g_e.game
     static GenTradeFn f = nullptr;
     if (!f && g_e.game) f = reinterpret_cast<GenTradeFn>(GetProcAddress(g_e.game, "?GenerateTradeInvFromTreasureSets@gCInventory_PS@@QAE_NXZ"));
     bool ok = false;
     return inv && f && SafeGenTrade(f, inv, &ok) && ok;
 }
 
-// ---- Bildschirmtext + Menueseite (API 3): gCSession::GetScreenOutputCtrl()->PrintScreen(bCUnicodeString, bCByteAlphaColor, Sekunden)
-// wie Script.dll GUI::PrintScreen_Debug, aber ohne "Debug: "-Praefix und mit eigener Farbe; gCGUIManager::PrintGameMessage/GetActivePage
-// wie GUI2. Unicode-String und Farbe ueber SharedBase-Exporte in rohen Puffern (Farbe 12 Byte: vtable, r, g, b, a).
+// ---- Screen text + menu page (API 3): gCSession::GetScreenOutputCtrl()->PrintScreen(bCUnicodeString, bCByteAlphaColor, seconds)
+// as Script.dll GUI::PrintScreen_Debug, but without the "Debug: " prefix and with an own color; gCGUIManager::PrintGameMessage/GetActivePage
+// as GUI2. Unicode string and color through SharedBase exports in raw buffers (color 12 bytes: vtable, r, g, b, a).
 typedef void(__thiscall* ScreenPrintFn)(void*, const void*, const void*, float);
 typedef void(__thiscall* GameMsgFn)(void*, const void*, int);
 typedef int(__thiscall* PageFn)(const void*);
@@ -2193,7 +2193,7 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     G3ASM_REG(e->RegisterObjectMethod("Entity", "float GetDistanceTo(const Entity &in) const", asFUNCTION(EntDist), asCALL_CDECL_OBJFIRST));
     G3ASM_REG(e->RegisterObjectMethod("Entity", "bool SetPosition(const bCVector &in)", asFUNCTION(EntSetPos), asCALL_CDECL_OBJFIRST));
     G3ASM_REG(e->RegisterObjectMethod("Entity", "bool opEquals(const Entity &in) const", asFUNCTION(EntEquals), asCALL_CDECL_OBJFIRST));
-    // API 3: Attribute + Spieluhr (Fehler/kein Spiel: -1 bzw. false)
+    // API 3: attributes + game clock (error or no game: -1 or false)
     G3ASM_REG(e->RegisterObjectMethod("Entity", "int GetAttribute(const bCString &in) const", asFUNCTION(EntAttr), asCALL_CDECL_OBJFIRST));
     G3ASM_REG(e->RegisterObjectMethod("Entity", "int GetAttributeBase(const bCString &in) const", asFUNCTION(EntAttrBase),
                                     asCALL_CDECL_OBJFIRST));
@@ -2302,7 +2302,7 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     G3ASM_REG(e->RegisterGlobalFunction("int GetGameDay()", asFUNCTION(GameDay), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("int GetGameHour()", asFUNCTION(GameHour), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("int GetGameMinute()", asFUNCTION(GameMinute), asCALL_CDECL));
-    G3ASM_REG(e->RegisterGlobalFunction("bool SetGameTime(int day, int hour, int minute)", asFUNCTION(SetGameTime), asCALL_CDECL));   // im Spiel nicht geprueft
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetGameTime(int day, int hour, int minute)", asFUNCTION(SetGameTime), asCALL_CDECL));   // not checked in the game
     G3ASM_REG(e->RegisterGlobalFunction("float GetTimeScale()", asFUNCTION(GetTimeScaleScript), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bool SetTimeScale(float scale)", asFUNCTION(SetTimeScaleScript), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("float GetClockFactor()", asFUNCTION(GetClockFactorScript), asCALL_CDECL));
@@ -2324,7 +2324,7 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     return ok;
 }
 
-// Name der Template-Entity zu einer Property-ID (GUID), z. B. eines Items; leer, wenn unbekannt
+// name of the template entity for a property ID (GUID), for example of an item; empty if not known
 std::string TemplateNameForId(const void* pid) {
     if (!pid || !Resolve() || !g_e.byId) return std::string();
     if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
@@ -2337,7 +2337,7 @@ std::string TemplateNameForId(const void* pid) {
     return SafeName(tpl, &t) && t ? std::string(t) : std::string();
 }
 
-// Held-Treffer (game_hooks.cpp, Override_Damage): ist die Entity die Spielfigur? Lebenspunkte-Attribut "HP" des Helden um delta aendern (nicht, wenn er schon tot ist)
+// hero hit (game_hooks.cpp, Override_Damage): is the entity the player character? Change the hit point attribute "HP" of the hero by delta (not if the hero is already dead)
 bool IsPlayerEntity(const void* p) { return p && Resolve() && (p == SafeHero(false) || p == SafeHero(true)); }
 bool AdjustHeroHitPoints(const void* ent, int delta) {
     Entity e{const_cast<void*>(ent)};

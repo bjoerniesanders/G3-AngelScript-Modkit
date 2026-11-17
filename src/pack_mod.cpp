@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// PackMod: Ordner -> G3V0-Archiv. Format und Verhalten folgen G3PakDir (Quellcode im Union Starter, G3PakDef.pas/G3PakDir.pas) und den Archiven der Community:
-//   Kopf (0x30 Byte): Version 0, 'G3V0', Revision 0, Verschluesselung 0, Komprimierung, 'G3PD', OffsetToFiles = OffsetToFolders = Beginn des Verzeichnisses,
-//   OffsetToVolume = Ende des Verzeichnisses (= Dateigroesse - 4); danach Nutzdaten, Verzeichnis, 4 Nullbytes.
-//   Eintrag: Erstellt/Zugriff/Geschrieben (FILETIME), 8 Nullbytes, Attribute (immer mit "Packed" 0x20000); Verzeichnis: Name, Zahl+Verzeichnisse, Zahl+Dateien;
-//   Datei: Versatz, gepackte Groesse, Groesse (je u64), Verschluesselung 0, Komprimierung (0 gespeichert, 2 zlib), Name, Kommentar.
-//   Namen sind Pfade relativ zum Archivwurzelordner mit '/', Verzeichnisse enden auf '/'. Je Ebene zuerst die Verzeichnisse, dann die Dateien, ohne Beachtung der Gross-/Kleinschreibung sortiert.
-//   "<name>.deleted" -> Eintrag mit Attribut "Deleted" (0x8000), Zeiten 0, ohne Daten. .dds/.ogg/.wav tragen das Attribut "Stream" (0x40000).
-// Hier wird nicht komprimiert (gespeichert; wie der "Neu verpacken"-Modus des Union Starters). Das Lesen komprimierter Eintraege liefert ReadArchiveEntry nicht.
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// PackMod: folder -> G3V0 archive. The format and the behavior follow G3PakDir (source code in the Union Starter, G3PakDef.pas/G3PakDir.pas) and the archives of the community:
+//   Header (0x30 bytes): version 0, 'G3V0', revision 0, encryption 0, compression, 'G3PD', OffsetToFiles = OffsetToFolders = start of the directory,
+//   OffsetToVolume = end of the directory (= file size - 4); then the payload, the directory, 4 zero bytes.
+//   Entry: created/accessed/written (FILETIME), 8 zero bytes, attributes (always with "Packed" 0x20000). Directory: name, count+directories, count+files.
+//   File: offset, packed size, size (each u64), encryption 0, compression (0 stored, 2 zlib), name, comment.
+//   Names are paths relative to the root folder of the archive with '/'. Directories end with '/'. On each level, first the directories, then the files, sorted without case sensitivity.
+//   "<name>.deleted" -> entry with the attribute "Deleted" (0x8000), times 0, without data. .dds/.ogg/.wav have the attribute "Stream" (0x40000).
+// This code does not compress (stored; as the "Neu verpacken" (pack again) mode of the Union Starter). ReadArchiveEntry does not read compressed entries.
 #include "pack_mod.h"
 
 #include <windows.h>
@@ -22,11 +22,11 @@ namespace {
 constexpr uint32_t kProduct = 0x30563347;        // 'G3V0'
 constexpr uint32_t kReservedG3PD = 0x44503347;   // 'G3PD' (G3PakDir >= 0.0.0.9)
 constexpr uint32_t kAttrDir = 0x10, kAttrDeleted = 0x8000, kAttrPacked = 0x20000, kAttrStream = 0x40000, kAttrCompressed = 0x800;
-constexpr uint32_t kSettable = 0x1 | 0x2 | 0x4 | 0x20;   // ReadOnly, Hidden, System, Archive: werden aus dem Dateisystem uebernommen
+constexpr uint32_t kSettable = 0x1 | 0x2 | 0x4 | 0x20;   // ReadOnly, Hidden, System, Archive: copied from the file system
 
 struct Node {
-    std::string name;   // Name im Archiv
-    std::string path;   // physischer Pfad (Dateien)
+    std::string name;   // name in the archive
+    std::string path;   // physical path (files)
     FILETIME c{}, a{}, w{};
     uint32_t attr = 0;
     uint64_t size = 0;
@@ -57,7 +57,7 @@ bool FileExists(const std::string& p) {
     return a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY);
 }
 
-// rel = Pfad des Ordners im Archiv ("" oder "A/B/")
+// rel = path of the folder in the archive ("" or "A/B/")
 bool Scan(const std::string& root, const std::string& rel, const PackOptions& o, Node* parent, std::string* err, int depth) {
     if (depth > 64) {
         *err = "Ordner zu tief verschachtelt: " + rel;
@@ -76,7 +76,7 @@ bool Scan(const std::string& root, const std::string& rel, const PackOptions& o,
         const std::string n = fd.cFileName;
         if (n == "." || n == "..") continue;
         if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            if (fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) continue;   // keine Verknuepfungen (Schleifen)
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) continue;   // no links (loops)
             Node d;
             d.name = rel + n + "/";
             d.attr = kAttrDir;
@@ -140,7 +140,7 @@ struct Writer {
         Raw(&n.c, 8);
         Raw(&n.a, 8);
         Raw(&n.w, 8);
-        U64(0);   // FileSizeHigh/Low (G3PakDir schreibt Null)
+        U64(0);   // FileSizeHigh/Low (G3PakDir writes zero)
         U32(attr | kAttrPacked);
     }
     bool CopyFile(const Node& f) {
@@ -194,8 +194,8 @@ struct Writer {
         U64(off);
         U64(bytes);
         U64(size);
-        U32(0);   // Verschluesselung: keine
-        U32(0);   // Komprimierung: gespeichert
+        U32(0);   // encryption: none
+        U32(0);   // compression: stored
         Str(n.name);
         Str(opt->comments && !n.deleted ? n.path : std::string());
         return true;
@@ -226,7 +226,7 @@ bool PackFolder(const std::string& srcDirIn, const std::string& outFile, const P
     std::string err;
     if (!Scan(src, std::string(), opt, &root, &err, 0)) return Fail(st, err);
 
-    // leerer Baum: nichts zu packen
+    // empty tree: nothing to pack
     struct Count {
         static size_t Files(const Node& n) {
             size_t c = n.files.size();
@@ -258,7 +258,7 @@ bool PackFolder(const std::string& srcDirIn, const std::string& outFile, const P
             hdr[1] = kProduct;
             hdr[2] = 0;
             hdr[3] = 0;
-            hdr[4] = 0;   // Komprimierung: keine
+            hdr[4] = 0;   // compression: none
             hdr[5] = kReservedG3PD;
             hdr[6] = uint32_t(infoOff);
             hdr[7] = uint32_t(infoOff >> 32);
@@ -318,7 +318,7 @@ std::string PackMod(const std::string& srcDir, const std::string& dataDir, const
     return PackFolder(srcDir, out, opt, st) ? out : std::string();
 }
 
-// ---------------------------------------------------------------- Lesen
+// ---------------------------------------------------------------- read
 namespace {
 struct Meta {
     std::string m;
@@ -420,7 +420,7 @@ bool ListArchive(const std::string& file, std::vector<ArchiveEntry>* out, std::s
         if (error) *error = "Verzeichnis beschaedigt: " + file;
         return false;
     }
-    if (!out->empty()) out->erase(out->begin());   // Wurzel (leerer Name)
+    if (!out->empty()) out->erase(out->begin());   // root (empty name)
     return true;
 }
 

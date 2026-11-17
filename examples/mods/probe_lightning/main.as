@@ -1,9 +1,9 @@
-// Blitz-Test, Schritt 1e (fuer "Klaue Beliars"): Strg + Ziffernblock - schlaegt einen Blitz auf den anvisierten NPC.
-// Schaden: Beschwoerung Smn_Lightning mit dem Helden als Besitzer (gCInteraction_PS.Owner) - laeuft durch die echte Treffer-Kette (gemessen: Quelle Smn_Lightning, Besitzer PC_Hero, Typ 6, toetet).
-// Optik: Die Beschwoerung selbst zeigt keinen Blitz. Jeder Druck probiert die naechste Blitz-Optik der Reihe nach aus (siehe OPTIK_*): ein benannter Effekt (StartEffect) oder die Effekt-Vorlage (SpawnNPC).
-// Sicherungen: nur NPCs als Ziel, mindestens WARTE Sekunden zwischen zwei Blitzen. Abschalten: "-probe_lightning" in g3asm\mods\load_order.txt.
-const int TASTE = 0x6D;          // Ziffernblock -, zusammen mit Strg (ohne Strg gehoert die Taste demo_spawn)
-const float WARTE = 3.0f;        // Sekunden zwischen zwei Blitzen
+// Lightning test, step 1e (for "Klaue Beliars"): Ctrl + numeric keypad - strikes the focused NPC with lightning.
+// Damage: the summon Smn_Lightning with the hero as the owner (gCInteraction_PS.Owner) - goes through the real hit chain (measured: inflictor Smn_Lightning, owner PC_Hero, type 6, kills).
+// Visuals: the summon itself shows no lightning. Each push tries the next lightning visual in sequence (see OPTIK_*): a named effect (StartEffect) or the effect template (SpawnNPC).
+// Protection: only NPCs as the target, a minimum of WARTE seconds between two lightning strikes. To turn off: "-probe_lightning" in g3asm\mods\load_order.txt.
+const int TASTE = 0x6D;          // numeric keypad -, together with Ctrl (without Ctrl, the key belongs to demo_spawn)
+const float WARTE = 3.0f;        // seconds between two lightning strikes
 const bCString SCHADEN_VORLAGE = "Smn_Lightning";
 
 int druck = 0;
@@ -12,13 +12,13 @@ float fenster = -1;
 bool gemeldet = false;
 
 bCString Optik(int i) {
-    if (i == 0) return "eff_magic_summonlightning_target_01";   // Zieleffekt des Zaubers "Blitz beschwoeren"
-    if (i == 1) return "eff_magic_lightningbolt_projectile_01"; // Geschosseffekt des Zaubers "Blitzschlag"
-    return "VFX_Magic_Electricity_LightningBolt_TargetBurst_01"; // Effekt-Vorlage (bisher sichtbar, nur Optik)
+    if (i == 0) return "eff_magic_summonlightning_target_01";   // target effect of the spell "Blitz beschwoeren" (summon lightning)
+    if (i == 1) return "eff_magic_lightningbolt_projectile_01"; // projectile effect of the spell "Blitzschlag" (lightning bolt)
+    return "VFX_Magic_Electricity_LightningBolt_TargetBurst_01"; // effect template (visible until now, visuals only)
 }
 
 void OnKey(int vk, bool down) {
-    if (!down || vk != TASTE || !IsKeyDown(0x11)) return;   // nur mit Strg
+    if (!down || vk != TASTE || !IsKeyDown(0x11)) return;   // only with Ctrl
     if (sperre > 0) return;
     Entity hero = GetHero();
     if (!hero.IsValid()) return;

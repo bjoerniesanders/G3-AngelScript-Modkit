@@ -1,7 +1,7 @@
-// Mess-Mod fuer KI-Skripte und Sprachausgabe (ab API 41).
-// Beobachtet einige Namen, die das Plugin G3Fixes umleitet (Zustand ZS_ObserveSuspect, KI-Funktion _AI_UseInventoryItem, Callbacks OnFollowPlayer und
-// OnGuidePlayer), und schreibt die ersten Aufrufe je Name mit Art, Ausfuehrendem, Ziel und Ergebnis ins Protokoll. Greift nicht ein (Super()).
-// Jeder gesprochene Satz (OnAIOutput) kommt mit ID und Text (GetSpeechText) ins Protokoll (die ersten 30) und steht 4 Sekunden unten in der Bildmitte (einfache Untertitel).
+// Measurement mod for AI scripts and speech output (from API 41).
+// Watches some names that the plugin G3Fixes redirects (state ZS_ObserveSuspect, AI function _AI_UseInventoryItem, callbacks OnFollowPlayer and
+// OnGuidePlayer), and writes the first calls for each name with type, executor, target and result to the log. It does not change anything (Super()).
+// Each spoken sentence (OnAIOutput) goes to the log with ID and text (GetSpeechText) (the first 30), and shows for 4 seconds at the bottom center of the screen (simple subtitles).
 array<bCString> namen = {"ZS_ObserveSuspect", "_AI_UseInventoryItem", "OnFollowPlayer", "OnGuidePlayer"};
 array<int> gezaehlt = {0, 0, 0, 0};
 int saetze = 0;

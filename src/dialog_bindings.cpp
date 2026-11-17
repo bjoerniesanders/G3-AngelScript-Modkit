@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Dialog-Bindings (Skript-Schnittstelle ab Version 10), Teil 1: die Infos des Spiels LESEN.
-// Dialoge in Gothic 3 sind "Infos" (gCInfo_PS) im gCInfoManager_PS: jede Info hat Besitzer (NPC), Eltern-Info, Quest, Bedingungsart,
-// Typ und ein Info-Skript aus Zeilen (gCInfoScriptLine_PS: Befehl, Entity1/2, ID1/2, Text als Text-ID). Bevor eigene Dialoge angelegt werden,
-// laesst sich hier ansehen, wie die echten aufgebaut sind (DescribeInfo).
-// Alles unter SEH-Schutz; ohne Spiel liefern die Funktionen -1 bzw. leeren Text.
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// Dialog bindings (script interface from version 10), part 1: READ the infos of the game.
+// Dialogs in Gothic 3 are "infos" (gCInfo_PS) in the gCInfoManager_PS: each info has an owner (NPC), a parent info, a quest, a condition type,
+// a type and an info script of lines (gCInfoScriptLine_PS: command, Entity1/2, ID1/2, text as text ID). Before you make your own dialogs,
+// you can look here at how the real dialogs are built (DescribeInfo).
+// Everything runs with SEH protection. Without the game, the functions give -1 or an empty text.
 #include <windows.h>
 
 #include <angelscript.h>
@@ -31,7 +31,7 @@ typedef void*(__thiscall* GetArrFn)(void*);
 typedef const void*(__thiscall* RefFn)(const void*);
 typedef void*(__thiscall* GetCmdFn)(void*, int);
 typedef int(__thiscall* CountFn)(const void*);
-typedef void*(__thiscall* HiddenRetFn)(const void*, void*);   // Rueckgabe per Wert: versteckter Zeiger nach this
+typedef void*(__thiscall* HiddenRetFn)(const void*, void*);   // return value by value: hidden pointer after this
 typedef const wchar_t*(__thiscall* UniTextFn)(const void*);
 typedef void(__thiscall* DtorFn)(void*);
 
@@ -48,7 +48,7 @@ struct DialogApi {
     UniTextFn uniText = nullptr;
     DtorFn uniDtor = nullptr;
     const void* scriptVtable = nullptr;
-    // Schreiben
+    // write
     typedef void*(__thiscall* AddInfoFn)(void*, const void*);
     typedef bool(__thiscall* InfoByNameFn)(void*, const void*);
     typedef void(__thiscall* VoidFn)(void*);
@@ -125,8 +125,8 @@ bool Resolve() {
     return g_d.ok;
 }
 
-// ---- rohe, SEH-geschuetzte Zugriffe
-void* g_imOverride = nullptr;   // waehrend des Aufbaus eines neuen Info-Managers (Laden)
+// ---- raw accesses with SEH protection
+void* g_imOverride = nullptr;   // while the game builds a new info manager (load)
 void* SafeInstance() {
     if (g_imOverride) return g_imOverride;
     __try {
@@ -145,13 +145,13 @@ const void* SafeRef(RefFn f, const void* self) {
         return f(self);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-const char* SafeStr(RefFn f, const void* self) {   // Getter, der eine bCString& liefert
+const char* SafeStr(RefFn f, const void* self) {   // getter that gives a bCString&
     __try {
         const void* r = f(self);
         return r ? g_sb.strGetText(r) : nullptr;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-bool SafeInt(RefFn f, const void* self, int* out, int off) {   // Referenz auf Wert (off 4 = bTPropertyContainer: vtable, Wert)
+bool SafeInt(RefFn f, const void* self, int* out, int off) {   // reference to a value (off 4 = bTPropertyContainer: vtable, value)
     __try {
         const unsigned char* r = static_cast<const unsigned char*>(f(self));
         *out = *reinterpret_cast<const int*>(r + off);
@@ -182,7 +182,7 @@ bool SafeVtable(const void* obj, const void** vt) {
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
-// bCUnicodeString per Wert (4 Byte, versteckter Rueckgabezeiger) -> UTF-8-freier Windows-1252-Text
+// bCUnicodeString by value (4 bytes, hidden return pointer) -> Windows-1252 text without UTF-8
 bool SafeUnicode(HiddenRetFn f, const void* self, std::wstring* out) {
     void* raw = nullptr;
     wchar_t buf[1024];
@@ -210,7 +210,7 @@ std::string Narrow(const std::wstring& w) {
     return s;
 }
 
-// Info-Array (bTPtrArray<gCInfo_PS*>): {Daten, Anzahl, Kapazitaet} wie beim Quest-Array, Lesart wird am ersten Element geprueft
+// info array (bTPtrArray<gCInfo_PS*>): {data, count, capacity} as for the quest array; the interpretation is checked on the first element
 bool InfoArray(unsigned char** data, int* count) {
     if (!Resolve()) return false;
     void* mgr = SafeInstance();
@@ -249,7 +249,7 @@ void* FindInfoByName(const char* name) {
     return nullptr;
 }
 
-// gCInfoScript_PS* aus dem bTPropertyObject-Huellobjekt des Info finden (Layout unbekannt): Zeiger bis Tiefe 2 mit passender vtable suchen
+// find gCInfoScript_PS* from the bTPropertyObject wrapper object of the info (layout not known): search pointers up to depth 2 with the matching vtable
 void* FindScript(void* info, unsigned raw[4]) {
     const unsigned char* w = static_cast<const unsigned char*>(SafeRef(g_d.getInfoScript, info));
     std::memset(raw, 0, 16);
@@ -332,7 +332,7 @@ SStr DescribeInfo(const SStr& name) {
     return SStr(r);
 }
 
-// ---------------------------------------------------------------- Schreiben
+// ---------------------------------------------------------------- write
 bool SafeAdd(void* mgr, const void* name, void** out) {
     __try {
         *out = g_d.addInfo(mgr, name);
@@ -345,7 +345,7 @@ bool SafeSetStr(DialogApi::SetStrFn f, void* info, const void* s) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-bool SafeSetEnum(DialogApi::AccessFn f, void* info, int v) {   // bTPropertyContainer<enum>: vtable, dann der Wert
+bool SafeSetEnum(DialogApi::AccessFn f, void* info, int v) {   // bTPropertyContainer<enum>: vtable, then the value
     __try {
         unsigned char* c = static_cast<unsigned char*>(f(info));
         *reinterpret_cast<int*>(c + 4) = v;
@@ -374,7 +374,7 @@ bool SafeAddCmd(void* script, const void* c, const void* e1, const void* e2, con
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
-// Text zu einer ID der Stringtabelle (API 41), z. B. die Satz-ID aus OnAIOutput: eCLocString(id).GetString(), mit Texten aus RegisterText und den Mod-Stringtabellen
+// text for an ID of the string table (API 41), for example the sentence ID from OnAIOutput: eCLocString(id).GetString(), with texts from RegisterText and the mod string tables
 bool SafeLocText(const void* id, std::wstring* out) {
     void* loc = nullptr;
     __try {
@@ -393,16 +393,16 @@ SStr GetLocText(const SStr& id) {
     return SStr(Narrow(w).c_str());
 }
 
-// Text eines gesprochenen Satzes (API 41) aus der Satz-ID von OnAIOutput. Die ID ist der Name der Sprachdatei, z. B.
-// "INFO_Hum_Elite_Hard_Bufford_SKALVERAM3638_German" (gemessen 2026-11-10), die Schluessel der Stringtabelle heissen dagegen "INFO_<Zeile>"
-// (z. B. INFO_NSCHNEIDER20060321163431). Wo die Stimme endet und die Zeile beginnt, steht nicht fest (Zeilen koennen "_3" enthalten): darum werden die
-// moeglichen Schluessel von kurz nach lang probiert (zuerst die ID selbst), die Sprache am Ende wird abgeschnitten. Erster nicht leerer Text gewinnt.
+// Text of a spoken sentence (API 41) from the sentence ID of OnAIOutput. The ID is the name of the speech file, for example
+// "INFO_Hum_Elite_Hard_Bufford_SKALVERAM3638_German" (measured 2026-11-10). But the keys of the string table are "INFO_<line>"
+// (for example INFO_NSCHNEIDER20060321163431). It is not fixed where the voice ends and the line starts (lines can contain "_3"): thus the code tries the
+// possible keys from short to long (first the ID itself) and cuts off the language at the end. The first text that is not empty wins.
 std::string LocLookup(const std::string& key) {
     std::wstring w;
     SStr k(key.c_str());
     if (!SafeLocText(&k, &w) || w.empty()) return std::string();
     const std::string t = Narrow(w);
-    return t == key ? std::string() : t;   // falls das Spiel bei unbekannten Schluesseln den Schluessel selbst liefert
+    return t == key ? std::string() : t;   // in case the game gives the key itself for unknown keys
 }
 SStr GetSpeechText(const SStr& id) {
     Resolve();
@@ -418,11 +418,11 @@ SStr GetSpeechText(const SStr& id) {
         b = e + 1;
     }
     if (parts.size() < 3) return SStr();
-    bool lang = parts.back().size() >= 4;   // "German", "English": nur Buchstaben
+    bool lang = parts.back().size() >= 4;   // "German", "English": only letters
     for (char c : parts.back())
         if (!std::isalpha(static_cast<unsigned char>(c))) lang = false;
     const size_t end = lang ? parts.size() - 1 : parts.size();
-    for (size_t first = end - 1; first >= 1; --first) {   // Zeile = parts[first..end)
+    for (size_t first = end - 1; first >= 1; --first) {   // line = parts[first..end)
         std::string key = parts[0];
         for (size_t i = first; i < end; ++i) key += "_" + parts[i];
         t = LocLookup(key);
@@ -443,7 +443,7 @@ bool SafeSetByte(DialogApi::AccessFn f, void* info, bool v) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-bool SetInfoGiven(const SStr& name, bool given) {   // "Info wurde schon gegeben": blendet sie aus und laesst ihre Zeilen im Questlog stehen
+bool SetInfoGiven(const SStr& name, bool given) {   // "the info was already given": hides it and keeps its lines in the quest log
     void* info = Resolve() ? FindInfoByName(name.c_str()) : nullptr;
     return info && g_d.accessGiven && SafeSetByte(g_d.accessGiven, info, given);
 }
@@ -455,10 +455,10 @@ bool IsInfoGiven(const SStr& name) {
 
 bool InfoExists(const SStr& name) { return Resolve() && FindInfoByName(name.c_str()) != nullptr; }
 
-// Namen aller per Skript angelegten Infos. gCInfoManager_PS fuehrt neben der Info-Liste (+0x2c) eine Namens-Tabelle (+0x4c), ueber die GetInfo
-// sucht. LoadInfosFromInis gibt nur die Liste frei, die Tabelle behaelt die alten Eintraege: kam das Laden aus ini-Dateien NACH dem Anlegen (z. B.
-// ReadCompiledInfoManager, dann LoadInfosFromInis bei vielen Union-Starter-Mods), haelt AddInfo den Namen fuer vergeben und haengt eine Nummer an.
-// Darum vor jedem LoadInfosFromInis die eigenen Infos ueber RemoveInfo austragen (ForgetCreatedInfos). Gemessen 2026-11-16 (Steamkopie, Game.dll).
+// Names of all infos that scripts made. In addition to the info list (+0x2c), gCInfoManager_PS has a name table (+0x4c) that GetInfo
+// uses for the search. LoadInfosFromInis frees only the list; the table keeps the old entries. If the load from ini files came AFTER the setup (for example
+// ReadCompiledInfoManager, then LoadInfosFromInis with many Union Starter mods), AddInfo thinks that the name is in use and adds a number.
+// Thus remove the own infos through RemoveInfo before each LoadInfosFromInis (ForgetCreatedInfos). Measured 2026-11-16 (Steam copy, Game.dll).
 std::vector<std::string> g_createdInfos;
 bool g_renameLogged = false;
 
@@ -471,8 +471,8 @@ bool CreateInfo(const SStr& name, const SStr& owner) {
     if (!SafeAdd(mgr, &name, &info) || !info) return false;
     const char* got = SafeStr(g_d.getName, info);
     if (!got || std::strcmp(got, name.c_str()) != 0) {
-        // Namens-Tabelle des Spiels kennt den Namen noch (siehe oben): die umbenannte, leere Info sofort wieder entfernen, sonst stapeln sich
-        // bei jedem neuen Versuch leere Dialoge ("invalid infoscript") beim NPC
+        // the name table of the game still knows the name (see above): remove the renamed, empty info immediately. If not, empty dialogs ("invalid infoscript")
+        // stack at the NPC with each new try
         const SStr renamed(got ? got : "");
         bool r = false;
         if (got) SafeRemove(mgr, &renamed, &r);
@@ -509,7 +509,7 @@ bool SetInfoCondition(const SStr& name, int cond) {
     void* info = Resolve() ? FindInfoByName(name.c_str()) : nullptr;
     return info && g_d.accessCond && SafeSetEnum(g_d.accessCond, info, cond);
 }
-// Zeile an das Info-Skript haengen. Text (falls nicht leer) wird als eigene Text-ID G3ASM_INFO_<Info>_<n> registriert.
+// add a line to the info script. If the text is not empty, the modkit registers it as a new text ID G3ASM_INFO_<info>_<n>.
 bool AddInfoLine(const SStr& name, const SStr& command, const SStr& e1, const SStr& e2, const SStr& id1, const SStr& id2,
                  const SStr& text) {
     if (!WriteReady()) return false;
@@ -527,13 +527,13 @@ bool AddInfoLine(const SStr& name, const SStr& command, const SStr& e1, const SS
     }
     return SafeAddCmd(script, &command, &e1, &e2, &id1, &id2, &idStr);
 }
-// nach dem Anlegen/Aendern von Infos: Besitzer-Index des Managers neu aufbauen, damit sie im Gespraech erscheinen
+// after you make or change infos: build the owner index of the manager again, so that they show in the dialog
 bool RebuildInfos() {
     void* mgr = Manager();
     return Resolve() && g_d.buildMap && mgr && SafeVoid(g_d.buildMap, mgr);
 }
 
-// Befehlsvokabular aller Infos des Spiels: je Befehl Anzahl und ein Beispiel (Entity1 | Entity2 | ID1 | ID2 | Text)
+// command vocabulary of all infos of the game: for each command, the count and one example (Entity1 | Entity2 | ID1 | ID2 | text)
 SStr DescribeCommands() {
     unsigned char* d;
     int n;

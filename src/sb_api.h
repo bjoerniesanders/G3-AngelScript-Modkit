@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 #pragma once
-// Bruecke zur geladenen SharedBase.dll (Original, Classic oder og3-Nachbau): Funktionszeiger werden ueber die dekorierten Exportnamen
-// aufgeloest, die Huellklassen haben exakt das Speicherlayout der Genome-Typen. Damit arbeiten Skripte auf echten Original-Objekten
-// und mit dem Originalverhalten (z. B. x87-Rundung der Vektorlaenge); nur + - * / der Vektoren rechnet die Huelle selbst.
-// Aufrufkonvention: Memberfunktionen = thiscall; Rueckgabe einer Klasse per Wert ueber einen versteckten Zeiger (erstes Stapelargument
-// nach this) - unter MSVC fuer ALLE Klassen-Rueckgaben von Memberfunktionen, unabhaengig von der Groesse.
+// Bridge to the loaded SharedBase.dll (original, Classic or og3 rebuild): the function pointers are resolved through the decorated export names,
+// and the wrapper classes have exactly the memory layout of the Genome types. Thus scripts work on real original objects
+// and with the original behavior (for example x87 rounding of the vector length). Only + - * / of the vectors are calculated by the wrapper itself.
+// Calling convention: member functions = thiscall. A class return value by value goes through a hidden pointer (first stack argument
+// after this) - in MSVC for ALL class return values of member functions, independent of the size.
 #include <windows.h>
 
 #include <cstdint>
@@ -57,7 +57,7 @@ struct SbApi {
     void(__thiscall* m3Invert)(void*) = nullptr;
     void*(__thiscall* m3MulM3)(const void*, void*, const void*) = nullptr;
     void*(__thiscall* m3MulVec)(const void*, void*, const void*) = nullptr;
-    // bCMatrix (4x4, 16 floats zeilenweise, Zeilenvektor-Konvention v' = v * M, Zeilen 0..2 = Achsen X/Y/Z, Zeile 3 = Verschiebung)
+    // bCMatrix (4x4, 16 floats row by row, row vector convention v' = v * M, rows 0..2 = axes X/Y/Z, row 3 = translation)
     void(__thiscall* m4Identity)(void*) = nullptr;
     void(__thiscall* m4Transpose)(void*) = nullptr;
     void(__thiscall* m4Invert)(void*) = nullptr;
@@ -74,24 +74,24 @@ struct SbApi {
     void(__thiscall* m3RotY)(void*, float) = nullptr;
     void(__thiscall* m3RotZ)(void*, float) = nullptr;
     void(__thiscall* m3FromQuat)(void*, const void*) = nullptr;
-    // Protokoll des Spiels (cdecl, printf-artig)
+    // log of the game (cdecl, printf style)
     void(__cdecl* geInfo)(const char*, ...) = nullptr;
 
     HMODULE module = nullptr;
-    std::string missing;                // nicht gefundene Exporte (Leerzeichen-getrennt)
-    bool Resolve(HMODULE sharedBase);   // false, wenn bCString-Grundfunktionen fehlen
+    std::string missing;                // exports that were not found (separated by spaces)
+    bool Resolve(HMODULE sharedBase);   // false if basic bCString functions are missing
 };
 extern SbApi g_sb;
 
-// ---------------------------------------------------------------- Huellklassen (Layout = Genome-Typ)
-class SStr {   // bCString: 4 Byte, Zeiger auf Zeichen mit Kopf (Referenzzaehler) davor
+// ---------------------------------------------------------------- wrapper classes (layout = Genome type)
+class SStr {   // bCString: 4 bytes, pointer to the characters, with a header (reference counter) before them
 public:
     SStr() { g_sb.strCtor(this); }
     SStr(const char* s) { g_sb.strCtorText(this, s); }
     SStr(const std::string& s) { g_sb.strCtorText(this, s.c_str()); }
     SStr(const SStr& o) { g_sb.strCopy(this, &o); }
     ~SStr() { g_sb.strDtor(this); }
-    SStr& operator=(const SStr& o) {   // NOLINT(bugprone-unhandled-self-assignment): bCString::operator= der Engine prueft das selbst
+    SStr& operator=(const SStr& o) {   // NOLINT(bugprone-unhandled-self-assignment): bCString::operator= of the engine checks this itself
         g_sb.strAssign(this, &o);
         return *this;
     }
@@ -124,10 +124,10 @@ struct SQuat {
 };
 struct SMat4 {
     float m[16];
-};   // bCMatrix: zeilenweise (Element i = Zeile i/4, Spalte i%4)
+};   // bCMatrix: row by row (element i = row i/4, column i%4)
 struct SMat3 {
     float m[9];
-};   // zeilenweise (Element i = Zeile i/3, Spalte i%3)
+};   // row by row (element i = row i/3, column i%3)
 static_assert(sizeof(SVec3) == 12 && sizeof(SQuat) == 16 && sizeof(SMat3) == 36 && sizeof(SMat4) == 64, "Layouts");
 
 }   // namespace g3asm

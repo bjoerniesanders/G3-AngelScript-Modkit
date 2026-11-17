@@ -1,13 +1,13 @@
-// Quest "Wolfsfell fuer Jens": Naehert sich der Held Jens, bittet er um ein Wolfsfell (Quest startet). Abgabe: Rollen-Taste in Jens' Naehe
-// (nimmt ein Wolfsfell aus dem Inventar) oder durch Uebergabe im Spiel (OnReceiveItem). Belohnung: Quest-XP. Toetet man Jens, scheitert die Quest.
-// Abschalten: in g3asm\mods\load_order.txt "-jens_quest" eintragen.
+// Quest "Wolfsfell fuer Jens": when the hero comes near Jens, Jens asks for a wolf skin (the quest starts). Delivery: Scroll Lock key near Jens
+// (takes one wolf skin from the inventory) or by a transfer in the game (OnReceiveItem). Reward: quest XP. If you kill Jens, the quest fails.
+// To turn off: write "-jens_quest" in g3asm\mods\load_order.txt.
 const bCString NPC = "Jens";
 const bCString QUEST = "G3ASM_Jens_Wolfsfell";
 const bCString ITEM = "It_Wolf_Fur";
 const float REICHWEITE = 400.0f;   // Zentimeter (4 m)
 
 float timer = 0;
-bool gebeten = false;   // Bitte schon ausgesprochen (nur Text, nicht die Quest)
+bool gebeten = false;   // request already said (only text, not the quest)
 
 void Zeige(const bCString &in t, int r = 255, int g = 255, int b = 180) { print(t); PrintScreen(t, 5, r, g, b); }
 
@@ -42,7 +42,7 @@ void OnFrame(float dt) {
     if (s != QUEST_RUNNING && !gebeten) {
         gebeten = true;
         CreateQuest(QUEST);
-        // Texte fuer das Questlog (Test: ob die Text-ID als Klartext angezeigt wird)
+        // texts for the quest log (test: does the game show the text ID as plain text?)
         print("Topic gesetzt: " + SetQuestTopic(QUEST, "Wolfsfell fuer Jens"));
         print("Beschreibung gesetzt: " + SetQuestDescription(QUEST, "Jens braucht ein Wolfsfell. Bring es ihm."));
         print("Quest-Dateipfad laut Spiel: " + GetQuestFilePath(QUEST) + ", Quest-Verzeichnis: " + GetQuestDir());
@@ -67,7 +67,7 @@ void OnKey(int vk, bool down) {
     Abschliessen(held);
 }
 
-// Uebergabe im Spiel (Handel/Geben): Held gibt Jens ein Wolfsfell
+// transfer in the game (trade or give): the hero gives Jens a wolf skin
 void OnReceiveItem(Entity von, Entity an, const bCString &in item, const bCString &in guid, uint anzahl) {
     if (item != ITEM || GetQuestStatus(QUEST) != QUEST_RUNNING) return;
     if (an.IsValid() && an.GetName() == NPC && von.IsValid() && von == GetHero()) {

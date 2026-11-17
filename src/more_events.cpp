@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Weitere Ereignisse aus exportierten Funktionen (Skript-Schnittstelle ab Version 35, Roadmap 7.3; Beruehrung, Haendlerware, Verwandlung ab 37).
-//   Konsole:      Engine.dll eCConsole::OnExecute(const bCString &eingabe, bCString &ausgabe) -> bool
-//                 Override_ConsoleCommand(zeile): true ohne Super() = Befehl gehoert der Mod; Antwort mit SetConsoleReply(text)
-//   Quest-Status: Game.dll gCQuest_PS::SetStatus(const gEQuestStatus &) -> bool
-//                 Override_QuestStatus(name, alt, neu): SetOverrideArg(2, x) aendert den neuen Status, ohne Super() bleibt er; danach OnQuestStatus(name, alt, neu)
-// Beide laufen nur im Spiel-Thread in die Skripte (OnGameThread). Messung: die ersten Aufrufe stehen im Protokoll.
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// More events from exported functions (script interface from version 35, roadmap 7.3; touch, trader goods, transformation from 37).
+//   Console:      Engine.dll eCConsole::OnExecute(const bCString &input, bCString &output) -> bool
+//                 Override_ConsoleCommand(line): true without Super() = the command belongs to the mod; answer with SetConsoleReply(text)
+//   Quest status: Game.dll gCQuest_PS::SetStatus(const gEQuestStatus &) -> bool
+//                 Override_QuestStatus(name, old, new): SetOverrideArg(2, x) changes the new status, without Super() it stays; then OnQuestStatus(name, old, new)
+// The two go to the scripts only in the game thread (OnGameThread). Measurement: the log shows the first calls.
 #include <windows.h>
 
 #include <angelscript.h>
@@ -27,7 +27,7 @@ ScriptHost* g_host = nullptr;
 // ---- Konsole
 typedef bool(__thiscall* ExecFn)(void*, const void*, void*);
 ExecFn o_exec = nullptr;
-void* g_reply = nullptr;   // Ausgabe-bCString des laufenden Befehls (nur waehrend Override_ConsoleCommand)
+void* g_reply = nullptr;   // output bCString of the running command (only during Override_ConsoleCommand)
 int g_execLogged = 0;
 
 
@@ -89,7 +89,7 @@ unsigned g_statusCalls = 0;
 
 int SafeOldStatus(void* q) {
     __try {
-        const unsigned char* c = static_cast<const unsigned char*>(g_getStatus(q));   // bTPropertyContainer: vtable, dann der Wert
+        const unsigned char* c = static_cast<const unsigned char*>(g_getStatus(q));   // bTPropertyContainer: vtable, then the value
         return c ? *reinterpret_cast<const int*>(c + 4) : -1;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
 }
@@ -129,7 +129,7 @@ bool __fastcall HSetStatus(void* q, void*, const int* status) {
         res = o_setStatus(q, status);
         called = true;
     }
-    // gemeldet wird der Status, der danach wirklich gilt (lehnt das Spiel ab, bleibt er gleich und es gibt kein Ereignis)
+    // the event reports the status that really applies after the call (if the game refuses, the status stays and there is no event)
     const int now = called && g_getStatus ? SafeOldStatus(q) : (called ? applied : old);
     if (called && now >= 0 && now != old) {
         EvArg e[] = {EvArg::Str(&sn), EvArg::U(static_cast<unsigned>(old)), EvArg::U(static_cast<unsigned>(now))};
@@ -138,7 +138,7 @@ bool __fastcall HSetStatus(void* q, void*, const int* status) {
     return res;
 }
 
-// ---- Namen fuer das Protokoll
+// ---- names for the log
 typedef const void*(__thiscall* EntNameFn)(const void*);
 typedef void*(__thiscall* PsEntityFn)(void*);
 EntNameFn g_entName = nullptr;
@@ -159,15 +159,15 @@ void* SafePsEntity(void* ps) {
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
 
-// ---- Beruehrung: Engine eCDynamicEntity::OnTouch(eCEntity *anderes, eCContactIterator &) auf dem beruehrten Entity -> OnTouch(self, other)
-// Sehr haeufig: gemeldet wird nur, wenn eine Mod OnTouch hat (einmal je Bild geprueft); gezaehlt wird immer.
+// ---- Touch: Engine eCDynamicEntity::OnTouch(eCEntity *other, eCContactIterator &) on the touched entity -> OnTouch(self, other)
+// Very frequent: reported only if a mod has OnTouch (checked 1 time each frame); always counted.
 typedef void(__thiscall* TouchFn)(void*, void*, void*);
 TouchFn o_touch = nullptr;
 const char* const kTouchDecl = "void OnTouch(Entity, Entity)";
 bool g_touchHandler = false;
 int g_touchDepth = 0, g_touchLogged = 0;
 unsigned g_touchCalls = 0, g_touchEvents = 0;
-LARGE_INTEGER g_touchTicks = {};   // Zeit in den Skripten
+LARGE_INTEGER g_touchTicks = {};   // time in the scripts
 
 void __fastcall HTouch(void* self, void*, void* other, void* contacts) {
     o_touch(self, other, contacts);
@@ -188,10 +188,10 @@ void __fastcall HTouch(void* self, void*, void* other, void* contacts) {
     --g_touchDepth;
 }
 
-// ---- Haendlerware: Game gCInventory_PS::GenerateTradeInvFromTreasureSets() -> Override_TradeGenerate(Haendler), danach OnTradeGenerated(Haendler, ok)
+// ---- Trader goods: Game gCInventory_PS::GenerateTradeInvFromTreasureSets() -> Override_TradeGenerate(trader), then OnTradeGenerated(trader, ok)
 typedef bool(__thiscall* GenTradeFn)(void*);
 GenTradeFn o_genTrade = nullptr;
-int g_tradeLogged = 0, g_tradeDepth = 0;   // Tiefe: GenerateTradeGoods() aus Override_TradeGenerate/OnTradeGenerated laeuft ohne Ereignis
+int g_tradeLogged = 0, g_tradeDepth = 0;   // depth: GenerateTradeGoods() from Override_TradeGenerate/OnTradeGenerated runs without an event
 
 bool __fastcall HGenTrade(void* inv) {
     void* trader = SafePsEntity(inv);
@@ -215,7 +215,7 @@ bool __fastcall HGenTrade(void* inv) {
     return res;
 }
 
-// ---- Verwandlung: Script.dll Entity::StartTransform(Entity &ziel, float, bool) und Entity::EndTransform(); this ist ein Script-Entity (erstes Feld eCEntity*)
+// ---- Transformation: Script.dll Entity::StartTransform(Entity &target, float, bool) and Entity::EndTransform(); this is a script entity (first field eCEntity*)
 typedef void(__thiscall* StartTrFn)(void*, void*, float, bool);
 typedef void(__thiscall* EndTrFn)(void*);
 StartTrFn o_startTr = nullptr;
@@ -256,10 +256,10 @@ void __fastcall HEndTr(void* self) {
 }
 
 
-// ---- Sprachausgabe (API 41): Game gCScriptProcessingUnit::sAIOutputInstr(args, SPU, fullStop), die KI-Anweisung "Satz sprechen" (gemessen am Assembler
-// 2026-11-10). Sie laeuft jedes Bild, solange der Satz laeuft: Beim Start ist args = {eCEntity* Sprecher, bCString Satz-ID} (die ID ist auch der Name der
-// Sprachdatei ohne ".wav", die Mindestdauer setzt das Spiel auf (Laenge der ID + 10) * 100 ms); danach args = nullptr, zum Abbrechen fullStop = true.
-// OnAIOutput(sprecher, id) kommt einmal je Satz, nach dem Start der Ausgabe. Den Text liefert GetLocText(id).
+// ---- Speech output (API 41): Game gCScriptProcessingUnit::sAIOutputInstr(args, SPU, fullStop), the AI instruction "say a sentence" (measured in the assembler code
+// 2026-11-10). It runs each frame while the sentence runs. At the start, args = {eCEntity* speaker, bCString sentence ID} (the ID is also the name of the
+// speech file without ".wav"; the game sets the minimum duration to (length of the ID + 10) * 100 ms). After that, args = nullptr; to cancel, fullStop = true.
+// OnAIOutput(speaker, id) comes 1 time for each sentence, after the output starts. GetLocText(id) gives the text.
 typedef bool(__stdcall* OutputFn)(void*, void*, bool);
 OutputFn o_output = nullptr;
 int g_outLogged = 0;
@@ -280,11 +280,11 @@ bool __stdcall HOutput(void* args, void* spu, bool fullStop) {
     return r;
 }
 
-// ---- Kampfbewegung (API 45): Game.dll gCScriptProcessingUnit::sAICombatMoveStart(void* args, gCScriptProcessingUnit*) stdcall -> bool.
-// Gemessen (2026-11-11, Assembler + PlayMotion-Messung): args+0x0C bCString (das Spiel prueft ihn auf "Hit"), args+0x10 float = Abspielgeschwindigkeit
-// der Kampfbewegung; die Funktion kopiert sie nach SPU+0x160 und in die Bewegungsbeschreibung (SPU+0x13C = eSMotionDesc+8) fuer PlayMotion. Ein NPC
-// (Gamal) griff mit 1,3 an. Override_CombatMove(self, move, speedPercent): SetOverrideArg(2, p) setzt die Geschwindigkeit in Prozent fuer diesen Aufruf;
-// der Wert in args wird nach dem Original zurueckgestellt (falls dieselben Argumente erneut benutzt werden, soll nichts aufaddiert werden).
+// ---- Combat movement (API 45): Game.dll gCScriptProcessingUnit::sAICombatMoveStart(void* args, gCScriptProcessingUnit*) stdcall -> bool.
+// Measured (2026-11-11, assembler code + PlayMotion measurement): args+0x0C bCString (the game compares it with "Hit"), args+0x10 float = playback speed
+// of the combat movement. The function copies it to SPU+0x160 and into the movement description (SPU+0x13C = eSMotionDesc+8) for PlayMotion. An NPC
+// (Gamal) attacked with 1.3. Override_CombatMove(self, move, speedPercent): SetOverrideArg(2, p) sets the speed in percent for this call.
+// The value in args is set back after the original (if the same arguments are used again, nothing must accumulate).
 typedef bool(__stdcall* CmStartFn)(void*, void*);
 typedef void*(__thiscall* SpuEntityFn)(void*);
 CmStartFn o_cmStart = nullptr;
@@ -309,12 +309,12 @@ bool __stdcall HCmStart(void* args, void* spu) {
     float applied = orig;
     bool res = false, called = false, taken = false;
     if (OnGameThread()) {
-        const unsigned pct = orig > 0 && orig < 1000 ? static_cast<unsigned>(orig * 100.0f + 0.5f) : 0;   // NOLINT(bugprone-incorrect-roundings): nur positive Werte
+        const unsigned pct = orig > 0 && orig < 1000 ? static_cast<unsigned>(orig * 100.0f + 0.5f) : 0;   // NOLINT(bugprone-incorrect-roundings): only positive values
         EvArg a[] = {EvArg::Ent(self), EvArg::Str(&move), EvArg::U(pct)};
         taken = g_host->CallOverride(
             "bool Override_CombatMove(Entity, const bCString &in, uint)", a, 3,
             [&](const EvArg* ar) {
-                applied = ar[2].value != pct ? static_cast<float>(ar[2].value) / 100.0f : orig;   // unveraendert: Originalwert ohne Rundung
+                applied = ar[2].value != pct ? static_cast<float>(ar[2].value) / 100.0f : orig;   // no change: original value without rounding
                 *speed = applied;
                 const bool r = o_cmStart(args, spu);
                 *speed = orig;
@@ -380,7 +380,7 @@ int InstallMoreEventHooks(ScriptHost& host) {
     return n;
 }
 
-// Einmal je Bild: OnTouch-Handler pruefen, Verwandlungs-Hooks nachholen (Script.dll), Beruehrungen je 10 s (erste 6 Fenster mit Aufrufen)
+// 1 time each frame: check the OnTouch handler, install the transformation hooks later (Script.dll), touches each 10 s (first 6 windows with calls)
 void MoreEventsFrame() {
     if (!g_host) return;
     g_touchHandler = g_host->HasHandler(kTouchDecl);

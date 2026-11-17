@@ -1,9 +1,9 @@
-// Mess-Mod fuer Spielskripte nach Namen (ab API 32): WatchScript, Override_Script, OnScript, CallScript, ScriptExists.
-//   erste Welt: welche bekannten Skriptnamen es gibt und in welcher Script_*.dll sie stehen
-//   immer:      die beobachteten Skripte (BEOBACHTEN) mit Self, Other, Zahl und Ergebnis ins Protokoll, je Name hoechstens MAX_ZEILEN Zeilen
-//   Strg + Ziffernblock +: lesende Spielskripte per CallScript fuer den Helden und das anvisierte Entity aufrufen
-// Override_Script reicht nur durch (Super()); es misst, ob die Kette und das Ergebnis stimmen. Protokoll: g3asm.log.
-const int TASTE = 0x6B;        // Ziffernblock +, zusammen mit Strg
+// Measurement mod for game scripts by name (from API 32): WatchScript, Override_Script, OnScript, CallScript, ScriptExists.
+//   first world: which known script names exist and in which Script_*.dll they are
+//   always:      the watched scripts (BEOBACHTEN) with self, other, number and result to the log, maximum MAX_ZEILEN lines for each name
+//   Ctrl + numeric keypad +: call read-only game scripts with CallScript for the hero and the focused entity
+// Override_Script only passes through (Super()). It measures if the chain and the result are correct. Log: g3asm.log.
+const int TASTE = 0x6B;        // numeric keypad +, together with Ctrl
 const int MAX_ZEILEN = 15;
 
 array<bCString> BEOBACHTEN = {"MagicTeleport", "OnHit", "GetStaminaPoints", "GetAttitude", "IsDeadlyDamage", "CanBurn", "Respawn", "AssessTarget"};
@@ -16,8 +16,8 @@ bCString N(Entity e) { return e.IsValid() ? e.GetName() : bCString("-"); }
 
 bool geprueft = false;
 
-// Die Script_*.dll laedt das Spiel erst spaet (beim ersten OnWorldActivate im Hauptmenue fehlen noch alle Skripte, gemessen 2026-11-09);
-// deshalb bei jedem Weltstart pruefen, bis ein bekanntes Skript da ist
+// The game loads the Script_*.dll files late (at the first OnWorldActivate in the main menu, all scripts are still missing, measured 2026-11-09);
+// thus check at each world start until a known script is there
 void Pruefen() {
     for (uint i = 0; i < PRUEFEN.length(); ++i)
         print("Skript '" + PRUEFEN[i] + "': " + (ScriptExists(PRUEFEN[i]) ? "vorhanden in " + GetScriptDll(PRUEFEN[i]) : bCString("fehlt")));

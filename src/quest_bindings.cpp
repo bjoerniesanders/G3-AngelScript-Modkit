@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Quest-Bindings von G3ASM (Skript-Schnittstelle ab Version 6): Questsystem des Spiels steuern.
-// Quellen im Spiel: Game.dll gCQuestManager_PS (Singleton, GetInstance) und gCQuest_PS. Quests liegen als ini-Dateien im Quest-Verzeichnis
-// (Data\Quests.pak bzw. Ordner Quests); der Manager laedt sie beim Start (LoadQuestsFromInis).
-// Jeder Aufruf laeuft unter SEH-Schutz; ohne Spiel/ohne Manager liefern die Funktionen false bzw. -1.
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// Quest bindings of G3ASM (script interface from version 6): control the quest system of the game.
+// Sources in the game: Game.dll gCQuestManager_PS (singleton, GetInstance) and gCQuest_PS. Quests are ini files in the quest directory
+// (Data\Quests.pak or the folder Quests). The manager loads them at the start (LoadQuestsFromInis).
+// Each call runs with SEH protection. Without the game or without the manager, the functions give false or -1.
 #include <windows.h>
 
 #include <angelscript.h>
@@ -47,7 +47,7 @@ struct QuestApi {
     LocCtorFn locCtor = nullptr;
     LocDtorFn locDtor = nullptr;
     SetLocFn setTopic = nullptr, setDesc = nullptr;
-    FileFn readFile = nullptr;   // Schreiben (gCQuest_PS::Write) entfernt mit API 46: schrieb nie eine Datei
+    FileFn readFile = nullptr;   // write (gCQuest_PS::Write) removed with API 46: it never wrote a file
     GetRefFn getName = nullptr;
     GetRefFn getAttrib = nullptr, getAttribAmount = nullptr;
     SetLocFn setAttrib = nullptr;   // SetAttribSuccess(const bCString&)
@@ -93,9 +93,9 @@ bool Resolve() {
     return g_q.ok;
 }
 
-// ---- rohe, SEH-geschuetzte Aufrufe (kein C++-Objekt mit Destruktor in diesen Funktionen)
+// ---- raw calls with SEH protection (no C++ object with a destructor in these functions)
 void* g_mgrOverride =
-    nullptr;   // waehrend LoadQuestsFromInis: der Manager, der gerade aufgebaut wird (GetInstance() liefert dann noch den alten)
+    nullptr;   // during LoadQuestsFromInis: the manager that the game makes at this time (GetInstance() then still gives the old one)
 void* Manager() {
     if (g_mgrOverride) return g_mgrOverride;
     __try {
@@ -121,7 +121,7 @@ bool SafeNoArg(NoArgBoolFn f, void* self, bool* out) {
 }
 bool SafeStatus(void* q, int* out) {
     __try {
-        const unsigned char* c = static_cast<const unsigned char*>(g_q.getStatus(q));   // bTPropertyContainer: vtable, dann der Wert
+        const unsigned char* c = static_cast<const unsigned char*>(g_q.getStatus(q));   // bTPropertyContainer: vtable, then the value
         *out = *reinterpret_cast<const int*>(c + 4);
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
@@ -172,7 +172,7 @@ bool FailQuest(const SStr& n) { return Resolve() && Control(g_q.fail, n); }
 bool CloseQuest(const SStr& n) { return Resolve() && Control(g_q.close, n); }
 bool RemoveQuest(const SStr& n) { return Resolve() && Control(g_q.remove, n); }
 int GetQuestStatus(
-    const SStr& name) {   // gEQuestStatus (0 Open, 1 Running, 2 Success, 3 Failed, 4 Obsolete, 5 Cancelled, 6 Lost, 7 Won), -1 unbekannt
+    const SStr& name) {   // gEQuestStatus (0 Open, 1 Running, 2 Success, 3 Failed, 4 Obsolete, 5 Cancelled, 6 Lost, 7 Won), -1 not known
     void* q = FindQuest(name);
     int v = -1;
     return q && g_q.getStatus && SafeStatus(q, &v) && v >= 0 && v <= 7 ? v : -1;
@@ -208,8 +208,8 @@ bool ReloadQuestFiles() {
     return m && SafeNoArg(g_q.reloadInis, m, &r) && r;
 }
 
-// ---- Texte, Dateien, Liste
-bool SafeSetLoc(SetLocFn f, void* q, const void* text) {   // eCLocString (4 Byte) aus bCString bauen, setzen, freigeben
+// ---- texts, files, list
+bool SafeSetLoc(SetLocFn f, void* q, const void* text) {   // make, set and free an eCLocString (4 bytes) from a bCString
     __try {
         void* loc = nullptr;
         g_q.locCtor(&loc, text);
@@ -228,20 +228,20 @@ void RegisterText(const SStr& id, const SStr& text);
 bool SetQuestText(SetLocFn fn, const SStr& name, const char* prefix, const SStr& text) {
     void* q = FindQuest(name);
     if (!q || !fn || !g_q.locCtor || !g_q.locDtor) return false;
-    SStr id((std::string(prefix) + name.c_str()).c_str());   // eigene Text-ID, z. B. G3ASM_QTOPIC_<Quest>
+    SStr id((std::string(prefix) + name.c_str()).c_str());   // own text ID, for example G3ASM_QTOPIC_<quest>
     RegisterText(id, text);
     return SafeSetLoc(fn, q, &id);
 }
 bool SetQuestTopic(const SStr& name, const SStr& text) { return SetQuestText(g_q.setTopic, name, "G3ASM_QTOPIC_", text); }
 bool SetQuestDescription(const SStr& name, const SStr& text) { return SetQuestText(g_q.setDesc, name, "G3ASM_QDESC_", text); }
-bool LoadQuestFile(const SStr& name, const SStr& path) {   // gCQuest_PS::Read(path): Eigenschaften der Quest aus ini-Datei lesen
+bool LoadQuestFile(const SStr& name, const SStr& path) {   // gCQuest_PS::Read(path): read the properties of the quest from an ini file
     void* q = FindQuest(name);
     bool r = false;
     return q && g_q.readFile && SafeFile(g_q.readFile, q, &path, &r) && r;
 }
 
-// Questliste: gCQuestManager_PS::m_arrQuests (bTObjArray<bTAutoPOSmartPtr<gCQuest_PS>>) bei Manager+0x14, 12 Byte. Feldreihenfolge und
-// Elementzeiger sind nicht dokumentiert -> QuestDebug() protokolliert die Rohwerte, GetQuestCount/NameAt versuchen die wahrscheinlichste Lesart.
+// Quest list: gCQuestManager_PS::m_arrQuests (bTObjArray<bTAutoPOSmartPtr<gCQuest_PS>>) at manager+0x14, 12 bytes. The field sequence and the
+// element pointers are not documented -> QuestDebug() logs the raw values, GetQuestCount/NameAt try the most probable interpretation.
 bool SafeRaw(const void* p, void* out, size_t n) {
     if (!ReadableMem(p, n)) return false;
     __try {
@@ -255,7 +255,7 @@ bool SafeQuestName(void* q, const char** out) {
         return *out != nullptr;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// Name in einen Puffer kopieren (Zeichen werden unter SEH gelesen, nicht erst spaeter ausserhalb)
+// copy the name into a buffer (the characters are read with SEH protection, not later outside)
 bool SafeQuestNameCopy(void* q, char* buf, size_t n) {
     __try {
         const char* t = g_sb.strGetText(g_q.getName(q));
@@ -266,10 +266,10 @@ bool SafeQuestNameCopy(void* q, char* buf, size_t n) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-// Element der Questliste -> gCQuest_PS*. Die Liste ist ein bTObjArray<bTAutoPOSmartPtr<gCQuest_PS>>; ein Element (4 Byte) zeigt laut SDK auf ein
-// bTPOPureSmartPtr (0x0C Byte: vtable, Zaehler, m_pObject), das Quest-Objekt steht also bei Element -> +8. Frueher wurde das Element selbst als Quest gelesen:
-// GetName lieferte dann irgendeinen lesbaren Text ("3"), die Pruefung auf "Name vorhanden" liess das durch. Jetzt gilt ein Treffer nur, wenn der gelesene Name
-// druckbar ist UND GetQuest(Name) wieder dasselbe Objekt liefert. Zur Sicherheit werden +8, +4 und das Element selbst probiert.
+// Element of the quest list -> gCQuest_PS*. The list is a bTObjArray<bTAutoPOSmartPtr<gCQuest_PS>>. In accordance with the SDK, an element (4 bytes) points to a
+// bTPOPureSmartPtr (0x0C bytes: vtable, counter, m_pObject), thus the quest object is at element -> +8. Previously, the code read the element itself as the quest:
+// GetName then gave some readable text ("3"), and the check for "name exists" let it through. Now a result counts only if the name that was read
+// is printable AND GetQuest(name) gives the same object again. For safety, the code tries +8, +4 and the element itself.
 bool PrintableName(const char* s) {
     if (!s || !*s) return false;
     for (; *s; ++s)
@@ -295,7 +295,7 @@ bool ArrayView(unsigned char** data, int* count) {
     void* m = Manager();
     unsigned w[3];
     if (!m || !SafeRaw(static_cast<unsigned char*>(m) + 0x14, w, sizeof w)) return false;
-    // Lesart A: {Daten, Anzahl, Kapazitaet}; B: {Anzahl, Kapazitaet, Daten}; C: {Kapazitaet, Anzahl, Daten}
+    // interpretation A: {data, count, capacity}; B: {count, capacity, data}; C: {capacity, count, data}
     const int cand[3][2] = {{0, 1}, {2, 0}, {2, 1}};
     for (auto& c : cand) {
         unsigned char* d = reinterpret_cast<unsigned char*>(static_cast<uintptr_t>(w[c[0]]));
@@ -343,9 +343,9 @@ void QuestDebug() {
         h->Log("QuestDebug: Array nicht deutbar");
 }
 
-// ---- Eigene Texte fuer Text-IDs (eCLocString): Quest-Titel/-Beschreibung sind IDs der Stringtabelle des Spiels. Unbekannte IDs liefern
-// einen leeren Text -> GetString()/GetString(bCString)/operator bCUnicodeString der Engine werden abgefangen; fuer registrierte IDs
-// kommt unser Text, sonst das Original. Rueckgabe bCUnicodeString per Wert = versteckter Zeiger (erstes Stapelargument nach this).
+// ---- Own texts for text IDs (eCLocString): quest titles and descriptions are IDs of the string table of the game. Unknown IDs give
+// an empty text -> the code intercepts GetString()/GetString(bCString)/operator bCUnicodeString of the engine. For registered IDs,
+// the modkit text comes, if not the original. Return value bCUnicodeString by value = hidden pointer (first stack argument after this).
 typedef void*(__thiscall* LocGet0Fn)(const void*, void*);
 typedef void*(__thiscall* LocGet1Fn)(const void*, void*, const void*);
 typedef void(__thiscall* UniCtorFn)(void*, const wchar_t*);
@@ -353,21 +353,21 @@ LocGet0Fn o_locGet0 = nullptr, o_locConv = nullptr;
 LocGet1Fn o_locGet1 = nullptr;
 UniCtorFn g_uniCtor = nullptr;
 std::map<std::string, std::wstring> g_texts;
-// Die Hooks laufen in jedem Thread, der einen Text der Stringtabelle holt; geschrieben wird nur aus Skripten. Leser teilen sich die Sperre.
+// The hooks run in each thread that gets a text of the string table. Only scripts write. Readers share the lock.
 SRWLOCK g_textsLock = SRWLOCK_INIT;
 bool g_textHooks = false;
 
 const char* SafeLocId(const void* self) {
     __try {
         return g_sb.strGetText(self);
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }   // eCLocString = ein bCString (4 Byte)
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }   // eCLocString = one bCString (4 bytes)
 }
-// Eigener Text zur ID in self: baut ihn in ret (bCUnicodeString) und liefert true. Der Text wird unter der Lesesperre kopiert.
+// own text for the ID in self: builds it in ret (bCUnicodeString) and gives true. The text is copied under the read lock.
 bool BuildOwnText(const void* self, void* ret) {
     if (!self) return false;
     bool found = false;
     AcquireSRWLockShared(&g_textsLock);
-    const char* id = g_texts.empty() ? nullptr : SafeLocId(self);   // ohne eigene Texte kostet der Hook nur die Sperre
+    const char* id = g_texts.empty() ? nullptr : SafeLocId(self);   // without own texts, the hook costs only the lock
     if (id && *id) {
         auto it = g_texts.find(id);
         if (it != g_texts.end()) {
@@ -421,9 +421,9 @@ void RegisterText(const SStr& id, const SStr& text) {
     AcquireSRWLockExclusive(&g_textsLock);
     g_texts[id.c_str()] = w;
     ReleaseSRWLockExclusive(&g_textsLock);
-    InstallTextHooks();   // ohne Spiel (Test) bleibt der Text gespeichert, wirkt aber nicht
+    InstallTextHooks();   // without the game (test), the text stays saved, but has no effect
 }
-// Unicode-Fassung fuer mod-eigene Stringtabellen. Speichert immer; die Hooks werden bei Bedarf spaeter nachgeholt (EnsureTextHooks).
+// Unicode version for the string tables of mods. Always saves; the hooks are installed later when necessary (EnsureTextHooks).
 void RegisterTextWideImpl(const std::string& id, const std::wstring& text) {
     AcquireSRWLockExclusive(&g_textsLock);
     g_texts[id] = text;
@@ -431,7 +431,7 @@ void RegisterTextWideImpl(const std::string& id, const std::wstring& text) {
     InstallTextHooks();
 }
 bool EnsureTextHooksImpl() { return g_textHooks || InstallTextHooks(); }
-// Name der aktuellen Spielsprache ("English", "German", ...); leer, solange Engine.dll nicht bereit ist
+// name of the current game language ("English", "German", ...); empty while Engine.dll is not ready
 typedef void*(__stdcall* LocInstFn)();
 typedef const void*(__thiscall* LocLangFn)(const void*);
 const char* SafeLangName(LocInstFn inst, LocLangFn lang) {
@@ -494,7 +494,7 @@ SStr GetGameDir() {
     return SStr(d.substr(0, d.find_last_of("\\/") + 1));
 }
 
-// ---- Mod-Archive (pack_mod.cpp): Ordner als naechste freie Generation <Volume>.mod / .m00 / ... in <Spiel>\Data ablegen, bzw. Archiv an beliebigem Ort schreiben
+// ---- Mod archives (pack_mod.cpp): put a folder as the next free generation <volume>.mod / .m00 / ... into <game>\Data, or write an archive to any location
 std::string g_packError;
 std::string GameDataDir() { return std::string(GetGameDir().c_str()) + "Data"; }
 SStr ScriptPackMod(const SStr& folder, const SStr& volume, bool alternativeBalancing) {
@@ -514,7 +514,7 @@ SStr ScriptNextModFile(const SStr& volume, bool alternativeBalancing) {
 }
 SStr ScriptPackError() { return SStr(g_packError); }
 
-// ---- Attribut-Belohnung der Quest (wird beim Erfolg im Spiel angezeigt und vergeben)
+// ---- attribute reward of the quest (the game shows and gives it at success)
 bool SafeSetReward(void* q, const void* tag, long amount) {
     __try {
         g_q.setAttrib(q, tag);
@@ -522,7 +522,7 @@ bool SafeSetReward(void* q, const void* tag, long amount) {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-bool SafeGetReward(void* q, char* tag, size_t n, long* amount) {   // Text und Zahl unter SEH in Puffer kopieren
+bool SafeGetReward(void* q, char* tag, size_t n, long* amount) {   // copy the text and the number into buffers with SEH protection
     __try {
         const char* t = g_sb.strGetText(g_q.getAttrib(q));
         size_t i = 0;
@@ -537,14 +537,14 @@ bool SetQuestReward(const SStr& name, const SStr& attribute, int amount) {
     void* q = FindQuest(name);
     return q && g_q.setAttrib && g_q.setAttribAmount && SafeSetReward(q, &attribute, amount);
 }
-SStr GetQuestReward(const SStr& name) {   // "TAG=Menge" oder leer
+SStr GetQuestReward(const SStr& name) {   // "TAG=quantity" or empty
     void* q = FindQuest(name);
     char tag[64];
     long amount = 0;
     if (!q || !g_q.getAttrib || !g_q.getAttribAmount || !SafeGetReward(q, tag, sizeof tag, &amount) || !*tag) return SStr();
     return SStr(std::string(tag) + "=" + std::to_string(amount));
 }
-// Alle Quests des Spiels: welche Attribut-Belohnungen kommen vor (Kennung, Anzahl, Beispiel)?
+// all quests of the game: which attribute rewards occur (tag, count, example)?
 SStr DescribeQuestRewards() {
     unsigned char* d;
     int n;
@@ -597,7 +597,7 @@ bool RegisterQuestBindings(asIScriptEngine* e) {
     G3ASM_REG(e->RegisterGlobalFunction("bool SetQuestDescription(const bCString &in, const bCString &in)", asFUNCTION(SetQuestDescription),
                                       asCALL_CDECL));
     G3ASM_REG(
-        e->RegisterGlobalFunction("bool LoadQuestFile(const bCString &in, const bCString &in)", asFUNCTION(LoadQuestFile), asCALL_CDECL));   // funktioniert nicht
+        e->RegisterGlobalFunction("bool LoadQuestFile(const bCString &in, const bCString &in)", asFUNCTION(LoadQuestFile), asCALL_CDECL));   // does not work
     G3ASM_REG(e->RegisterGlobalFunction("int GetQuestCount()", asFUNCTION(GetQuestCount), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bCString GetQuestNameAt(int)", asFUNCTION(GetQuestNameAt), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bool SetQuestReward(const bCString &in, const bCString &in, int)", asFUNCTION(SetQuestReward),

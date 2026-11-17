@@ -1,7 +1,7 @@
-// Mess-Mod fuer die Zeitrate (ab API 36): GetTimeScale/SetTimeScale (ganze Simulation) und GetClockFactor/SetClockFactor (Spieluhr).
-//   Umschalt + Ziffernblock +  Simulation schneller (x2, bis 4)      Umschalt + Ziffernblock -  langsamer (/2, bis 0.25)
-//   Umschalt + Ziffernblock *  Spieluhr x10 an/aus (die Uhr steht im Spielstand: vor dem Speichern stellt die Mod den alten Wert her)
-// Anzeige oben links (OnDraw), Werte im Protokoll.
+// Measurement mod for the time rate (from API 36): GetTimeScale/SetTimeScale (full simulation) and GetClockFactor/SetClockFactor (game clock).
+//   Shift + numeric keypad +  simulation faster (x2, up to 4)      Shift + numeric keypad -  slower (/2, down to 0.25)
+//   Shift + numeric keypad *  game clock x10 on or off (the clock is in the saved game: before the save, the mod restores the old value)
+// Display at the top left (OnDraw), values in the log.
 float uhrAlt = -1;
 int schrift = 0;
 

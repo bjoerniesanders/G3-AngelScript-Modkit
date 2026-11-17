@@ -1,6 +1,6 @@
-// Mess-Mod Monsterschaden (ab API 42), Vorbild: Plugin MonsterDamage.
-// Monsterschaden auf NPCs (ab Version 42): Das Spiel teilt den Schaden von Monstern an humanoiden NPCs durch 10 (beschworene Wesen: durch 2). Diese Mod
-// ersetzt die Teilung durch einen Faktor wie das Plugin MonsterDamage (Game.MonsterDamageMultiplicator=0.2, also doppelt so viel wie im Original).
+// Measurement mod for monster damage (from API 42), model: plugin MonsterDamage.
+// Monster damage on NPCs (from version 42): the game divides the damage of monsters on humanoid NPCs by 10 (summoned creatures: by 2). This mod
+// replaces the division with a factor, as the plugin MonsterDamage does (Game.MonsterDamageMultiplicator=0.2, thus 2 times the original).
 const float kFactor = 0.2f;
 int g_logged = 0;
 
@@ -11,5 +11,5 @@ bool Override_MonsterDamage(Entity victim, Entity attacker, int damage, int divi
         print(attacker.GetName() + " trifft " + victim.GetName() + ": roh " + damage + ", Original " + (divisor > 1 ? damage / divisor : damage) + ", neu " + neu);
     }
     SetOverrideArg(2, neu);
-    return true;   // ohne Super(): das Spiel bekommt damage ungeteilt, hier also den neuen Wert
+    return true;   // without Super(): the game gets damage without division, here thus the new value
 }

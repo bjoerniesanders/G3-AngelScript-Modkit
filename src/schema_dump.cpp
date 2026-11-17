@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Schema-Dump der Eigenschaften (Skript-Schnittstelle ab Version 43, Roadmap 6.1): alle beim Aufruf registrierten Eigenschaftsklassen aus
-// bCPropertyObjectSingleton (SharedBase.dll) mit Basisklasse, Beschreibung und allen Eigenschaften (Name, Typ, Kategorie, Beschreibung, Art,
-// Nur-Lesen, Offset, Groesse, Enum-Werte) als JSON-Datei.
-//   int DumpPropertySchema(const bCString &in file)  -> Zahl der Klassen, < 0 bei Fehler (-1 Exporte fehlen, -2 Dateiname ungueltig, -3 Datei)
-// Die Datei liegt im Ordner g3asm neben g3asm.dll (im Spiel: <Spiel>\g3asm\<file>). Nur ein schlichter Dateiname ist erlaubt.
-// Klassen registrieren sich beim Laden ihrer DLL. Ohne Spiel (Testprogramm mit Original-SharedBase und Game.dll, 2026-11-11): 273 Klassen,
-// 1584 Eigenschaften, 1534 Enum-Werte, 110 ms, 258 KB. Ob die spaet geladenen Script_*.dll im Spiel weitere Klassen anmelden, ist nicht gemessen.
-// Aufbau (SDK, gemessen): Iterator der Klassenliste = {bTPtrArray<bSNode*>* Faecher, int Fach, bSNode* Knoten}, bSNode = {bCString Name,
-// bCPOTypeListItem* Eintrag, bSNode* Weiter}; bTPtrArray = {T* Daten, u32 Anzahl, u32 Kapazitaet}. Virtuelle Funktionen in der Reihenfolge des SDK:
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// Schema dump of the properties (script interface from version 43, roadmap 6.1): all property classes that are registered at the time of the call, from
+// bCPropertyObjectSingleton (SharedBase.dll), with base class, description and all properties (name, type, category, description, kind,
+// read only, offset, size, enum values) as a JSON file.
+//   int DumpPropertySchema(const bCString &in file)  -> number of classes, < 0 if there is an error (-1 exports missing, -2 file name not valid, -3 file)
+// The file is in the folder g3asm next to g3asm.dll (in the game: <game>\g3asm\<file>). Only a simple file name is permitted.
+// Classes register when their DLL loads. Without the game (test program with the original SharedBase and Game.dll, 2026-11-11): 273 classes,
+// 1584 properties, 1534 enum values, 110 ms, 258 KB. It is not measured if the Script_*.dll files that load late register more classes in the game.
+// Layout (SDK, measured): iterator of the class list = {bTPtrArray<bSNode*>* buckets, int bucket, bSNode* node}, bSNode = {bCString name,
+// bCPOTypeListItem* entry, bSNode* next}; bTPtrArray = {T* data, u32 count, u32 capacity}. Virtual functions in the sequence of the SDK:
 // bCPropertyObjectTypeBase [0] GetClassName [1] GetBaseClassName; bCPropertyTypeBase [0] GetMemberOffset [1] GetDataSize [3] GetPropertyClassName
 // [6] HasEnumValues [7] GetEnumValueCount [8] GetEnumValue; bCEnumWrapper [0] GetValueString [1] GetValue.
-// Achtung: bCPOTypeListItem::GetBaseClassName und die Getter der Eigenschaftsliste (GetPropertyType(int) u. a.) blieben im Test haengen (vermutlich
-// Assert-Dialog der Original-DLL); die Liste wird deshalb direkt gelesen (bCPropertyObjectTypeBase +8 Liste, +0xC Anzahl, +0x14 Bit 0 speicherbar).
-// Jeder Engine-Aufruf ist mit SEH gekapselt; harte Obergrenzen gegen kaputte Listen (Klassen, Eigenschaften je Klasse, Enum-Werte je Eigenschaft).
+// Caution: bCPOTypeListItem::GetBaseClassName and the getters of the property list (GetPropertyType(int) and others) hung in the test (probably an
+// assert dialog of the original DLL). Thus the code reads the list directly (bCPropertyObjectTypeBase +8 list, +0xC count, +0x14 bit 0 savable).
+// Each engine call has an SEH wrapper. Hard upper limits against damaged lists (classes, properties for each class, enum values for each property).
 #include <windows.h>
 
 #include <angelscript.h>
@@ -30,8 +30,8 @@ namespace {
 constexpr int kMaxClasses = 20000, kMaxProps = 4000, kMaxEnum = 2000, kMaxBuckets = 1 << 20;
 
 typedef void*(__stdcall* GetInstanceFn)();
-typedef void*(__thiscall* IterFn)(const void*, void*);           // Rueckgabe des Iterators ueber versteckten Zeiger
-typedef const void*(__thiscall* PtrFn)(const void*);             // const bCString& / Zeiger
+typedef void*(__thiscall* IterFn)(const void*, void*);           // return value of the iterator through a hidden pointer
+typedef const void*(__thiscall* PtrFn)(const void*);             // const bCString& or pointer
 typedef int(__thiscall* IntFn)(const void*);
 typedef bool(__thiscall* BoolFn)(const void*);
 typedef const void*(__thiscall* IndexFn)(const void*, int);
@@ -66,8 +66,8 @@ bool Resolve() {
     return g_api.ok;
 }
 
-// ---- kleine SEH-Huellen (keine C++-Objekte mit Destruktor)
-const char* SafeTextOf(PtrFn fn, const void* self) {   // Funktion liefert const bCString&
+// ---- small SEH wrappers (no C++ objects with a destructor)
+const char* SafeTextOf(PtrFn fn, const void* self) {   // the function gives const bCString&
     if (!self) return nullptr;
     __try {
         const void* s = fn(self);
@@ -86,7 +86,7 @@ int SafeInt(IntFn fn, const void* self, int fallback) {
         return fn(self);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return fallback; }
 }
-int SafeBool(BoolFn fn, const void* self) {   // 1/0, -1 = Ausnahme
+int SafeBool(BoolFn fn, const void* self) {   // 1/0, -1 = exception
     if (!self) return -1;
     __try {
         return fn(self) ? 1 : 0;
@@ -102,7 +102,7 @@ const char* SafeVText(const void* obj, int slot) {
     PtrFn fn = reinterpret_cast<PtrFn>(VFunc(obj, slot));
     return fn ? SafeTextOf(fn, obj) : nullptr;
 }
-long long SafeVInt(const void* obj, int slot) {   // -1 = nicht lesbar
+long long SafeVInt(const void* obj, int slot) {   // -1 = not readable
     IntFn fn = reinterpret_cast<IntFn>(VFunc(obj, slot));
     if (!fn) return -1;
     __try {
@@ -124,9 +124,9 @@ const void* SafeVIndex(const void* obj, int slot, int i) {
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
 struct Iter {
-    const unsigned* nodes;   // bTPtrArray<bSNode*>: Daten, Anzahl, Kapazitaet
+    const unsigned* nodes;   // bTPtrArray<bSNode*>: data, count, capacity
     int hash;
-    const unsigned* node;    // bSNode: Name, Eintrag, Weiter
+    const unsigned* node;    // bSNode: name, entry, next
 };
 bool SafeBegin(Iter* it) {
     __try {
@@ -228,12 +228,12 @@ int DumpPropertySchemaImpl(const std::string& file, std::string& report) {
             o += "{\"name\":";
             Json(o, name ? name : key);
             o += ",\"base\":";
-            Json(o, type ? SafeVText(type, 1) : nullptr);   // bCPOTypeListItem::GetBaseClassName haengt (im Test gemessen), daher virtuell am Typ
+            Json(o, type ? SafeVText(type, 1) : nullptr);   // bCPOTypeListItem::GetBaseClassName hangs (measured in the test), thus the virtual function on the type
             if (type) {
                 const char* desc = SafeTextOf(g_api.typeDesc, type);
                 if (desc && *desc) o += ",\"description\":", Json(o, desc);
-                // Felder direkt (SDK-Layout, 0x18 Byte): +8 bCPropertyTypeBase** Liste, +0xC Anzahl, +0x14 Bit 0 = speicherbar.
-                // Die Getter der Original-DLL pruefen mit Assert-Dialogen (im Test haengengeblieben), daher hier nur lesen.
+                // fields directly (SDK layout, 0x18 bytes): +8 bCPropertyTypeBase** list, +0xC count, +0x14 bit 0 = savable.
+                // The getters of the original DLL do checks with assert dialogs (they hung in the test), thus only read here.
                 const unsigned* tb = static_cast<const unsigned*>(type);
                 const bool readable = ReadableMem(tb, 0x18);
                 o += readable && (reinterpret_cast<const unsigned char*>(tb)[0x14] & 1) ? ",\"persistable\":true" : ",\"persistable\":false";

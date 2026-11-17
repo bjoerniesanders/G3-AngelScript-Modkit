@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Laufzeit als Gothic-3-Script-DLL: <Spiel>\scripts\Script_G3ASM_<API>.dll (Ziel g3asm_script, gleiche Quellen wie g3asm.dll).
-// Das Spiel laedt jede scripts\Script_*.dll selbst und ruft _ScriptInit@0 auf (gFScriptInit: gSScriptInit const* __stdcall()). So kommt das Modkit ohne
-// Loader ins Spiel; jede Mod fuer Spieler bringt diese DLL mit (Union Starter: ScriptFiles\scripts\).
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// Runtime as a Gothic 3 script DLL: <game>\scripts\Script_G3ASM_<API>.dll (target g3asm_script, same sources as g3asm.dll).
+// The game loads each scripts\Script_*.dll itself and calls _ScriptInit@0 (gFScriptInit: gSScriptInit const* __stdcall()). Thus the modkit gets into the game without
+// the loader. Each mod for players contains this DLL (Union Starter: ScriptFiles\scripts\).
 //
-// Wer startet:
-//   - Laeuft g3asm.dll schon (Loader-Weg, Entwicklung), tut die Script-DLL nichts.
-//   - Liegen mehrere Script_G3ASM_<n>.dll nebeneinander (Mods mit verschiedenen Laufzeit-Versionen), startet nur die mit der hoechsten Nummer.
-//   - g3asm.ini mit [g3asm] enable=0 schaltet auch diesen Weg ab.
-// Gemessen 2026-11-16 (Mess-Stub, saubere Steam-Installation): ScriptInit kommt nach OnPostInitializeModules und vor Script_Game.dll; alle Hooks greifen,
-// main() laeuft ueber den OnProcess-Rueckfall. Datei-Patches kommen auf diesem Weg zu spaet (Data ist schon erfasst) - Spieldateien als Archiv ausliefern.
+// Which one starts:
+//   - If g3asm.dll already runs (loader path, development), the script DLL does nothing.
+//   - If there are more than one Script_G3ASM_<n>.dll (mods with different runtime versions), only the one with the highest number starts.
+//   - g3asm.ini with [g3asm] enable=0 also turns off this path.
+// Measured 2026-11-16 (measurement stub, clean Steam installation): ScriptInit comes after OnPostInitializeModules and before Script_Game.dll. All hooks work,
+// main() runs through the OnProcess fallback. File patches come too late on this path (Data is already read) - give game files as an archive.
 #include <windows.h>
 
 #include <cstdio>
@@ -23,10 +23,10 @@ extern const char* g_startOrigin;
 extern "C" int g3asm_start(HMODULE sharedBase, const char* ini, const char* gameDir, void (*hostLog)(const char*));
 
 namespace {
-// gSScriptInit: fuenf bTObjArray (je Zeiger, Anzahl, Kapazitaet) = 60 Byte; leer = alles 0. Wir melden dem Spiel keine eigenen Skripte.
+// gSScriptInit: five bTObjArray (each pointer, count, capacity) = 60 bytes; empty = all 0. The modkit registers no own scripts with the game.
 alignas(4) unsigned char g_emptyInit[60] = {};
 
-// Nummer aus "Script_G3ASM_<n>.dll", -1 wenn der Name nicht passt
+// number from "Script_G3ASM_<n>.dll", -1 if the name does not agree
 int VersionOf(const char* file) {
     const char* p = file;
     if (_strnicmp(p, "Script_G3ASM_", 13) != 0) return -1;
@@ -41,20 +41,20 @@ void Start() {
     static bool done = false;
     if (done) return;
     done = true;
-    if (GetModuleHandleA("g3asm.dll")) return;   // Loader-Weg aktiv: dort laeuft das Modkit schon
-    HMODULE me = nullptr;                        // DllMain steht in g3asm_main.cpp; eigenes Modul ueber eine Adresse darin bestimmen
+    if (GetModuleHandleA("g3asm.dll")) return;   // loader path active: the modkit already runs there
+    HMODULE me = nullptr;                        // DllMain is in g3asm_main.cpp; find the own module through an address in it
     GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                        reinterpret_cast<LPCSTR>(&g_emptyInit), &me);
     char self[MAX_PATH];
     if (!me || !GetModuleFileNameA(me, self, MAX_PATH)) return;
-    std::string dir(self);   // <Spiel>\scripts\Script_G3ASM_046.dll
+    std::string dir(self);   // <game>\scripts\Script_G3ASM_046.dll
     const size_t s1 = dir.find_last_of('\\');
     if (s1 == std::string::npos) return;
     const std::string myFile = dir.substr(s1 + 1), scripts = dir.substr(0, s1);
     const size_t s2 = scripts.find_last_of('\\');
     if (s2 == std::string::npos) return;
     const std::string game = scripts.substr(0, s2 + 1);
-    // hoechste Nummer gewinnt; bei gleicher Nummer (anders geschrieben) der alphabetisch erste Dateiname
+    // the highest number wins; for the same number (different spelling), the file name that is first in alphabetical sequence
     const int mine = VersionOf(myFile.c_str());
     WIN32_FIND_DATAA fd;
     HANDLE h = FindFirstFileA((scripts + "\\Script_G3ASM_*.dll").c_str(), &fd);

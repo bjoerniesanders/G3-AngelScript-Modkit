@@ -1,10 +1,10 @@
-// Mess-Mod fuer die Freeze-Liste (ab API 46). Alles nur Protokoll ([probe_freeze] ...).
-//   automatisch nach dem Laden: Quest-Datei lesen mit verschiedenen Pfaden (LoadQuestFile)
-//   Strg + Umschalt + Ziffernblock *  anvisiertes Wesen toeten (Entity::Kill, Taeter = Held) - vorher ein unwichtiges Tier anvisieren!
-//   Strg + Umschalt + Ziffernblock -  Haendlerware des anvisierten NPCs neu erzeugen (GenerateTradeGoods), Stapel und Gold vorher/nachher
-//   Strg + Umschalt + Ziffernblock +  naechster Schritt: Fadenkreuz aus, Fadenkreuz an, Uhr 22:00, Uhr 10:00 (dann von vorn)
-//   Verwandlung (Rolle benutzen): OnTransformStart/OnTransformEnd werden gemeldet
-// Mit Strg + Umschalt reagieren die anderen Beispiel-Mods auf diese Tasten nicht (demo_spawn, demo_lifesteal, probe_reference pruefen das).
+// Measurement mod for the freeze list (from API 46). Everything only in the log ([probe_freeze] ...).
+//   automatically after a load: read a quest file with different paths (LoadQuestFile)
+//   Ctrl + Shift + numeric keypad *  kill the focused creature (Entity::Kill, killer = hero) - focus an unimportant animal first!
+//   Ctrl + Shift + numeric keypad -  make the trader goods of the focused NPC again (GenerateTradeGoods), stacks and gold before and after
+//   Ctrl + Shift + numeric keypad +  next step: crosshair off, crosshair on, clock 22:00, clock 10:00 (then from the start)
+//   transformation (use a scroll): the mod reports OnTransformStart and OnTransformEnd
+// With Ctrl + Shift, the other example mods do not react to these keys (demo_spawn, demo_lifesteal, probe_reference check this).
 const int VK_UMSCHALT = 0x10, VK_STRG = 0x11;
 int schritt = 0;
 bool questGeprueft = false;
@@ -16,7 +16,7 @@ void QuestDateien() {
     const bCString q = GetQuestNameAt(0);
     const bCString pfad = GetQuestFilePath(q);
     print("Quest '" + q + "': GetQuestDir='" + GetQuestDir() + "' GetQuestFilePath='" + pfad + "'");
-    // Lesen: so wie das Spiel (virtueller Pfad Data/Quests/<Welt>/<Datei>, auch aus den Archiven)
+    // read: as the game does (virtual path Data/Quests/<world>/<file>, also from the archives)
     print("LoadQuestFile(GetQuestFilePath) = " + LoadQuestFile(q, pfad));
     print("LoadQuestFile(Data/Quests/G3_World_01/" + q + "_quest_G3_World_01.quest) = " + LoadQuestFile(q, "Data/Quests/G3_World_01/" + q + "_quest_G3_World_01.quest"));
 }

@@ -1,16 +1,16 @@
-// Mess-Mod fuer die Zeichen-API (ab API 34): OnDraw, CreateFont, DrawText, TextWidth, WorldToScreen; ab API 38 LoadImage/DrawImage; ab API 39 ueber dem HUD.
-// Zeigt oben links Bildgroesse und Bildzaehler und schreibt 'Held' 1 m ueber und 'Mitte' an die Position des Helden (Pruefung von WorldToScreen).
-// Darunter Bilder: Kompass (Pfad aus g3.gui.res), dieselbe Datei als kurzer Name, ein sich drehender Kompass (eine Umdrehung in 4 s) und ein Orts-Symbol.
-// Unten links und rechts ein Kompass und roter Text ueber der Statusleiste, in den vier Ecken je eine Ecken-Marke und in der Mitte ein Text: Pruefung,
-// dass OnDraw ueber dem HUD (auch ueber dem Inventar) und an der richtigen Stelle zeichnet.
-// Protokoll (einmal): Schrift-Handle, Textbreite, Bildschirmposition des Helden, Bild-Nummern.
+// Measurement mod for the drawing API (from API 34): OnDraw, CreateFont, DrawText, TextWidth, WorldToScreen; from API 38 LoadImage and DrawImage; from API 39 above the HUD.
+// Shows the screen size and the frame counter at the top left, and writes 'Held' 1 m above and 'Mitte' at the position of the hero (check of WorldToScreen).
+// Below: images: compass (path from g3.gui.res), the same file as a short name, a turning compass (one turn in 4 s) and a location symbol.
+// At the bottom left and right a compass and red text above the status bar, in each of the four corners a corner mark, and in the center a text: these check
+// that OnDraw draws above the HUD (also above the inventory) and at the correct position.
+// Log (1 time): font handle, text width, screen position of the hero, image numbers.
 int schrift = 0;
 int bilder = 0;
 bool gemeldet = false;
 int bildPfad = -1, bildKurz = -1, bildGross = -1;
 float winkel = 0;
 
-// Laden vor der ersten Welt: liefert oft 0 (GUI-Daten fehlen noch); dieselbe Nummer muss spaeter in OnDraw trotzdem kommen
+// load before the first world: frequently gives 0 (GUI data still missing). The same number must still come later in OnDraw
 int bildFrueh = -1;
 void main() {
     bildFrueh = LoadImage("g3_hud_icon_location_silden.tga");
@@ -41,12 +41,12 @@ void OnDraw() {
     bool b = DrawImage(bildKurz, 110, 60, 64, 64);
     bool c = DrawImage(bildPfad, 190, 60, 64, 64, winkel);
     bool d = DrawImage(bildGross, 270, 60, 128, 128);
-    // ueber dem HUD: Statusleiste unten
+    // above the HUD: status bar at the bottom
     DrawImage(bildPfad, 10, h - 70, 64, 64);
     DrawText(schrift, 80, h - 50, "G3ASM ueber dem HUD", 0xFFFF6060);
     bCString rechts = "G3ASM ueber dem HUD";
     DrawText(schrift, w - TextWidth(schrift, rechts) - 20, h - 50, rechts, 0xFFFF6060);
-    // Ecken und Mitte: liegen sie genau dort?
+    // corners and center: are they exactly there?
     DrawText(schrift, 2, 2, "[oben links]", 0xFF40FFFF);
     bCString orr = "[oben rechts]";
     DrawText(schrift, w - TextWidth(schrift, orr) - 2, 2, orr, 0xFF40FFFF);

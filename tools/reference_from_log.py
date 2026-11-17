@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-"""Erzeugt Abschnitt 8 von docs/modkit/reference.md aus dem Protokoll der Mod probe_reference.
+# Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+"""Makes section 8 of docs/modkit/reference.md from the log of the mod probe_reference.
 
-Aufruf:  python -I tools/reference_from_log.py [Protokoll] [reference.md]
-  Protokoll   Standard G:\\Gothic3\\g3asm.log (der letzte Dump darin zaehlt)
-  reference.md  Standard docs/modkit/reference.md; der Text zwischen <!-- DUMP-ANFANG --> und <!-- DUMP-ENDE --> wird ersetzt.
-Ohne zweites Argument wird nur auf die Standardausgabe geschrieben, wenn die Marker fehlen.
+Usage:  python -I tools/reference_from_log.py [log] [reference.md]
+  log           default G:\\Gothic3\\g3asm.log (the last dump in it counts)
+  reference.md  default docs/modkit/reference.md; the script replaces the text between <!-- DUMP-ANFANG --> and <!-- DUMP-ENDE -->.
+Without a second argument, the script writes only to the standard output if the markers are missing.
 """
 import io
 import os
@@ -25,7 +25,7 @@ start = max(starts_dump)
 end = next(i for i in range(start, len(lines)) if '=== Ende des Dumps ===' in lines[i])
 block = [PREFIX.sub('', l) for l in lines[start + 1:end]]
 
-# --- Attribute: Kennungen aus Quest-Belohnungen und Werte des Helden
+# --- attributes: tags from quest rewards and values of the hero
 quest_tags = []
 hero = []
 for l in block:
@@ -36,8 +36,8 @@ for l in block:
     if m:
         hero.append(m.groups())
 
-# --- Vorlagen-Gruppen
-groups = []   # (teil, anzahl_eintraege, gekuerzt, namen)
+# --- template groups
+groups = []   # (part, number_of_entries, shortened, names)
 cur = None
 for l in block:
     m = re.match(r"Vorlagen mit '(.+)': (\d+) Eintraege( \(nur der Anfang\))?", l)
@@ -93,7 +93,7 @@ for teil, n, gek, namen in groups:
     out.append(', '.join('`%s`' % u for u in uniq))
     out.append('')
 
-# --- Gesamtliste aller Vorlagen (zweiter Dump der Mod, Rollen-Taste): docs/modkit/data/templates.txt, eindeutig und sortiert
+# --- full list of all templates (second dump of the mod, Scroll Lock key): docs/modkit/data/templates.txt, unique and sorted
 starts = [i for i, l in enumerate(lines) if '=== Alle Vorlagen ===' in l]
 if starts:
     st = starts[-1]

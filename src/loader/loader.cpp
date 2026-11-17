@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// G3ASM-Loader: schlanke Ersatz-"dbghelp.dll" fuer G3ASM (Gothic 3, 32 Bit). Eigenstaendig, ohne das OpenGothic3-Hauptrepo.
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// G3ASM loader: small replacement "dbghelp.dll" for G3ASM (Gothic 3, 32 bit). Standalone, without the OpenGothic3 main repository.
 //
-// SharedBase.dll importiert dbghelp.dll (nur MiniDumpWriteDump) und laedt sie aus dem Spielordner. Dieser Loader steht an dieser Stelle:
-//   - leitet MiniDumpWriteDump an die umbenannte Original-DLL (dbghelp_orig.dll) weiter, damit das Spiel wie gewohnt Absturzberichte schreiben kann,
-//   - laedt g3asm.dll (neben dem Loader) und ruft g3asm_start() auf,
-//   - schreibt optional ein einfaches Absturzprotokoll (erste Chance, Modul+Offset).
-// Einstellungen in g3asm.ini neben der DLL (Fallback: og3_hooks.ini des Hauptrepos):
-//   [g3asm]   enable=1 (Standard 1)   script=...  hotreload=...  mods=...  (Rest siehe docs/modkit/mod-package.md)
-//   [loader]  crashlog=1 (Standard 1)
-// Protokoll: g3asm_loader.log neben der DLL.
+// SharedBase.dll imports dbghelp.dll (only MiniDumpWriteDump) and loads it from the game folder. This loader is at that location:
+//   - it sends MiniDumpWriteDump to the renamed original DLL (dbghelp_orig.dll), so that the game can write crash reports as usual,
+//   - it loads g3asm.dll (next to the loader) and calls g3asm_start(),
+//   - optionally, it writes a simple crash log (first chance, module+offset).
+// Settings in g3asm.ini next to the DLL (fallback: og3_hooks.ini of the main repository):
+//   [g3asm]   enable=1 (default 1)   script=...  hotreload=...  mods=...  (for the other settings, see docs/modkit/mod-package.md)
+//   [loader]  crashlog=1 (default 1)
+// Log: g3asm_loader.log next to the DLL.
 #include <windows.h>
 
 #include <cstdarg>
@@ -32,7 +32,7 @@ void Log(const char* fmt, ...) {
     line[n++] = '\r';
     line[n++] = '\n';
     _snprintf_s(path, sizeof path, _TRUNCATE, "%sg3asm_loader.log", g_dir);
-    // erster Eintrag eines Starts legt die Datei neu an, danach wird angehaengt
+    // the first entry of a start makes the file again; after that, the loader appends
     HANDLE f = CreateFileA(path, g_logStarted ? FILE_APPEND_DATA : GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
                            g_logStarted ? OPEN_ALWAYS : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (f == INVALID_HANDLE_VALUE) return;
@@ -42,7 +42,7 @@ void Log(const char* fmt, ...) {
     CloseHandle(f);
 }
 
-// "Modul+0xOffset" zu einer Adresse
+// "module+0xoffset" for an address
 void Where(DWORD addr, char* out, size_t n) {
     HMODULE m = nullptr;
     char name[MAX_PATH] = "?";
@@ -55,7 +55,7 @@ void Where(DWORD addr, char* out, size_t n) {
     }
 }
 
-// Absturzprotokoll: Adresse, Register und Rueckverweise des Stapels in Spielmodule. Es ist kein Absturz-Handler: die Ausnahme geht unveraendert weiter.
+// Crash log: address, registers and return addresses of the stack into game modules. It is not a crash handler: the exception continues without changes.
 LONG CALLBACK CrashLogger(EXCEPTION_POINTERS* ep) {
     static volatile LONG count = 0;
     const DWORD code = ep->ExceptionRecord->ExceptionCode;
@@ -90,7 +90,7 @@ LONG CALLBACK CrashLogger(EXCEPTION_POINTERS* ep) {
 void PatchLog(const char* s) { Log("%s", s); }
 }   // namespace
 
-// Weiterleitung an die Original-DLL (ein Export, 7 Argumente, stdcall); ein reiner Forwarder im .def wird vom 32-Bit-Linker nicht angenommen.
+// Forward to the original DLL (one export, 7 arguments, stdcall). The 32-bit linker does not accept a pure forwarder in the .def file.
 extern "C" BOOL __stdcall MiniDumpWriteDump(HANDLE process, DWORD pid, HANDLE file, int type, void* exc, void* user, void* cb) {
     using Fn = BOOL(__stdcall*)(HANDLE, DWORD, HANDLE, int, void*, void*, void*);
     static Fn fn = nullptr;
@@ -112,13 +112,13 @@ BOOL APIENTRY DllMain(HMODULE self, DWORD reason, LPVOID) {
 
     char ini[MAX_PATH + 32];
     _snprintf_s(ini, sizeof ini, _TRUNCATE, "%sg3asm.ini", g_dir);
-    if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES) _snprintf_s(ini, sizeof ini, _TRUNCATE, "%sog3_hooks.ini", g_dir);   // Hauptrepo-Datei
+    if (GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES) _snprintf_s(ini, sizeof ini, _TRUNCATE, "%sog3_hooks.ini", g_dir);   // file of the main repository
 
     Log("G3ASM-Loader gestartet (Einstellungen: %s)", GetFileAttributesA(ini) == INVALID_FILE_ATTRIBUTES ? "keine ini, Standardwerte" : ini);
     const g3asm::IniFile cfg(ini);
     if (cfg.Bom()) Log("Hinweis: %s beginnt mit UTF-8-BOM (wird beruecksichtigt)", ini);
     if (cfg.Int("loader", "crashlog", 1) != 0) AddVectoredExceptionHandler(1, CrashLogger);
-    // Abschnitt [g3asm]; fehlt er, gilt der fruehere Name [patch]
+    // section [g3asm]; if it is missing, the previous name [patch] applies
     const char* sec = cfg.HasSection("g3asm") ? "g3asm" : "patch";
     if (cfg.Int(sec, "enable", 1) == 0) {
         Log("G3ASM per ini abgeschaltet");

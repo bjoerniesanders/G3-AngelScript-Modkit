@@ -1,12 +1,12 @@
-// Eigenschaften-Inspektion (ab API 29): Strg + Ziffernblock / schreibt alle Eigenschaften eines Items samt Werten ins Protokoll (g3asm.log, Zeilen "[demo_properties] ...").
-// Ziel: das Item in der rechten Hand, sonst in der linken Hand oder am Ruecken, sonst das Entity unter dem Fadenkreuz (z. B. ein Item am Boden oder ein NPC).
-// Gelesen werden die Eigenschaftssets Item (Wert, Kategorie, Voraussetzungen, Fertigkeiten, Attributmodifikationen), Damage (Schadensart und -menge) und Interaction.
-// Nur Lesen, aendert nichts im Spiel. Die Werte sind der Text, den die Engine fuer die Eigenschaft liefert (Verweise auf Vorlagen sind nicht immer aussagekraeftig).
-// Abschalten: "-demo_properties" in g3asm\mods\load_order.txt.
-const int TASTE_INSPEKT = 0x6F;   // Ziffernblock /, zusammen mit Strg
+// Property inspection (from API 29): Ctrl + numeric keypad / writes all properties of an item with their values to the log (g3asm.log, lines "[demo_properties] ...").
+// Target: the item in the right hand, if there is none in the left hand or on the back, if there is none the entity below the crosshair (for example an item on the ground or an NPC).
+// The mod reads the property sets Item (value, category, requirements, skills, attribute changes), Damage (damage type and quantity) and Interaction.
+// Read only, it changes nothing in the game. The values are the text that the engine gives for the property (references to templates do not always give useful data).
+// To turn off: "-demo_properties" in g3asm\mods\load_order.txt.
+const int TASTE_INSPEKT = 0x6F;   // numeric keypad /, together with Ctrl
 const int VK_STRG = 0x11;
 
-// Eine ';'-getrennte Liste in Zeilen von etwa 350 Zeichen ausgeben
+// write a list separated by ';' in lines of approximately 350 characters
 void Zeilen(const bCString &in titel, const bCString &in liste) {
     if (liste.IsEmpty()) {
         print(titel + ": (nicht lesbar oder leer)");

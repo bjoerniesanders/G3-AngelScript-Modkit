@@ -1,8 +1,8 @@
-// PackMod-Demo: prueft, ob die Engine ein von g3asm_packmod geschriebenes Mod-Archiv (Quests.mod, Quests.m00, ...) liest und ob es eine Datei des Spiels ueberschreibt.
-// Das Archiv enthaelt die Quest-Datei "Agenak_ArenaDefeatDimitar" mit ExperiencePoints=4242 (Original: 300). Erzeugen: Ordner G3_World_01\Agenak_ArenaDefeatDimitar_quest_G3_World_01.quest
-// anlegen und  g3asm_packmod install <Ordner> <Spielordner> Quests  (ergibt Data\Quests.mod bzw. die naechste freie Generation).
-// Die Quest ist absichtlich eine, die in keinem Spielstand vorkommt: gespeicherte Quest-Laufzeitdaten koennten sonst den Wert der Datei ueberdecken.
-// Abschalten: in g3asm\mods\load_order.txt "-demo_packmod" eintragen (das Archiv selbst aus Data\ loeschen, um den Test rueckgaengig zu machen).
+// PackMod demo: checks if the engine reads a mod archive that g3asm_packmod wrote (Quests.mod, Quests.m00, ...), and if it overwrites a file of the game.
+// The archive contains the quest file "Agenak_ArenaDefeatDimitar" with ExperiencePoints=4242 (original: 300). To make it: make the folder G3_World_01\Agenak_ArenaDefeatDimitar_quest_G3_World_01.quest
+// and run  g3asm_packmod install <folder> <game folder> Quests  (result: Data\Quests.mod or the next free generation).
+// The quest is intentionally one that no saved game contains: saved quest run-time data could hide the value of the file.
+// To turn off: write "-demo_packmod" in g3asm\mods\load_order.txt (delete the archive itself from Data\ to undo the test).
 const bCString TEST_QUEST = "Agenak_ArenaDefeatDimitar";
 bool geprueft = false;
 float zeit = 0;

@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// KI-Tracer (Roadmap 6.2, nur Protokoll, keine Skript-Schnittstelle): schreibt Wechsel von KI-Zustand, -Aufgabe, -Routine, KI-Modus und Aktion
-// der NPCs ins Protokoll, um zu sehen, wann und warum die KI etwas abbricht (z. B. Animationen). Standard aus; g3asm.ini:
-//   [g3asm] aitrace=1            einschalten (Hooks werden nur dann eingehaengt)
-//           aitracefilter=Diego  nur NPCs, deren Name diesen Text enthaelt (Gross-/Kleinschreibung egal; leer = alle)
-//           aitracemax=2000      hoechstens so viele Zeilen je Spielstart, danach eine Schlusszeile
-// Eingehaengt (Game.dll-Exporte, thiscall, ein Referenzargument):
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// AI tracer (roadmap 6.2, only log, no script interface): writes changes of AI state, AI task, AI routine, AI mode and action
+// of the NPCs to the log, to see when and why the AI stops something (for example animations). Off by default. g3asm.ini:
+//   [g3asm] aitrace=1            turn on (the hooks are installed only in this case)
+//           aitracefilter=Diego  only NPCs with a name that contains this text (no case sensitivity; empty = all)
+//           aitracemax=2000      maximum number of lines for each game start, then one final line
+// Installed (Game.dll exports, thiscall, one reference argument):
 //   gCScriptRoutine_PS::SetCurrentState(const bCString&), SetCurrentTask(const bCString&), SetRoutine(const bCScriptString&),
 //   SetAIMode(const bTPropertyContainer<gEAIMode>&), SetAction(const bTPropertyContainer<gEAction>&); gCNavigation_PS::SetRoutine(const bCString&)
-// bCScriptString erbt von bCString; bTPropertyContainer<Enum> = {vtable, Wert} (8 Byte, Schema-Dump). Gemeldet wird nur ein geaenderter Wert
-// je NPC und Art (Wiederholungen desselben Werts zaehlen nur mit). Was die Aufrufe im Spiel ausloest, ist noch nicht gemessen.
-// Ausserdem (eigener Schalter, unten): [g3asm] anispeedlog=1 misst eCWrapper_emfx2Actor::SetPlaySpeed/GetPlaySpeed (Roadmap 6.3).
+// bCScriptString derives from bCString; bTPropertyContainer<Enum> = {vtable, value} (8 bytes, schema dump). The tracer reports only a changed value
+// for each NPC and type (repeats of the same value are only counted). It is not measured yet what causes the calls in the game.
+// Also (separate switch, below): [g3asm] anispeedlog=1 measures eCWrapper_emfx2Actor::SetPlaySpeed/GetPlaySpeed (roadmap 6.3).
 #include <windows.h>
 #include <intrin.h>
 
@@ -37,7 +37,7 @@ bool g_lockInit = false;
 
 enum Kind { kState, kTask, kRoutine, kNavRoutine, kMode, kAction, kKinds };
 const char* const kKindName[kKinds] = {"Zustand", "Aufgabe", "Routine", "Navigation-Routine", "KI-Modus", "Aktion"};
-std::unordered_map<const void*, std::string> g_last[kKinds];   // Entity -> zuletzt gemeldeter Wert
+std::unordered_map<const void*, std::string> g_last[kKinds];   // entity -> last reported value
 
 typedef const void*(__thiscall* EntNameFn)(const void*);
 typedef void*(__thiscall* PsEntityFn)(void*);
@@ -58,7 +58,7 @@ void* SafePsEntity(void* ps) {
         return g_psEntity(ps);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
 }
-int ContainerValue(const void* c) {   // bTPropertyContainer<Enum>: Wert hinter dem vtable-Zeiger
+int ContainerValue(const void* c) {   // bTPropertyContainer<Enum>: value after the vtable pointer
     return c && ReadableMem(c, 8) ? reinterpret_cast<const int*>(c)[1] : -1;
 }
 
@@ -123,17 +123,17 @@ void __fastcall HAction(void* ps, void*, const void* c) {
     o_action(ps, c);
 }
 
-// ---- Messung Abspielgeschwindigkeit (Roadmap 6.3, ini [g3asm] anispeedlog=1): Engine.dll eCWrapper_emfx2Actor::SetPlaySpeed(eEMotionType, float)
-// und GetPlaySpeed(eEMotionType) (beide von Game.dll importiert). Ziel: herausfinden, wer die Angriffsgeschwindigkeit setzt, bevor es einen Override gibt.
-// Erste Messung (2026-11-11): Einzelwerte fuellten 300 Zeilen in 2 s (fliessende Werte von Game.dll+0xDC5AA). Jetzt: eine neue Aufrufstelle wird sofort
-// gemeldet (hoechstens 100), sonst alle 10 s je Aufrufstelle und Art eine Zusammenfassung (Anzahl, kleinster/groesster Wert, Zahl der Werte > 1,05),
-// hoechstens 120 Fenster.
+// ---- measurement of the playback speed (roadmap 6.3, ini [g3asm] anispeedlog=1): Engine.dll eCWrapper_emfx2Actor::SetPlaySpeed(eEMotionType, float)
+// and GetPlaySpeed(eEMotionType) (both imported by Game.dll). Goal: find out which code sets the attack speed, before there is an override.
+// First measurement (2026-11-11): single values filled 300 lines in 2 s (continuous values from Game.dll+0xDC5AA). Now: a new call location is reported
+// immediately (maximum 100). If not, each 10 s one summary for each call location and type (count, smallest and largest value, number of values > 1.05),
+// maximum 120 windows.
 bool g_aniSpeed = false;
 struct SpeedStat {
     unsigned count = 0, above = 0;
     float lo = 0, hi = 0;
 };
-std::unordered_map<std::string, SpeedStat> g_aniWin;   // "Set Game.dll+0x... Art 0" -> Werte im laufenden 10-s-Fenster
+std::unordered_map<std::string, SpeedStat> g_aniWin;   // "Set Game.dll+0x... type 0" -> values in the current 10 s window
 std::unordered_map<std::string, bool> g_aniSites;
 std::unordered_map<void*, std::string> g_siteCache;
 DWORD g_aniWinStart = 0;
@@ -201,10 +201,10 @@ float __fastcall HGetSpeed(const void* actor, void*, int type) {
     return r;
 }
 
-// ---- Messung PlayMotion (2026-11-11, gleicher Schalter anispeedlog): SetPlaySpeed setzt nur Laufbewegung (Game.dll+0xDC5AA) und Drehen (+0xDA031/+0xDA21A),
-// Kampfbewegungen starten ueber Engine.dll eCVisualAnimation_PS::PlayMotion(eEMotionType, eSMotionDesc*). Der Aufbau von eSMotionDesc ist im SDK leer;
-// an Game.dll+0xDA1A5 werden darin u. a. zwei 1.0f gesetzt (Kandidat Geschwindigkeit). Gemeldet: je Aufrufstelle, Art und Feldmuster der ersten 12
-// Doppelwoerter (Zeiger als "p", Zahlen als Zahl) eine Zeile mit dem Entity-Namen, hoechstens 400 Zeilen.
+// ---- measurement PlayMotion (2026-11-11, same switch anispeedlog): SetPlaySpeed sets only the walk movement (Game.dll+0xDC5AA) and the turn (+0xDA031/+0xDA21A).
+// Combat movements start through Engine.dll eCVisualAnimation_PS::PlayMotion(eEMotionType, eSMotionDesc*). The SDK gives no layout for eSMotionDesc.
+// At Game.dll+0xDA1A5, the code sets two 1.0f values in it, among others (candidate speed). Reported: for each call location, type and field pattern of the first 12
+// double words (pointers as "p", numbers as numbers) one line with the entity name, maximum 400 lines.
 typedef void(__thiscall* PlayMotionFn)(void*, int, void*);
 PlayMotionFn o_playMotion = nullptr;
 std::unordered_map<std::string, bool> g_motionSeen;
@@ -226,7 +226,7 @@ std::string DescPattern(const void* desc) {
             std::snprintf(b, sizeof b, "-1");
         else if (v < 0x10000u)
             std::snprintf(b, sizeof b, "%u", v);
-        else if (exp >= 100 && exp <= 140)   // etwa 1e-8 bis 1e4
+        else if (exp >= 100 && exp <= 140)   // approximately 1e-8 to 1e4
             std::snprintf(b, sizeof b, "%.3gf", f);
         else
             std::snprintf(b, sizeof b, "p");

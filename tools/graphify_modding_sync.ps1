@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-# Aktualisiert die Kopie in graphify-modding aus den Quellen (AngelScript-Teil) und baut den Graphen inkrementell neu:
-#   powershell -NoProfile -File G3-AngelScript-Modkit\tools\graphify_modding_sync.ps1   (danach im Ordner graphify-modding: /graphify . --update)
+# Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+# Updates the copy in graphify-modding from the sources (AngelScript part) and builds the graph again incrementally:
+#   powershell -NoProfile -File G3-AngelScript-Modkit\tools\graphify_modding_sync.ps1   (then in the folder graphify-modding: /graphify . --update)
 $src = Split-Path -Parent $PSScriptRoot; $dst = Join-Path $src 'graphify-modding'
 New-Item -ItemType Directory -Force "$dst\src_patch","$dst\mods","$dst\docs" | Out-Null
 Copy-Item "$src\src\*" "$dst\src_patch" -Recurse -Force

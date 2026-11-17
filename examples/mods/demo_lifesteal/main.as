@@ -1,20 +1,20 @@
-// Lebensraub-Demo (ab API 28): "Lebensraub" ist eine Eigenschaft der Waffe, wie "geschaerft" oder "gesegnet": ein Qualitaetsbit (QUALITY_LIFESTEAL), das in der Beschreibung der Waffe als
-// Zeile "(20 %) Lebensraub" erscheint (Text aus stringtable.ini, Schluessel HUD_Quality_Lifesteal) und mit dem Spielstand gespeichert wird.
-// Taste Ziffernblock * (Mal): setzt bzw. entfernt die Eigenschaft an der Waffe des Helden (rechte Hand, sonst am Ruecken rechts bzw. links). Trifft der Held mit einer solchen Waffe in der Hand einen NPC,
-// bekommt er LEBENSRAUB_PROZENT des angerichteten Schadens als Lebenspunkte zurueck (bis zum Maximum). Angerichteter Schaden = Menge von OnDamage, bei einem toedlichen Treffer
-// nur der Rest der Lebenspunkte des Opfers.
-// Perk der Waffe: mit AUTO_PERK bekommt die Waffe PERK_WAFFE (Orkschlaechter) die Eigenschaft von selbst, sobald sie in der Hand oder auf dem Ruecken liegt, wie eine eingebaute Eigenschaft
-// der Waffe (die Taste schaltet dann nur noch andere Waffen um; an dieser Waffe setzt das Skript die Eigenschaft sofort wieder).
-// Zeigt: owner/inflictor in OnDamage, Qualitaet pro Slot lesen/setzen, eigener Text ueber die Mod-Stringtabelle. Abschalten: "-demo_lifesteal" in g3asm\mods\load_order.txt.
+// Life steal demo (from API 28): "Lebensraub" (life steal) is a property of the weapon, as "geschaerft" (sharpened) or "gesegnet" (blessed): a quality bit (QUALITY_LIFESTEAL) that shows in the description of the weapon as
+// the line "(20 %) Lebensraub" (text from stringtable.ini, key HUD_Quality_Lifesteal). The game saves it with the saved game.
+// Key numeric keypad * (multiply): sets or removes the property on the weapon of the hero (right hand, if empty the right or left back slot). If the hero hits an NPC with such a weapon in the hand,
+// the hero gets LEBENSRAUB_PROZENT of the damage back as hit points (up to the maximum). Damage = quantity from OnDamage. For a fatal hit,
+// only the remaining hit points of the victim.
+// Perk of the weapon: with AUTO_PERK, the weapon PERK_WAFFE (Orkschlaechter) gets the property automatically when it is in the hand or on the back, as a built-in property
+// of the weapon (the key then changes only other weapons; on this weapon, the script sets the property again immediately).
+// Shows: owner and inflictor in OnDamage, read and set the quality for each slot, a custom text through the mod string table. To turn off: "-demo_lifesteal" in g3asm\mods\load_order.txt.
 const int LEBENSRAUB_PROZENT = 20;
-const int TASTE_LEBENSRAUB = 0x6A;   // Ziffernblock * (Ende, 0x23, kam bei einem Test nicht an)
+const int TASTE_LEBENSRAUB = 0x6A;   // numeric keypad * (End, 0x23, did not get to the script in a test)
 
-const bool AUTO_PERK = false;   // aus: der Lebensraub haengt jetzt am Bonustalent (Mod perk_lifesteal), nicht mehr am Qualitaetsbit
+const bool AUTO_PERK = false;   // off: the life steal is now on the bonus skill (mod perk_lifesteal), not on the quality bit
 const bCString PERK_WAFFE = "It_1H_OrcSlayer_01";
 float perkZeit = 0;
 int heilLog = 0;
 
-// Setzt die Eigenschaft an der Waffe im Slot, wenn dort PERK_WAFFE liegt; true, wenn etwas geaendert wurde
+// Sets the property on the weapon in the slot if PERK_WAFFE is there. true if something changed
 bool PerkSetzen(Entity hero, int slot) {
     Entity item = hero.GetSlotItem(slot);
     if (!item.IsValid() || item.GetName() != PERK_WAFFE) return false;
@@ -25,7 +25,7 @@ bool PerkSetzen(Entity hero, int slot) {
     return true;
 }
 
-// Einmal pro Sekunde pruefen (Waffe ziehen oder wegstecken wechselt den Slot)
+// Check 1 time each second (draw or put away the weapon changes the slot)
 void OnFrame(float dt) {
     if (!AUTO_PERK) return;
     perkZeit += dt;
@@ -38,12 +38,12 @@ void OnFrame(float dt) {
     PerkSetzen(hero, SLOT_BACK_LEFT);
 }
 
-// Liegt im Slot ueberhaupt ein Stapel? (SetSlotQuality mit dem unveraenderten Wert gelingt nur dann)
+// Is there a stack in the slot? (SetSlotQuality with the same value is successful only in this case)
 bool SlotBelegt(Entity hero, int slot) {
     return hero.SetSlotQuality(slot, hero.GetSlotQuality(slot));
 }
 
-// Eigenschaft an der Waffe im Slot umschalten; false, wenn der Slot leer ist
+// Toggle the property on the weapon in the slot. false if the slot is empty
 bool Umschalten(Entity hero, int slot, const bCString &in name) {
     if (!SlotBelegt(hero, slot)) return false;
     uint q = hero.GetSlotQuality(slot);
@@ -56,7 +56,7 @@ bool Umschalten(Entity hero, int slot, const bCString &in name) {
 }
 
 void OnKey(int vk, bool down) {
-    if (!down || vk != TASTE_LEBENSRAUB || IsKeyDown(0x11)) return;   // Strg + Ziffernblock * gehoert probe_events
+    if (!down || vk != TASTE_LEBENSRAUB || IsKeyDown(0x11)) return;   // Ctrl + numeric keypad * belongs to probe_events
     Entity hero = GetHero();
     if (!hero.IsValid()) return;
     if (Umschalten(hero, SLOT_RIGHT_HAND, "rechte Hand")) return;
@@ -67,13 +67,13 @@ void OnKey(int vk, bool down) {
 
 void OnDamage(Entity victim, Entity inflictor, Entity owner, int amount, int type) {
     Entity hero = GetHero();
-    if (!hero.IsValid() || !owner.IsValid() || owner != hero) return;   // nur Treffer, die der Held verursacht
-    if (victim == hero) return;                                         // nicht bei Schaden am Helden selbst
-    if ((hero.GetSlotQuality(SLOT_RIGHT_HAND) & QUALITY_LIFESTEAL) == 0) return;   // die gefuehrte Waffe hat die Eigenschaft nicht
+    if (!hero.IsValid() || !owner.IsValid() || owner != hero) return;   // only hits that the hero causes
+    if (victim == hero) return;                                         // not for damage to the hero
+    if ((hero.GetSlotQuality(SLOT_RIGHT_HAND) & QUALITY_LIFESTEAL) == 0) return;   // the weapon in use does not have the property
 
     int heal = amount * LEBENSRAUB_PROZENT / 100;
     if (heal <= 0) return;
-    int fehlt = hero.GetAttributeMax("HP") - hero.GetAttribute("HP");   // nicht ueber das Maximum heilen
+    int fehlt = hero.GetAttributeMax("HP") - hero.GetAttribute("HP");   // do not heal above the maximum
     if (fehlt <= 0) return;
     if (heal > fehlt) heal = fehlt;
 

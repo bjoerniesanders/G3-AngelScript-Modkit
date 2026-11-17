@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// g3asm.dll - G3 AngelScript Modkit: AngelScript-Modding fuer Gothic 3.
-// Wird vom Loader (src/loader, Ersatz-dbghelp.dll; g3asm.ini [g3asm] enable=1) geladen und arbeitet mit der geladenen SharedBase.dll (Original oder Nachbau).
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// g3asm.dll - G3 AngelScript Modkit: AngelScript mods for Gothic 3.
+// The loader (src/loader, replacement dbghelp.dll; g3asm.ini [g3asm] enable=1) loads it. It works with the loaded SharedBase.dll (original or rebuild).
 //
-// Einhaengen ohne Code-Eingriff (vertraeglich mit dem Parallel-Universe-Patch): die Importtabelle von Gothic3.exe wird fuer vier
-// Lebenszyklus-Funktionen von eCApplication (Engine.dll) umgelenkt. Die EXE leitet ihre Anwendungsklasse von eCApplication ab und
-// ruft diese virtuellen Funktionen ueber Import-Thunks auf:
-//   OnPostInitializeModules -> Skript laden, main()        OnProcess -> OnFrame(dt), Neuladen bei Dateiaenderung
-//   OnWorldActivate / OnWorldDeactivate -> gleichnamige Skript-Ereignisse
-// Beim Laden durch den Loader sind die Importe der EXE eventuell noch nicht gebunden: ein Hilfsthread wartet darauf (hoechstens 60 s).
+// Connection without a code change (compatible with the Parallel Universe Patch): the code redirects the import table of Gothic3.exe for four
+// life-cycle functions of eCApplication (Engine.dll). The EXE derives its application class from eCApplication and
+// calls these virtual functions through import thunks:
+//   OnPostInitializeModules -> load the script, main()        OnProcess -> OnFrame(dt), reload when a file changes
+//   OnWorldActivate / OnWorldDeactivate -> script events with the same names
+// When the loader loads the DLL, the imports of the EXE are possibly not bound yet: a helper thread waits for this (maximum 60 s).
 //
-// ini [g3asm]: enable=0|1, script=g3asm\scripts\main.as (relativ zum Spielordner), hotreload=1
-// Protokoll: <Spielordner>\g3asm.log
+// ini [g3asm]: enable=0|1, script=g3asm\scripts\main.as (relative to the game folder), hotreload=1
+// Log: <game folder>\g3asm.log
 #include <windows.h>
 #include <xmmintrin.h>
 
@@ -31,7 +31,7 @@ namespace {
 
 ScriptHost g_host;
 std::string g_gameDir, g_scriptPath, g_modsDir;
-bool g_scriptIsDefault = true;   // script= nicht oder mit dem Standardwert eingetragen
+bool g_scriptIsDefault = true;   // script= not set or set to the default value
 bool g_hotReload = true, g_gameHooks = true, g_filePatches = true;
 FILE* g_log = nullptr;
 void (*g_hostLog)(const char*) = nullptr;
@@ -40,21 +40,21 @@ bool g_logLockInit = false;
 std::atomic<bool> g_initDone{false};
 bool g_mainRan = false;
 }   // namespace
-// Wer das Modkit gestartet hat (Protokollzeile); script_dll.cpp setzt es vor g3asm_start
+// which component started the modkit (log line); script_dll.cpp sets it before g3asm_start
 const char* g_startOrigin = "Loader (dbghelp.dll)";
 namespace {
 
-// Protokoll. Standard: sofort schreiben. Optional asynchron (ini [g3asm] asynclog=1): Der aufrufende Thread legt die Zeile nur in eine Warteschlange, ein
-// Hintergrund-Thread schreibt g3asm.log und reicht die Zeilen an den Loader (g3asm_loader.log) weiter. Entstanden beim Suchen der verwaschenen Texturen;
-// das Schreiben war nicht die Ursache (die war fninit in der AngelScript-Aufrufbruecke, siehe CMakeLists.txt CLEAR_FPU_STACK).
+// Log. Default: write immediately. Optionally asynchronous (ini [g3asm] asynclog=1): the calling thread only puts the line into a queue, and a
+// background thread writes g3asm.log and sends the lines to the loader (g3asm_loader.log). Made during the search for the blurred textures;
+// the write was not the cause (the cause was fninit in the AngelScript call bridge, see CMakeLists.txt CLEAR_FPU_STACK).
 bool g_asyncLog = false;
-bool g_logWrite = true;   // ini [g3asm] logwrite=0: nach dem Start (main gelaufen) keine Protokollzeilen mehr (nur fuer Tests)
-// Eine Meldung: Dateizeile mit Zeitstempel und Zeile fuer den Loader (ohne Zeitstempel, ganze Meldung wie frueher)
+bool g_logWrite = true;   // ini [g3asm] logwrite=0: after the start (main ran), no more log lines (only for tests)
+// One message: file line with a time stamp, and a line for the loader (without a time stamp, the full message as before)
 struct LogItem {
     std::string fileLine, hostLine;
 };
-std::vector<LogItem> g_logQueue;   // nur asynchron, geschuetzt durch g_logLock
-CRITICAL_SECTION g_writeLock;       // serialisiert das Schreiben (Aufrufer, Hintergrund-Thread, FlushLog)
+std::vector<LogItem> g_logQueue;   // only asynchronous, protected by g_logLock
+CRITICAL_SECTION g_writeLock;       // serializes the write (caller, background thread, FlushLog)
 HANDLE g_logEvent = nullptr;
 bool g_logThread = false;
 void InitLogLocks() {
@@ -63,7 +63,7 @@ void InitLogLocks() {
     InitializeCriticalSection(&g_writeLock);
     g_logLockInit = true;
 }
-// Schreibt die Datei unter g_writeLock; den Loader ruft sie danach ausserhalb der Sperre auf
+// writes the file under g_writeLock; then calls the loader outside the lock
 void WriteItems(const std::vector<LogItem>& items) {
     if (items.empty()) return;
     EnterCriticalSection(&g_writeLock);
@@ -107,8 +107,8 @@ void Log(const std::string& s) {
     LeaveCriticalSection(&g_logLock);
     if (g_logEvent) SetEvent(g_logEvent);
 }
-// Restliche Zeilen sofort schreiben. Nur beim Entladen per FreeLibrary aufrufen, NICHT beim Prozessende: dann sind die anderen Threads schon beendet,
-// einer koennte mitten in einer Sperre gestorben sein, und das Warten darauf liesse das Spiel beim Schliessen haengen.
+// Write the remaining lines immediately. Call this only at an unload with FreeLibrary, NOT at the end of the process: then the other threads are already stopped,
+// one could have died in the middle of a lock, and the wait for it would make the game hang when it closes.
 void FlushLog() {
     if (!g_logLockInit) return;
     std::vector<LogItem> batch;
@@ -118,7 +118,7 @@ void FlushLog() {
     WriteItems(batch);
 }
 
-// ---------------------------------------------------------------- Bildzeit aus der Engine
+// ---------------------------------------------------------------- frame time from the engine
 typedef void*(__stdcall* AppInstanceFn)();
 typedef float(__thiscall* AppFrameTimeFn)(const void*);
 AppInstanceFn g_appInstance = nullptr;
@@ -137,7 +137,7 @@ float FrameTime() {
     return g_appFrameTime(g_appInstance());
 }
 
-// ---------------------------------------------------------------- Importtabelle der EXE
+// ---------------------------------------------------------------- import table of the EXE
 typedef void(__thiscall* VoidMethod)(void*);
 enum HookId { kPostInit = 0, kProcess, kWorldActivate, kWorldDeactivate, kHookCount };
 const char* kHookNames[kHookCount] = {"?OnPostInitializeModules@eCApplication@@MAEXXZ", "?OnProcess@eCApplication@@UAEXXZ",
@@ -145,8 +145,8 @@ const char* kHookNames[kHookCount] = {"?OnPostInitializeModules@eCApplication@@M
 VoidMethod g_orig[kHookCount] = {};
 void** g_slot[kHookCount] = {};
 
-// Gleitkomma-Zustand der Engine (Diagnose): Genome rechnet mit x87-Steuerwort 007F (24 Bit, bCFPUAdmin). Geschuetzt wird er zentral in
-// ScriptHost::Execute (script_host.cpp); hier nur feste Messpunkte im Protokoll ("FPU-Zustand ..."), um eine Abweichung zu sehen.
+// Floating-point state of the engine (diagnostics): Genome calculates with the x87 control word 007F (24 bit, bCFPUAdmin). It is protected centrally in
+// ScriptHost::Execute (script_host.cpp). Here only fixed measurement points in the log ("FPU-Zustand ..."), to see a difference.
 unsigned short FpuCw() {
     unsigned short cw = 0;
     __asm fnstcw cw
@@ -154,7 +154,7 @@ unsigned short FpuCw() {
 }
 unsigned Mxcsr() { return _mm_getcsr(); }
 
-// Zustand protokollieren (fester Messpunkt): x87-Steuerwort und MXCSR
+// log the state (fixed measurement point): x87 control word and MXCSR
 void FpuState(const char* where) {
     char b[160];
     std::snprintf(b, sizeof b, "FPU-Zustand %s: x87-Steuerwort %04X, MXCSR %08X", where, FpuCw(), Mxcsr());
@@ -165,8 +165,8 @@ void RunMainOnce() {
     if (g_mainRan) return;
     g_mainRan = true;
     if (g_gameHooks) InstallGameHooks(g_host);
-    // Einzelskript (ini script=). Fehlt die Datei am Standardort, ist das der Normalfall bei Spielern (nur Mods, Script-DLL ohne ini): dann kein Eintrag
-    // und keine Fehlermeldung. Ein ausdruecklich eingetragener Pfad wird immer angelegt (Meldung, Hot-Reload greift, sobald die Datei entsteht).
+    // Single script (ini script=). If the file is missing at the default location, this is the normal case for players (only mods, script DLL without ini): then no entry
+    // and no error message. A path that is set explicitly is always added (message; hot reload works when the file is made).
     if (!g_scriptIsDefault || GetFileAttributesA(g_scriptPath.c_str()) != INVALID_FILE_ATTRIBUTES) g_host.AddScript("main", g_scriptPath);
     g_host.SetModsDir(g_modsDir);
     g_host.ScanMods();
@@ -174,10 +174,10 @@ void RunMainOnce() {
     g_host.CallMain();
     FpuState("nach main");
 }
-// Versionszeilen (Roadmap 2.2): Dateigroesse und PE-Zeitstempel der wichtigen Module, damit Fehlerberichte von anderen Installationen vergleichbar sind.
-// "Spielordner ja/nein" zeigt z. B. ein DXVK-d3d9.dll (liegt im Spielordner) gegenueber dem System-d3d9.dll. Der Pfad selbst wird nicht ausgegeben.
-// CRC32 (zlib-Polynom, wie 7-Zip/Python zlib.crc32) ueber den Dateiinhalt. Noetig, weil binaer gepatchte DLLs (Community-/PU-Patch-Varianten) dieselbe Groesse und
-// denselben PE-Zeitstempel haben koennen (gemessen 2026-11-07: Game.dll Steam-Installation vs. Entwicklerinstallation, 15701 Bytes anders). 0 bei Lesefehler.
+// Version lines (roadmap 2.2): file size and PE time stamp of the important modules, so that error reports from other installations are comparable.
+// "Spielordner ja/nein" (in the game folder yes/no) shows, for example, a DXVK d3d9.dll (in the game folder) against the system d3d9.dll. The path itself is not written.
+// CRC32 (zlib polynomial, as 7-Zip and Python zlib.crc32) over the file contents. Necessary, because DLLs that are patched in binary form (Community Patch or PU patch variants) can have the same size and
+// the same PE time stamp (measured 2026-11-07: Game.dll of the Steam installation against the development installation, 15701 bytes different). 0 for a read error.
 unsigned FileCrc32(const char* path, bool* ok) {
     static unsigned table[256];
     static bool init = false;
@@ -222,9 +222,9 @@ void LogModuleVersion(const char* name) {
                   static_cast<unsigned long>(nt->FileHeader.TimeDateStamp), crcText, inGameDir ? "ja" : "nein");
     Log(b);
 }
-// Voraussetzungen: Community Patch 1.75 und Parallel-Universe-Patch (PU). Nur Pruefung und Protokoll, das Modkit laeuft in jedem Fall weiter.
-// CP 1.75: PE-Zeitstempel der Gothic3.exe 4F959F4F (gleich in Entwicklerinstallation, Steam sauber und Steam gemoddet, gemessen 2026-11-13; die
-// Game.dll taugt nicht, gemoddete Installationen patchen sie binaer). PU: paru_s1.dll und scripts\Script_paru.dll im Spielordner.
+// Requirements: Community Patch 1.75 and Parallel Universe Patch (PU). Only a check and a log line. The modkit continues to run in all cases.
+// CP 1.75: PE time stamp of Gothic3.exe 4F959F4F (the same in the development installation, Steam clean and Steam modded, measured 2026-11-13; the
+// Game.dll is not usable, because modded installations patch it in binary form). PU: paru_s1.dll and scripts\Script_paru.dll in the game folder.
 void LogPrerequisites() {
     const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(GetModuleHandleA(nullptr));
     const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(reinterpret_cast<const char*>(dos) + dos->e_lfanew);
@@ -236,14 +236,14 @@ void LogPrerequisites() {
         Log("WARNUNG: G3ASM setzt Community Patch 1.75 und Parallel-Universe-Patch voraus; ohne sie ist es nicht getestet (Hooks pruefen ihre Bytes selbst)");
 }
 void LogModuleVersions() {
-    // Script.dll und Script_Game.dll laden erst nach OnPostInitializeModules (gemessen 2026-11-07); sie werden bei der ersten Weltaktivierung nachgetragen.
+    // Script.dll and Script_Game.dll load only after OnPostInitializeModules (measured 2026-11-07); the code adds them at the first world activation.
     static const char* kMods[] = {"Gothic3.exe", "Game.dll", "Engine.dll", "SharedBase.dll", "d3d9.dll"};
     for (const char* n : kMods) LogModuleVersion(n);
     LogPrerequisites();
 }
 void LogScriptModuleVersions() {
-    // Bei der ersten Weltaktivierung (Hauptmenue) sind beide oft noch nicht geladen (gemessen 2026-11-13, Steam sauber): dann bei der naechsten Aktivierung
-    // erneut versuchen, statt zweimal "nicht geladen" festzuschreiben.
+    // At the first world activation (main menu), the two are frequently not loaded yet (measured 2026-11-13, Steam clean): then try again at the next activation,
+    // in place of writing "nicht geladen" (not loaded) two times.
     static bool done = false;
     if (done) return;
     if (!GetModuleHandleA("Script.dll") || !GetModuleHandleA("Script_Game.dll")) return;
@@ -257,17 +257,17 @@ void __fastcall HPostInit(void* self, void*) {
     LogModuleVersions();
     RunMainOnce();
 }
-// ---------------------------------------------------------------- Windows-Menuetaste ohne Piepton
-// F10 (und Alt allein / Alt+Buchstabe) schaltet Windows in den Menuemodus; das Spielfenster hat kein Menue,
-// daher piept DefWindowProc beim naechsten Tastendruck. SC_KEYMENU und WM_SYSCHAR werden geschluckt,
-// alles andere (auch WM_SYSKEYDOWN fuer Alt+F4/Alt+Enter) geht unveraendert an die Fensterprozedur des Spiels.
+// ---------------------------------------------------------------- Windows menu key without a beep
+// F10 (and Alt alone or Alt+letter) puts Windows into the menu mode. The game window has no menu,
+// thus DefWindowProc beeps at the next key push. The code discards SC_KEYMENU and WM_SYSCHAR.
+// All other messages (also WM_SYSKEYDOWN for Alt+F4/Alt+Enter) go without changes to the window procedure of the game.
 WNDPROC g_origWndProc = nullptr;
 bool g_wndUnicode = false;
 LRESULT CALLBACK QuietWndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_SYSCOMMAND && (wp & 0xFFF0) == SC_KEYMENU) return 0;
     if (msg == WM_SYSCHAR) return 0;
     if (msg == WM_MENUCHAR) return MAKELRESULT(0, MNC_CLOSE);
-    // Tasten-Ereignis fuer Skripte (OnKey); Wiederholung (Bit 30) wird nicht gemeldet, die Nachricht geht immer weiter ans Spiel
+    // key event for scripts (OnKey); a repeat (bit 30) is not reported, and the message always continues to the game
     if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) {
         if (!(lp & (1 << 30))) g_host.CallKey(static_cast<int>(wp), true);
     } else if (msg == WM_KEYUP || msg == WM_SYSKEYUP)
@@ -278,7 +278,7 @@ void InstallQuietMenu() {
     static unsigned lastTry = 0;
     if (g_origWndProc) return;
     const unsigned now = GetTickCount();
-    if (now - lastTry < 1000) return;   // Fenstersuche hoechstens einmal je Sekunde
+    if (now - lastTry < 1000) return;   // window search maximum 1 time each second
     lastTry = now;
     HWND h = GameWindow();
     if (!h) return;
@@ -293,8 +293,8 @@ void InstallQuietMenu() {
     Log("Menuetaste stumm (F10/Alt ohne Windows-Piepton)");
 }
 
-// Speichermessung (Diagnose, ini [g3asm] memlog=1, Standard aus): alle 30 s freier Speicher und Adressraum wie von GlobalMemoryStatusEx (das auch die Engine liest)
-// ins Protokoll, Zeilen "Speicher: ..." (nur Lesen, aendert nichts).
+// Memory measurement (diagnostics, ini [g3asm] memlog=1, default off): each 30 s, the free memory and the address space as from GlobalMemoryStatusEx (which the engine also reads)
+// to the log, lines "Speicher: ..." (read only, changes nothing).
 bool g_memLog = false;
 void MemoryProbe() {
     if (!g_memLog) return;
@@ -319,9 +319,9 @@ void MemoryProbe() {
                   m.ullTotalVirtual >> 20, m.dwMemoryLoad, freeV < 400 ? "  <-- Adressraum knapp" : "");
     Log(b);
 }
-// Ladepause (ini [g3asm] loadpause=<Sekunden>, 0 = aus): Waehrend eine Welt geladen wird (OnWorldDeactivate bis OnWorldActivate) und bis loadpause Sekunden
-// nach dem letzten OnWorldActivate wird OnFrame der Skripte nicht aufgerufen. Test fuer "verwaschene Gebaeude-Texturen nach dem Laden": Der Lader holt die
-// Gebaeude in dieser Zeit nach; jeder Skriptaufruf in C++ hat sie gestoert (gemessen 2026-11-06).
+// Load pause (ini [g3asm] loadpause=<seconds>, 0 = off): while a world loads (OnWorldDeactivate to OnWorldActivate) and until loadpause seconds
+// after the last OnWorldActivate, the modkit does not call OnFrame of the scripts. Test for "blurred building textures after a load": the loader gets the
+// buildings during this time. Each script call in C++ disturbed them (measured 2026-11-06).
 unsigned g_loadPauseMs = 0;
 bool g_inWorldLoad = false;
 unsigned g_lastActivate = 0;
@@ -339,7 +339,7 @@ void __fastcall HProcess(void* self, void*) {
     g_orig[kProcess](self);
     MemoryProbe();
     InstallQuietMenu();
-    if (!g_mainRan) RunMainOnce();   // falls OnPostInitializeModules vor dem Einhaengen lief
+    if (!g_mainRan) RunMainOnce();   // in case OnPostInitializeModules ran before the hook was installed
     if (g_hotReload) g_host.CheckReload();
     static bool firstFrame = true;
     if (firstFrame) {
@@ -400,7 +400,7 @@ bool InExe(const void* p) {
     return p >= base && p < base + nt->OptionalHeader.SizeOfImage;
 }
 
-// Patcht alle Plaetze, deren Import schon gebunden ist (Zeiger ausserhalb der EXE). Rueckgabe: Anzahl noch offener Plaetze.
+// Patches all slots whose import is already bound (pointer outside the EXE). Return value: the number of slots that are still open.
 int PatchBoundSlots() {
     int open = 0;
     for (int h = 0; h < kHookCount; ++h) {
@@ -409,7 +409,7 @@ int PatchBoundSlots() {
         if (!cur || InExe(cur)) {
             ++open;
             continue;
-        }   // noch nicht gebunden (enthaelt RVA des Namens)
+        }   // not bound yet (contains the RVA of the name)
         HMODULE eng = GetModuleHandleA("Engine.dll");
         void* exp = eng ? reinterpret_cast<void*>(GetProcAddress(eng, kHookNames[h])) : nullptr;
         g_orig[h] = reinterpret_cast<VoidMethod>(cur);
@@ -437,7 +437,7 @@ bool InitCommon(HMODULE sb, const char* gameDir, void (*hostLog)(const char*)) {
     g_hostLog = hostLog;
     g_gameDir = gameDir ? gameDir : "";
     if (!g_gameDir.empty() && g_gameDir.back() != '\\' && g_gameDir.back() != '/') g_gameDir += '\\';
-    g_log = _fsopen((g_gameDir + "g3asm.log").c_str(), "w", _SH_DENYNO);   // waehrend des Spiels lesbar
+    g_log = _fsopen((g_gameDir + "g3asm.log").c_str(), "w", _SH_DENYNO);   // readable during the game
     if (!g_sb.Resolve(sb ? sb : GetModuleHandleA("SharedBase.dll"))) {
         Log("SharedBase-Exporte fuer bCString fehlen - Abbruch: " + g_sb.missing);
         return false;
@@ -449,36 +449,36 @@ bool InitCommon(HMODULE sb, const char* gameDir, void (*hostLog)(const char*)) {
 
 }   // namespace
 
-// Fuer Tests: Host ohne Spiel-Hooks anlegen
+// for tests: make the host without game hooks
 extern "C" __declspec(dllexport) int g3asm_init(HMODULE sharedBase, const char* logDir, void (*hostLog)(const char*)) {
-    SetLoadDefaultOffMods(true);   // Testprogramm: auch Beispiel-Mods mit mod.ini enabled=0 laden (Kompilierpruefung aller Beispiele)
-    if (const char* ai = std::getenv("G3ASM_TEST_AITRACE")) {   // Testprogramm: Einhaengen von KI-Tracer und Geschwindigkeitsmessung pruefen
+    SetLoadDefaultOffMods(true);   // test program: also load example mods with mod.ini enabled=0 (compile check of all examples)
+    if (const char* ai = std::getenv("G3ASM_TEST_AITRACE")) {   // test program: check the installation of the AI tracer and the speed measurement
         SetAiTraceOptions(*ai == '1', "", 50);
         SetAniSpeedLog(*ai == '1');
     }
     return InitCommon(sharedBase, logDir, hostLog) ? 1 : 0;
 }
 
-// Fuer Tests: gepackte Mods aus <gameDir>\Data\G3ASM.* nach modsDir entpacken; Rueckgabe = Zahl bereiter Mods
+// for tests: unpack packed mods from <gameDir>\Data\G3ASM.* to modsDir; return value = number of ready mods
 extern "C" __declspec(dllexport) int g3asm_extract_packed(const char* gameDir, const char* modsDir) {
     std::string g = gameDir ? gameDir : "";
     if (!g.empty() && g.back() != '\\' && g.back() != '/') g += '\\';
     return ExtractPackedMods(g, modsDir ? modsDir : "", [](const std::string& s) { Log(s); });
 }
 
-// Fuer Tests: Datei-Patches auf ein Testverzeichnis anwenden
+// for tests: apply file patches to a test directory
 extern "C" __declspec(dllexport) int g3asm_apply_patches(const char* gameDir, const char* modsDir) {
     return ApplyScriptPatches(gameDir, modsDir, [](const std::string& s) { Log(s); });
 }
 
-// Fuer Tests: Spielereignis-Hooks einhaengen (Game.dll muss geladen sein); Rueckgabe = Zahl aktiver Hooks
+// for tests: install game event hooks (Game.dll must be loaded); return value = number of active hooks
 extern "C" __declspec(dllexport) int g3asm_install_hooks() { return InstallGameHooks(g_host); }
 
-// Fuer Tests: Skriptdatei laden und main() ausfuehren; Rueckgabe = Anzahl fehlgeschlagener check()-Aufrufe, -1 bei Ladefehler
+// for tests: load a script file and run main(); return value = number of failed check() calls, -1 for a load error
 extern "C" __declspec(dllexport) int g3asm_run_file(const char* path) {
     const DWORD attr = GetFileAttributesA(path);
     const bool dirMode = attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY);
-    if (dirMode) {   // Mod-Ordner (Tests)
+    if (dirMode) {   // mod folder (tests)
         g_host.SetModsDir(path);
         g_host.ScanMods();
         if (!g_host.Loaded()) return -1;
@@ -488,7 +488,7 @@ extern "C" __declspec(dllexport) int g3asm_run_file(const char* path) {
                 if (_stricmp(names[i].c_str(), n) == 0) return int(i);
             return -1;
         };
-        if (idx("a_nach_alpha") >= 0) {   // tests\mods: Abhaengigkeiten aus mod.ini (API 40)
+        if (idx("a_nach_alpha") >= 0) {   // tests\mods: dependencies from mod.ini (API 40)
             g_host.Check(idx("a_nach_alpha") > idx("alpha") && idx("a_nach_alpha") > idx("zeta"),
                          "Abhaengigkeit: benoetigte Mods laden vor der Mod, die sie braucht");
             g_host.Check(idx("braucht_fehlt") < 0 && idx("braucht_gesperrt") < 0 && idx("braucht_aus") < 0 && idx("braucht_neu") < 0 &&
@@ -498,15 +498,15 @@ extern "C" __declspec(dllexport) int g3asm_run_file(const char* path) {
     } else if (!g_host.Load(path))
         return -1;
     g_host.CallMain();
-    {   // Ereignisse mit Argumenten (ohne Spiel: ungueltige Entities)
+    {   // events with arguments (without the game: entities that are not valid)
         SStr id("GUID-123"), nm("It_Test");
         EvArg a[] = {EvArg::Ent(nullptr), EvArg::Ent(nullptr), EvArg::Str(&nm), EvArg::Str(&id), EvArg::U(7)};
         g_host.CallEvent("void OnReceiveItem(Entity, Entity, const bCString &in, const bCString &in, uint)", a, 5);
         g_host.CallEvent("void OnNPCKilled(Entity)", a, 1);
-        EvArg n[] = {EvArg::Ent(nullptr), EvArg::Str(nullptr)};   // Nullzeiger aus der Engine: das Skript bekommt einen leeren Text
+        EvArg n[] = {EvArg::Ent(nullptr), EvArg::Str(nullptr)};   // null pointer from the engine: the script gets an empty text
         g_host.CallEvent("void OnEnter(Entity, const bCString &in)", n, 2);
     }
-    {   // Override-Kette: Super() ruft das "Original", Rueckgabe wird vom Skript veraendert; ohne Super() wird das Original uebersprungen
+    {   // override chain: Super() calls the "original", the script changes the return value; without Super(), the original is skipped
         EvArg a[] = {EvArg::U(5)};
         bool res = true, orig = false;
         bool handled = g_host.CallOverride(
@@ -516,7 +516,7 @@ extern "C" __declspec(dllexport) int g3asm_run_file(const char* path) {
                 return true;
             },
             &res, &orig);
-        if (dirMode) {   // Kette ueber mehrere Mods (zeta -> alpha -> Original): beide rufen Super(), Ergebnis bleibt wahr
+        if (dirMode) {   // chain across more than one mod (zeta -> alpha -> original): the two call Super(), the result stays true
             g_host.Check(handled && orig && res, "Override-Kette ueber mehrere Mods: Original am Ende, Ergebnis unveraendert");
         } else {
             g_host.Check(handled && orig && !res, "Override mit Super(): Original lief, Ergebnis vom Skript umgekehrt");
@@ -531,7 +531,7 @@ extern "C" __declspec(dllexport) int g3asm_run_file(const char* path) {
                 &res, &orig);
             g_host.Check(handled && !orig && res, "Override ohne Super(): Original uebersprungen, Ergebnis vom Skript");
         }
-        if (!dirMode) {   // Argument aendern: die Mod verdoppelt es (SetOverrideArg), Super() reicht es ans Original weiter
+        if (!dirMode) {   // change an argument: the mod doubles it (SetOverrideArg), Super() gives it to the original
             EvArg b[] = {EvArg::U(5)};
             unsigned seen = 0;
             res = false;
@@ -560,15 +560,15 @@ extern "C" __declspec(dllexport) int g3asm_run_file(const char* path) {
     return g_host.Failures();
 }
 
-// Spielbetrieb (vom Proxy): Host anlegen und in die Importtabelle der EXE einhaengen
+// game mode (from the proxy): make the host and connect it to the import table of the EXE
 extern "C" __declspec(dllexport) int g3asm_start(HMODULE sharedBase, const char* ini, const char* gameDir,
                                                      void (*hostLog)(const char*)) {
     if (!InitCommon(sharedBase, gameDir, hostLog)) return 0;
     char script[MAX_PATH] = "g3asm\\scripts\\main.as", modsRel[MAX_PATH] = "g3asm\\mods";
     bool packedMods = true;
     if (ini && *ini) {
-        // Abschnitt [g3asm]; fehlt er, gilt der fruehere Name [patch] (aeltere ini, og3_hooks.ini des Hauptrepos)
-        // IniFile: wie GetPrivateProfile*, liest aber auch Dateien mit UTF-8-BOM (ini_file.h)
+        // section [g3asm]; if it is missing, the previous name [patch] applies (older ini, og3_hooks.ini of the main repository)
+        // IniFile: as GetPrivateProfile*, but also reads files with UTF-8 BOM (ini_file.h)
         const IniFile cfg(ini);
         if (cfg.Bom()) Log(std::string("Hinweis: ") + ini + " beginnt mit UTF-8-BOM (wird beruecksichtigt)");
         const char* sec = cfg.HasSection("g3asm") ? "g3asm" : "patch";
@@ -595,9 +595,9 @@ extern "C" __declspec(dllexport) int g3asm_start(HMODULE sharedBase, const char*
     g_scriptIsDefault = _stricmp(script, "g3asm\\scripts\\main.as") == 0;
     g_scriptPath = (script[1] == ':' || script[0] == '\\') ? std::string(script) : g_gameDir + script;
     Log(std::string("Gestartet ueber: ") + g_startOrigin);
-    if (packedMods) ExtractPackedMods(g_gameDir, g_modsDir, [](const std::string& s) { Log(s); });   // Data\G3ASM.* -> Mod-Ordner
+    if (packedMods) ExtractPackedMods(g_gameDir, g_modsDir, [](const std::string& s) { Log(s); });   // Data\G3ASM.* -> mod folder
     if (g_filePatches)
-        ApplyScriptPatches(g_gameDir, g_modsDir, [](const std::string& s) { Log(s); });   // vor dem ersten Lesen der Daten durch das Spiel
+        ApplyScriptPatches(g_gameDir, g_modsDir, [](const std::string& s) { Log(s); });   // before the game reads the data for the first time
     Log("Skript: " + g_scriptPath + (g_hotReload ? " (Neuladen bei Aenderung an)" : "") + ", Mod-Ordner: " + g_modsDir);
     if (!FindExeSlots()) {
         Log("Gothic3.exe importiert die eCApplication-Ereignisse nicht - nur ohne Spiel-Ereignisse nutzbar");
@@ -610,6 +610,6 @@ extern "C" __declspec(dllexport) int g3asm_start(HMODULE sharedBase, const char*
 BOOL WINAPI DllMain(HINSTANCE h, DWORD reason, void* reserved) {
     if (reason == DLL_PROCESS_ATTACH) DisableThreadLibraryCalls(h);
     if (reason == DLL_PROCESS_DETACH && !reserved && g_initDone) { Log("Ende"); }
-    if (reason == DLL_PROCESS_DETACH && !reserved) FlushLog();   // nur beim Entladen per FreeLibrary, nicht beim Prozessende (siehe FlushLog)
+    if (reason == DLL_PROCESS_DETACH && !reserved) FlushLog();   // only at an unload with FreeLibrary, not at the end of the process (see FlushLog)
     return TRUE;
 }

@@ -1,7 +1,7 @@
-// Fokus und Fadenkreuz.
-//   Pos1  meldet das anvisierte Entity (Fokus), das Entity unter dem Fadenkreuz und den Zielpunkt der Welt (Name, Abstand, Position, Weltmatrix)
-//   Entf  entfernt den NPC unter dem Fadenkreuz, wenn er per SpawnNPC erzeugt wurde (Welt-NPCs bleiben)
-// Protokoll: g3asm.log.
+// Focus and crosshair.
+//   Home    reports the focused entity, the entity below the crosshair and the target point in the world (name, distance, position, world matrix)
+//   Delete  removes the NPC below the crosshair if SpawnNPC made it (world NPCs stay)
+// Log: g3asm.log.
 
 bCString Beschreibe(const bCString &in was, Entity e, Entity held) {
     if (!e.IsValid()) return was + ": nichts";

@@ -127,7 +127,7 @@ SStr StrLower(const SStr& s) {
     return r;
 }
 
-// Literale: konstante bCString-Objekte, nach Inhalt zusammengelegt
+// literals: constant bCString objects, merged by contents
 class StrFactory : public asIStringFactory {
 public:
     const void* GetStringConstant(const char* data, asUINT length) override {
@@ -148,7 +148,7 @@ public:
         if (--t->second.refs == 0) {
             byText_.erase(t);
             byPtr_.erase(p);
-        }   // erase gibt das SStr ueber unique_ptr frei
+        }   // erase frees the SStr through unique_ptr
         return asSUCCESS;
     }
     int GetRawStringData(const void* str, char* data, asUINT* length) const override {
@@ -249,7 +249,7 @@ void M3RotX(SMat3& m, float a) { g_sb.m3RotX(&m, a); }
 void M3RotY(SMat3& m, float a) { g_sb.m3RotY(&m, a); }
 void M3RotZ(SMat3& m, float a) { g_sb.m3RotZ(&m, a); }
 void M3FromQuat(SMat3& m, const SQuat& q) { g_sb.m3FromQuat(&m, &q); }
-// bCMatrix4 (= bCMatrix der Engine, 4x4): Zeilenvektor-Konvention v' = v * M, Zeilen 0..2 = Achsen, Zeile 3 = Verschiebung
+// bCMatrix4 (= bCMatrix of the engine, 4x4): row vector convention v' = v * M, rows 0..2 = axes, row 3 = translation
 void M4Construct(void* m) {
     SMat4* p = new (m) SMat4;
     g_sb.m4Identity(p);
@@ -290,7 +290,7 @@ void M4SetTranslation(SMat4& m, const SVec3& v) {
     m.m[12] = v.x;
     m.m[13] = v.y;
     m.m[14] = v.z;
-}   // nur Zeile 3, der Rest bleibt
+}   // only row 3, the rest stays
 void M4ToTranslation(SMat4& m, const SVec3& v) { g_sb.m4Translation(&m, &v); }
 void M4ToScaling(SMat4& m, const SVec3& v) { g_sb.m4Scaling(&m, &v); }
 void M4ToRotation(SMat4& m, const SQuat& q) { g_sb.m4FromQuat(&m, &q); }
@@ -310,8 +310,8 @@ SQuat M4Quaternion(const SMat4& m) {
     return q;
 }
 
-// ---------------------------------------------------------------- globale Funktionen
-bool g_printToGameLog = true;   // ini [g3asm] printgame=0: print() schreibt nur ins eigene Protokoll, nicht zusaetzlich ins Spielprotokoll (geInfo)
+// ---------------------------------------------------------------- global functions
+bool g_printToGameLog = true;   // ini [g3asm] printgame=0: print() writes only to the modkit log, not also to the log of the game (geInfo)
 void Print(const SStr& s) {
     if (ScriptHost::s_current) ScriptHost::s_current->Log(std::string("[") + ScriptHost::s_current->CurrentMod() + "] " + s.c_str());
     if (g_printToGameLog && g_sb.geInfo) g_sb.geInfo("g3asm-Skript: %s", s.c_str());
@@ -356,7 +356,7 @@ unsigned GetTimeStamp() {
     return f ? unsigned(f()) : GetTickCount();
 }
 int GetApiVersion() { return G3ASM_SCRIPT_API_VERSION; }
-bool IsModActive(const SStr& name);   // Mod-Abhaengigkeiten, weiter unten bei DiscoverMods
+bool IsModActive(const SStr& name);   // mod dependencies, below at DiscoverMods
 SStr CallModScript(const SStr& mod, const SStr& func, const SStr& arg) {
     SStr out;
     if (ScriptHost::s_current) ScriptHost::s_current->CallModText(mod.c_str(), func.c_str(), &arg, &out);
@@ -368,7 +368,7 @@ bool ModFunctionExistsScript(const SStr& mod, const SStr& func) {
 int SendModMessageScript(const SStr& topic, const SStr& data) { return ScriptHost::s_current ? ScriptHost::s_current->SendModMessage(&topic, &data) : 0; }
 SStr GetModVersion(const SStr& name);
 
-// Fenster/Eingabe/Ton (Windows): das Spielfenster = groesstes sichtbares Hauptfenster dieses Prozesses
+// window, input, sound (Windows): the game window = largest visible main window of this process
 HWND FindGameWindow() {
     static HWND cached = nullptr;
     if (cached && IsWindow(cached)) return cached;
@@ -402,7 +402,7 @@ bool IsKeyDown(int vk) {
     HWND fg = GetForegroundWindow();
     DWORD pid = 0;
     GetWindowThreadProcessId(fg, &pid);
-    if (pid != GetCurrentProcessId()) return false;   // nur, wenn das Spiel im Vordergrund ist
+    if (pid != GetCurrentProcessId()) return false;   // only if the game is in the foreground
     return (GetAsyncKeyState(vk) & 0x8000) != 0;
 }
 void PlaySystemSound() { MessageBeep(MB_ICONASTERISK); }
@@ -416,7 +416,7 @@ void MessageCallback(const asSMessageInfo* msg, void*) {
     if (ScriptHost::s_current) ScriptHost::s_current->Log(b);
 }
 
-// Schutz gegen Endlosschleifen: ein Aufruf darf hoechstens 5 s laufen
+// protection against endless loops: a call can run for a maximum of 5 s
 struct Timeout {
     unsigned startTick;
 };
@@ -513,7 +513,7 @@ bool RegisterAll(asIScriptEngine* e) {
     G3ASM_REG(e->RegisterObjectMethod("bCVector4", "float GetMagnitude() const", asFUNCTION(V4Mag), asCALL_CDECL_OBJFIRST));
     G3ASM_REG(e->RegisterObjectMethod("bCVector4", "void Normalize()", asFUNCTION(V4Normalize), asCALL_CDECL_OBJFIRST));
 
-    // bCQuaternion / bCMatrix3 (Matrix zuerst deklarieren, beide verweisen aufeinander)
+    // bCQuaternion / bCMatrix3 (declare the matrix first, the two refer to each other)
     G3ASM_REG(e->RegisterObjectType("bCQuaternion", sizeof(SQuat),
                                   asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_ALLFLOATS | asGetTypeTraits<SQuat>()));
     G3ASM_REG(
@@ -647,7 +647,7 @@ const char* SafeStrText(const void* s, const char* fallback) {
 
 bool ReadableMem(const void* p, size_t n) {
     const uintptr_t start = reinterpret_cast<uintptr_t>(p);
-    if (start < 0x10000 || n == 0) return false;   // Nullzeiger-Bereich: Zahlen, Flags, Zaehler - keine Zeiger
+    if (start < 0x10000 || n == 0) return false;   // null pointer area: numbers, flags, counters - no pointers
     uintptr_t addr = start;
     const uintptr_t end = start + n;
     if (end < start) return false;
@@ -726,7 +726,7 @@ void ScriptHost::Unload(Mod& m) {
 
 bool ScriptHost::Build(Mod& m) {
     Unload(m);
-    m.mtime = FileTime(m.path);   // auch bei Fehlern merken: erst bei neuer Aenderung wieder versuchen
+    m.mtime = FileTime(m.path);   // keep it also for errors: try again only at a new change
     if (!m.mtime) {
         Log("[" + m.name + "] Skript nicht gefunden: " + m.path);
         return false;
@@ -772,9 +772,9 @@ bool ScriptHost::Load(const std::string& path) {
     return AddScript("main", path);
 }
 
-// Gleitkomma-Zustand der Engine schuetzen (gefunden 2026-11-06): Genome rechnet mit x87-Steuerwort 007F (24 Bit Genauigkeit, bCFPUAdmin). Beim ersten Skriptaufruf,
-// der in C++ springt, setzt etwas im Modkit die x87-Einheit auf den Windows-Standard 037F (64 Bit) zurueck. Ohne Schutz rechnete die Engine danach die ganze Sitzung
-// mit falscher Genauigkeit weiter: Gebaeude-Texturen blieben nach dem Laden verwaschen. Jeder Skriptaufruf stellt deshalb x87-Steuerwort und MXCSR danach wieder her.
+// Protect the floating-point state of the engine (found 2026-11-06): Genome calculates with the x87 control word 007F (24-bit precision, bCFPUAdmin). At the first script call
+// that jumps into C++, something in the modkit resets the x87 unit to the Windows default 037F (64 bit). Without protection, the engine then calculated for the full session
+// with an incorrect precision: building textures stayed blurred after a load. Thus each script call restores the x87 control word and MXCSR after it.
 namespace {
 unsigned short FpuControlWord() {
     unsigned short cw = 0;
@@ -795,7 +795,7 @@ struct FpuRestore {
     unsigned mx;
     FpuRestore(ScriptHost* h, const asIScriptFunction* f) : host(h), fn(f), cw(FpuControlWord()), mx(FpuMxcsr()) {}
     ~FpuRestore() {
-        // MXCSR-Bits 0-5 sind Merkbits fuer Ausnahmen, die normale Rechnungen setzen (z. B. "ungenau"): nur die Steuerbits vergleichen und zuruecksetzen
+        // MXCSR bits 0-5 are flag bits for exceptions that normal calculations set (for example "inexact"): compare and reset only the control bits
         const unsigned kFlags = 0x3F;
         const unsigned short cw2 = FpuControlWord();
         const unsigned mx2 = FpuMxcsr();
@@ -818,8 +818,8 @@ struct FpuRestore {
 bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const bool* argBool, const EvArg* ev, int nev, bool* retBool, void* retText) {
     asIScriptFunction* f = static_cast<asIScriptFunction*>(fp);
     FpuRestore fpu(this, f);
-    const bool nested = ctx_->GetState() == asEXECUTION_ACTIVE;   // Ereignis feuert, waehrend ein Skript laeuft
-    auto failOnce = [&](const char* what, int code) {   // sonst stille Fehlschlaege: je Funktion einmal melden
+    const bool nested = ctx_->GetState() == asEXECUTION_ACTIVE;   // an event fires while a script runs
+    auto failOnce = [&](const char* what, int code) {   // if not, silent failures: report 1 time for each function
         static std::set<const void*> seen;
         if (seen.insert(f).second) Log(std::string(what) + " fehlgeschlagen (" + std::to_string(code) + ") fuer " + f->GetDeclaration() + " in [" + curMod_ + "]");
         return false;
@@ -847,7 +847,7 @@ bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const boo
             } e{const_cast<void*>(ev[i].ptr)};
             ctx_->SetArgObject(i, &e);
         } else if (ev[i].kind == EvArg::Text) {
-            // const bCString &in darf nie null sein (das Skript stuerzte beim ersten Zugriff ab): dann ein leerer Text
+            // const bCString &in must never be null (the script crashed at the first access): then an empty text
             static SStr* empty = nullptr;
             const void* s = ev[i].ptr;
             if (!s) {
@@ -859,8 +859,8 @@ bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const boo
         } else
             ctx_->SetArgDWord(i, ev[i].value);
     }
-    // Der Zeit-Waechter gehoert zum Kontext, nicht zum gesicherten Zustand: ein verschachtelter Aufruf laesst den des aeusseren Aufrufs stehen
-    // (dessen 5 s laufen weiter). Frueher loeschte der innere Aufruf ihn, und das aeussere Skript lief danach ohne Schleifenschutz.
+    // The time guard belongs to the context, not to the saved state: a nested call leaves the guard of the outer call
+    // (its 5 s continue). Previously, the inner call deleted it, and the outer script then ran without loop protection.
     Timeout t{GetTickCount()};
     if (!nested) ctx_->SetLineCallback(asFUNCTION(LineCallback), &t, asCALL_CDECL);
     const int r = ctx_->Execute();
@@ -914,10 +914,10 @@ asIScriptFunction* ScriptHost::FindFn(Mod& m, const char* decl) {
     return f;
 }
 
-static bool DropForeignThread(ScriptHost* host, const char* decl);   // weiter unten, bei CallEvent
+static bool DropForeignThread(ScriptHost* host, const char* decl);   // below, at CallEvent
 
 bool ScriptHost::HasHandler(const char* decl) {
-    if (DropForeignThread(this, decl)) return false;   // FindFn schreibt in den Cache der Mod: nur im Spiel-Thread
+    if (DropForeignThread(this, decl)) return false;   // FindFn writes into the cache of the mod: only in the game thread
     for (Mod& m : mods_)
         if (FindFn(m, decl)) return true;
     return false;
@@ -925,7 +925,7 @@ bool ScriptHost::HasHandler(const char* decl) {
 
 bool ScriptHost::CallOverride(const char* decl, const EvArg* args, int n, std::function<bool(const EvArg*)> original, bool* result,
                               bool* originalCalled, EvArg* finalArgs) {
-    if (!HasHandler(decl)) return false;   // auch aus einem fremden Thread: der Aufrufer nimmt dann sein Original
+    if (!HasHandler(decl)) return false;   // also from a different thread: the caller then uses its original
     chain_.emplace_back();
     const size_t idx = chain_.size() - 1;
     Chain& c0 = chain_[idx];
@@ -941,9 +941,9 @@ bool ScriptHost::CallOverride(const char* decl, const EvArg* args, int n, std::f
         chain_[idx].next = i + 1;
         curMod_ = mods_[i].name;
         ok = Execute(f, nullptr, nullptr, nullptr, chain_[idx].args, chain_[idx].n, &ret);
-        if (!ok) break;   // Fehler im Skript: Rueckfall unten
+        if (!ok) break;   // error in the script: fallback below
     }
-    if (!ok) {   // Skriptfehler: das Spiel soll sein Original bekommen
+    if (!ok) {   // script error: the game must get its original
         if (!chain_[idx].originalCalled) {
             chain_[idx].originalCalled = true;
             ret = chain_[idx].original(chain_[idx].args);
@@ -972,7 +972,7 @@ bool ScriptHost::ChainSuper() {
         curMod_ = saved;
         return ok ? ret : false;
     }
-    chain_[idx].originalCalled = true;   // Ende der Kette: das Original der Spielfunktion
+    chain_[idx].originalCalled = true;   // end of the chain: the original of the game function
     return chain_[idx].original(chain_[idx].args);
 }
 
@@ -1000,10 +1000,10 @@ bool ScriptHost::GetOverrideArg(int index, unsigned* value) const {
     return true;
 }
 
-// Skripte laufen nur im Spiel-Thread: Es gibt einen einzigen AngelScript-Kontext und eine Override-Kette, beide ohne Sperre. Ruft das Spiel eine
-// eingehaengte Funktion aus einem anderen Thread, wird das Ereignis nicht an die Skripte gemeldet (Overrides: das Spiel bekommt sein Original).
-// Die ersten Faelle stehen im Protokoll; ob eine Mod das Ereignis ueberhaupt behandelt haette, wird dabei nicht geprueft (schon die Suche danach
-// schreibt in den Cache der Mod). Hooks auf haeufigen Wegen pruefen den Thread schon selbst (OnGameThread), bevor sie hier ankommen.
+// Scripts run only in the game thread: there is one AngelScript context and one override chain, both without a lock. If the game calls a
+// hooked function from a different thread, the event is not reported to the scripts (overrides: the game gets its original).
+// The log shows the first cases. The code does not check if a mod would have handled the event (the search for it already
+// writes into the cache of the mod). Hooks on frequent paths check the thread themselves (OnGameThread) before they come here.
 static bool DropForeignThread(ScriptHost* host, const char* decl) {
     if (!OnForeignThread()) return false;
     static volatile long logged = 0;
@@ -1037,7 +1037,7 @@ void ScriptHost::CallFrame(float dt) {
 }
 
 void ScriptHost::CallKey(int vk, bool down) {
-    if (busyKey_) return;   // Nachrichten, die waehrend eines Skriptaufrufs eintreffen, nicht verschachteln
+    if (busyKey_) return;   // do not nest messages that come during a script call
     busyKey_ = true;
     for (size_t i = 0; i < mods_.size(); ++i)
         if (mods_[i].module && mods_[i].fKey) {
@@ -1047,7 +1047,7 @@ void ScriptHost::CallKey(int vk, bool down) {
     busyKey_ = false;
 }
 
-// ---------------------------------------------------------------- Zwischen Mods (ab Version 44)
+// ---------------------------------------------------------------- between mods (from version 44)
 std::string ScriptHost::ModDir(const std::string& mod) const {
     for (const Mod& m : mods_)
         if (_stricmp(m.name.c_str(), mod.c_str()) == 0) {
@@ -1122,7 +1122,7 @@ int ScriptHost::SendModMessage(const void* topic, const void* data) {
     return n;
 }
 
-// stringtable.ini einer Mod: im Mod-Ordner oder, wie beim Union Starter, unter ModFiles\ (leer, wenn keine vorhanden ist)
+// stringtable.ini of a mod: in the mod folder or, as for the Union Starter, in ModFiles\ (empty if there is none)
 static std::string ModStringTablePath(const std::string& modBase) {
     const std::string a = modBase + "\\stringtable.ini", b = modBase + "\\ModFiles\\stringtable.ini";
     if (GetFileAttributesA(a.c_str()) != INVALID_FILE_ATTRIBUTES) return a;
@@ -1130,13 +1130,13 @@ static std::string ModStringTablePath(const std::string& modBase) {
     return std::string();
 }
 
-// Mod-Namen in Ladereihenfolge (load_order.txt, dann alphabetisch), abgeschaltete weggelassen
-// Beispiel- und Test-Mods sind standardmaessig aus: <Mod>\mod.ini mit [mod] enabled=0. Sie werden nur geladen, wenn load_order.txt sie mit "+name"
-// zuschaltet. Mods ohne mod.ini (oder mit enabled=1) laden wie bisher, ausser "-name" schaltet sie ab. Das Testprogramm laedt alle (SetLoadDefaultOffMods).
-// Abhaengigkeiten (API 40), ebenfalls in [mod]: version=1.2.0 (eigene Version), api=39 (mindestens noetige Skript-Schnittstelle),
-// requires=andere_mod >= 1.0, dritte_mod (Komma-getrennt, Version optional). Eine Mod, deren Bedingungen nicht erfuellt sind, wird nicht geladen
-// (auch ihre Datei-Patches und Stringtabellen nicht); das zieht abhaengige Mods mit. Benoetigte Mods laden vor der Mod, die sie braucht.
-// Jede Aenderung des Zustands wird einmal protokolliert.
+// Mod names in the load order (load_order.txt, then alphabetical), without the mods that are off
+// Example and test mods are off by default: <mod>\mod.ini with [mod] enabled=0. They load only if load_order.txt turns them on with "+name".
+// Mods without mod.ini (or with enabled=1) load as before, but "-name" turns them off. The test program loads all (SetLoadDefaultOffMods).
+// Dependencies (API 40), also in [mod]: version=1.2.0 (own version), api=39 (minimum necessary script interface),
+// requires=other_mod >= 1.0, third_mod (separated by commas, version optional). A mod whose conditions are not met does not load
+// (also not its file patches and string tables). This also stops dependent mods. Needed mods load before the mod that needs them.
+// Each change of the state is logged 1 time.
 static bool g_loadDefaultOff = false;
 void SetLoadDefaultOffMods(bool on) { g_loadDefaultOff = on; }
 
@@ -1148,13 +1148,13 @@ struct ModMeta {
     std::string version;
     int api = 0;
     std::vector<ModDep> deps;
-    unsigned kinds = 0;    // 1 Skript, 2 Datei-Patches, 4 Stringtabelle
+    unsigned kinds = 0;    // 1 script, 2 file patches, 4 string table
     bool enabled = true;   // [mod] enabled (Standard 1)
 };
 std::mutex g_modStateMu;
-std::map<std::string, std::string> g_modVersions;   // aktive Mods (alle Arten) -> Version, Schluessel klein geschrieben
-std::map<std::string, std::string> g_modBlockLog;   // Mod -> zuletzt gemeldeter Grund, warum sie nicht laedt
-std::map<std::string, std::string> g_modOrderLog;   // Mod -> zuletzt gemeldete Umstellung der Reihenfolge
+std::map<std::string, std::string> g_modVersions;   // active mods (all kinds) -> version, keys in lower case
+std::map<std::string, std::string> g_modBlockLog;   // mod -> last reported reason why it does not load
+std::map<std::string, std::string> g_modOrderLog;   // mod -> last reported change of the sequence
 
 std::string LowerName(std::string s) {
     for (char& c : s) c = char(std::tolower(static_cast<unsigned char>(c)));
@@ -1166,7 +1166,7 @@ std::string TrimText(const std::string& s) {
     const size_t e = s.find_last_not_of(" \t\r\n");
     return s.substr(b, e - b + 1);
 }
-// Eine Zahl je Teil ("1.10.2"); Text nach den Ziffern eines Teils (z. B. "0-beta") wird ignoriert, fehlende Teile zaehlen als 0
+// one number for each part ("1.10.2"); text after the digits of a part (for example "0-beta") is ignored, missing parts count as 0
 std::vector<unsigned long> VersionParts(const std::string& v) {
     std::vector<unsigned long> parts;
     size_t i = 0;
@@ -1192,7 +1192,7 @@ int CompareVersions(const std::string& a, const std::string& b) {
 }
 ModMeta ReadModMeta(const std::string& base) {
     ModMeta m;
-    // eigener Leser statt GetPrivateProfile*: der uebersah [mod] in Dateien mit UTF-8-BOM (dann lud eine Mod mit enabled=0)
+    // own reader in place of GetPrivateProfile*: that function did not see [mod] in files with UTF-8 BOM (then a mod with enabled=0 loaded)
     const std::map<std::string, std::string> sec = ReadIniSection(base + "\\mod.ini", "mod");
     const auto get = [&sec](const char* key) {
         const auto it = sec.find(key);
@@ -1220,9 +1220,9 @@ ModMeta ReadModMeta(const std::string& base) {
     }
     return m;
 }
-// Meldet eine Aenderung des Zustands einer Mod genau einmal; leerer Text = Zustand aufgehoben
+// reports a change of the state of a mod exactly 1 time; empty text = state cleared
 void ModStateLog(std::map<std::string, std::string>& seen, const std::string& mod, const std::string& msg, const char* cleared) {
-    if (!ScriptHost::s_current) return;   // vor dem Start des Hosts: beim ersten Scan danach melden
+    if (!ScriptHost::s_current) return;   // before the host starts: report at the first scan after that
     auto it = seen.find(mod);
     if (msg.empty()) {
         if (it == seen.end()) return;
@@ -1236,7 +1236,7 @@ void ModStateLog(std::map<std::string, std::string>& seen, const std::string& mo
 }
 }   // namespace
 
-// kinds: welche Mods zurueckgegeben werden (1 Skript, 2 Datei-Patches, 4 Stringtabelle). Abhaengigkeiten werden immer ueber alle Arten geprueft.
+// kinds: which mods are returned (1 script, 2 file patches, 4 string table). Dependencies are always checked across all kinds.
 static std::vector<std::string> DiscoverModsOfKind(const std::string& dir, unsigned kinds) {
     std::vector<std::string> found, order, off, on, defaultOff, result;
     std::map<std::string, ModMeta> meta;
@@ -1246,7 +1246,7 @@ static std::vector<std::string> DiscoverModsOfKind(const std::string& dir, unsig
         do {
             if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || fd.cFileName[0] == '.') continue;
             const std::string base = dir + "\\" + fd.cFileName;
-            const DWORD pa = GetFileAttributesA((base + "\\ScriptPatches").c_str());   // Mod nur mit Datei-Patches, ohne Skript
+            const DWORD pa = GetFileAttributesA((base + "\\ScriptPatches").c_str());   // mod only with file patches, without a script
             unsigned k = 0;
             if (FileTime(base + "\\main.as")) k |= 1;
             if (pa != INVALID_FILE_ATTRIBUTES && (pa & FILE_ATTRIBUTE_DIRECTORY)) k |= 2;
@@ -1264,13 +1264,13 @@ static std::vector<std::string> DiscoverModsOfKind(const std::string& dir, unsig
     if (FILE* f = std::fopen((dir + "\\load_order.txt").c_str(), "r")) {
         char line[512];
         bool first = true;
-        auto name = [](const std::string& s) {   // Name hinter + oder -, Leerzeichen dazwischen erlaubt ("+ mein_mod")
+        auto name = [](const std::string& s) {   // name after + or -, spaces between are permitted ("+ my_mod")
             const size_t b = s.find_first_not_of(" \t", 1);
             return b == std::string::npos ? std::string() : s.substr(b);
         };
         while (std::fgets(line, sizeof line, f)) {
             std::string t(line);
-            // UTF-8-Kennung am Dateianfang (Editor "UTF-8 mit BOM", PowerShell 5 Set-Content -Encoding utf8): sonst zaehlte die erste Zeile nicht
+            // UTF-8 signature at the start of the file (editor "UTF-8 with BOM", PowerShell 5 Set-Content -Encoding utf8): if not removed, the first line did not count
             if (first && t.compare(0, 3, "\xEF\xBB\xBF") == 0) t.erase(0, 3);
             first = false;
             size_t c = t.find('#');
@@ -1294,7 +1294,7 @@ static std::vector<std::string> DiscoverModsOfKind(const std::string& dir, unsig
             if (_stricmp(x.c_str(), n.c_str()) == 0) return true;
         return false;
     };
-    auto spelled = [](const std::vector<std::string>& v, const std::string& n) {   // Schreibweise des Ordners, leer wenn nicht enthalten
+    auto spelled = [](const std::vector<std::string>& v, const std::string& n) {   // spelling of the folder, empty if not included
         for (const std::string& x : v)
             if (_stricmp(x.c_str(), n.c_str()) == 0) return x;
         return std::string();
@@ -1307,7 +1307,7 @@ static std::vector<std::string> DiscoverModsOfKind(const std::string& dir, unsig
     for (const std::string& n : found)
         if (enabled(n) && !has(result, n)) result.push_back(n);
 
-    // Bedingungen pruefen, bis sich nichts mehr aendert (eine gesperrte Mod sperrt die Mods, die sie brauchen)
+    // check the conditions until nothing changes (a blocked mod blocks the mods that need it)
     std::map<std::string, std::string> blocked;
     for (bool changed = true; changed;) {
         changed = false;
@@ -1339,7 +1339,7 @@ static std::vector<std::string> DiscoverModsOfKind(const std::string& dir, unsig
         }
     }
 
-    // Benoetigte Mods vor die Mod stellen, die sie braucht (sonst bleibt die Reihenfolge); Kreise werden gemeldet und nicht aufgeloest
+    // put needed mods before the mod that needs them (if not necessary, the sequence stays); circles are reported and not resolved
     std::vector<std::string> sorted, stack;
     std::map<std::string, std::string> moved, cycles;
     std::function<void(const std::string&)> place = [&](const std::string& n) {
@@ -1381,7 +1381,7 @@ static std::vector<std::string> DiscoverMods(const std::string& dir, bool withPa
     return DiscoverModsOfKind(dir, 1u | (withPatchOnly ? 2u : 0u) | (withStrings ? 4u : 0u));
 }
 
-// Skript-Funktionen (API 40): ist eine Mod aktiv (Bedingungen erfuellt, nicht abgeschaltet), und welche Version nennt ihre mod.ini
+// script functions (API 40): is a mod active (conditions met, not off), and which version does its mod.ini give
 namespace {
 bool IsModActive(const SStr& name) {
     std::lock_guard<std::mutex> lock(g_modStateMu);
@@ -1394,10 +1394,10 @@ SStr GetModVersion(const SStr& name) {
 }
 }   // namespace
 
-// ---------------------------------------------------------------- Mod-Stringtabellen (<Mod>\stringtable.ini)
-// Format wie die stringtable.ini des Spiels: "Schluessel=Text;;Text;;..." je Zeile. Steht oben eine Zeile "Languages=English;German;...", sind die Spalten
-// in dieser Reihenfolge und die Spalte der aktuellen Spielsprache wird genommen (fehlt/leer: erste Spalte). Ohne diese Zeile gilt der ganze Wert als Text.
-// Kommentarzeilen beginnen mit ; # oder [ . Dateikodierung: UTF-16 (BOM), UTF-8 (BOM) oder ANSI (cp1252). Spaetere Mods ueberschreiben fruehere.
+// ---------------------------------------------------------------- mod string tables (<mod>\stringtable.ini)
+// Format as the stringtable.ini of the game: "key=text;;text;;..." on each line. If a line "Languages=English;German;..." is at the top, the columns are
+// in this sequence, and the code uses the column of the current game language (missing or empty: first column). Without this line, the full value is the text.
+// Comment lines start with ; # or [ . File encoding: UTF-16 (BOM), UTF-8 (BOM) or ANSI (cp1252). Later mods overwrite earlier mods.
 struct StrTable {
     std::vector<std::wstring> langs;
     std::vector<std::pair<std::string, std::vector<std::wstring>>> rows;
@@ -1465,7 +1465,7 @@ bool ParseStringTable(const std::string& path, StrTable* out, std::string* err) 
     }
     return true;
 }
-// Traegt alle geladenen Tabellen in die Text-Hooks ein, sobald Sprache und Hooks verfuegbar sind (sonst spaeter, siehe CheckReload)
+// puts all loaded tables into the text hooks when the language and the hooks are available (if not, later, see CheckReload)
 void ApplyStringTables(ScriptHost* host) {
     if (!g_strDirty) return;
     const std::string lang = CurrentGameLanguage();
@@ -1538,7 +1538,7 @@ int ScriptHost::ScanMods() {
         Unload(m);
         mods_.erase(mods_.begin() + i);
     }
-    for (const std::string& n : want) {   // neue Mods bauen, geaenderte neu laden
+    for (const std::string& n : want) {   // build new mods, reload changed mods
         if (n == "main") {
             Log("Mod-Ordner 'main' ignoriert (Name fuer das Einzelskript reserviert)");
             continue;
@@ -1555,8 +1555,8 @@ int ScriptHost::ScanMods() {
         m->path = path;
         if (Build(*m)) ++loaded;
     }
-    ScanStringTables(modsDir_, this);                                                // <Mod>\stringtable.ini (auch fuer Mods ohne Skript)
-    std::stable_sort(mods_.begin(), mods_.end(), [&](const Mod& a, const Mod& b) {   // "main" zuerst, dann Ladereihenfolge
+    ScanStringTables(modsDir_, this);                                                // <mod>\stringtable.ini (also for mods without a script)
+    std::stable_sort(mods_.begin(), mods_.end(), [&](const Mod& a, const Mod& b) {   // "main" first, then the load order
         auto rank = [&](const Mod& m) {
             if (m.name == "main") return -1;
             for (size_t i = 0; i < want.size(); ++i)
@@ -1588,7 +1588,7 @@ bool ScriptHost::CheckReload() {
         CallMain();
         any = true;
     }
-    ApplyStringTables(this);   // Tabellen, die vor dem Spielstart gelesen wurden (Sprache/Hooks noch nicht bereit)
+    ApplyStringTables(this);   // tables that were read before the game start (language and hooks not ready yet)
     return any;
 }
 

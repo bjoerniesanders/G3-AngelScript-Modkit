@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 #pragma once
-// Lesen von g3asm.ini (Loader und DLL). GetPrivateProfile* uebersieht den ersten Abschnitt, wenn die Datei mit einem UTF-8-BOM beginnt
-// (Editor "UTF-8 mit BOM", PowerShell 5 Set-Content -Encoding utf8): dann galten alle Standardwerte, enable=0 wirkte nicht.
-// Ohne BOM bleibt alles bei GetPrivateProfile* (gleiches Verhalten wie bisher, auch fuer UTF-16-Dateien). Mit BOM liest diese Klasse
-// die Datei selbst, mit denselben Regeln: Abschnitt und Schluessel ohne Gross-/Kleinschreibung, Leerraum getrimmt, erster Treffer gilt,
-// ein umschliessendes Paar "" wird entfernt, Kommentarzeilen beginnen mit ';'. Nur kernel32 und C-Laufzeit (auch in DllMain nutzbar).
+// Reads g3asm.ini (loader and DLL). GetPrivateProfile* does not see the first section if the file starts with a UTF-8 BOM
+// (editor "UTF-8 with BOM", PowerShell 5 Set-Content -Encoding utf8): then all default values applied, and enable=0 had no effect.
+// Without a BOM, everything stays with GetPrivateProfile* (same behavior as before, also for UTF-16 files). With a BOM, this class reads
+// the file itself, with the same rules: section and key without case sensitivity, white space trimmed, the first match applies,
+// one enclosing pair "" is removed, comment lines start with ';'. Only kernel32 and the C run time (also usable in DllMain).
 #include <windows.h>
 
 #include <cstdlib>
@@ -29,7 +29,7 @@ public:
                     data_[len_] = 0;
                 }
             }
-            bom_ = true;   // auch bei leerer Datei mit BOM: eigener Leser (findet dann nichts)
+            bom_ = true;   // also for an empty file with BOM: own reader (it then finds nothing)
         }
         CloseHandle(f);
     }
@@ -41,7 +41,7 @@ public:
 
     bool Bom() const { return bom_; }
 
-    // wie GetPrivateProfileSectionA(...) > 0: Abschnitt vorhanden und nicht leer
+    // as GetPrivateProfileSectionA(...) > 0: the section exists and is not empty
     bool HasSection(const char* sec) const {
         if (!bom_) {
             char probe[8];
@@ -68,7 +68,7 @@ public:
         return static_cast<int>(std::strtol(buf, nullptr, 10));
     }
 
-    // def darf auf out zeigen (wie bei GetPrivateProfileStringA)
+    // def can point to out (as with GetPrivateProfileStringA)
     void Str(const char* sec, const char* key, const char* def, char* out, DWORD n) const {
         if (!n) return;
         if (!bom_) {
@@ -81,7 +81,7 @@ public:
     }
 
 private:
-    // Zeile ab pos: [a, b) getrimmt; liefert die Position der naechsten Zeile
+    // line from pos: [a, b) trimmed; gives the position of the next line
     size_t NextLine(size_t pos, const char*& a, const char*& b) const {
         size_t end = pos;
         while (end < len_ && data_[end] != '\n') ++end;

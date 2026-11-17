@@ -1,15 +1,15 @@
-// G3ASM Mini-Mod "Charakter-Info" (API 3) - Gothic-3-Gegenstueck zum Remake-Beispiel "ExampleStatsPageExtension".
-// Liegt im Spiel unter <Gothic3>\g3asm\scripts\main.as; Aenderungen werden im laufenden Spiel neu geladen.
-//  - Bildschirmtext im Spielstil (PrintScreen) statt Windows-Toenen
-//  - F11:        Info auf dem Bildschirm: Position, Spielzeit, Attribute (wie der Text-Block im Beispiel)
-//  - Shift+F11:  Staerke +1 (wie der Knopf im Beispiel: IncreaseStrengthAttributeBy(1))
-//  - F10:        aktuelle Position merken, Shift+F10: dorthin teleportieren
-//  - Menueseite: beim Oeffnen einer Spielseite (Inventar, Charakter, ...) steht ihre Nummer im Protokoll;
-//                ist CHARAKTER_SEITE gesetzt, erscheint die Info automatisch beim Oeffnen dieser Seite.
-// (F5/F9 = Schnellspeichern/-laden, F1-F3, F6-F8, F12 sind vom Spiel belegt)
+// G3ASM mini mod "Charakter-Info" (API 3) - the Gothic 3 equivalent of the remake example "ExampleStatsPageExtension".
+// In the game, it is in <Gothic3>\g3asm\scripts\main.as. The modkit loads changes again while the game runs.
+//  - screen text in the style of the game (PrintScreen) in place of Windows sounds
+//  - F11:        info on the screen: position, game time, attributes (as the text block in the example)
+//  - Shift+F11:  strength +1 (as the button in the example: IncreaseStrengthAttributeBy(1))
+//  - F10:        keep the current position, Shift+F10: teleport there
+//  - menu page:  when you open a game page (inventory, character, ...), the log shows its number;
+//                if CHARAKTER_SEITE is set, the info shows automatically when you open this page.
+// (F5/F9 = quick save and quick load. The game uses F1-F3, F6-F8, F12)
 
 const int VK_SHIFT = 0x10;
-const int CHARAKTER_SEITE = -100;   // Nummer der Charakterseite aus dem Protokoll ("Spielseite: N") hier eintragen
+const int CHARAKTER_SEITE = -100;   // write the number of the character page from the log ("Spielseite: N") here
 
 float sekunde = 0;
 int bilder = 0;
@@ -60,7 +60,7 @@ void OnFrame(float dt) {
 
     if (f11neu && held.IsValid()) {
         if (shift) {
-            // der "Knopf": Staerke +1 (Grundwert, wie PSPlayerMemory::AddStrength)
+            // the "button": strength +1 (base value, as PSPlayerMemory::AddStrength)
             if (held.AddAttributeBase("STR", 1)) Zeige("Staerke +1 -> " + held.GetAttribute("STR"));
             else Zeige("Staerke aendern nicht moeglich");
         } else {
@@ -79,7 +79,7 @@ void OnFrame(float dt) {
         }
     }
 
-    // Menueseiten beobachten (Nummer fuer CHARAKTER_SEITE ermitteln)
+    // watch menu pages (find the number for CHARAKTER_SEITE)
     int seite = GetActivePage();
     if (seite != seiteVorher) {
         print("Spielseite: " + seite);

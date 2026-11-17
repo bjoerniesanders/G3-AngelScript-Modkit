@@ -1,19 +1,19 @@
-// Jens-Dialog: Jens bekommt zwei neue Gespraechsoptionen (echte Dialoge des Spiels, mit Questlog-Verbindung).
-//   "Hast du Arbeit fuer mich?"  -> Jens bittet um ein Wolfsfell, die Quest startet (Titel/Beschreibung/Dialogtext im Questlog).
-//   "Ich habe das Wolfsfell."     -> erscheint, solange die Quest laeuft; nimmt das Fell, schliesst die Quest ab, Belohnung.
-// Speichern/Laden: Quest und Dialoge sind Laufzeit-Objekte und gehen beim Laden verloren. Der Fortschritt steht deshalb in zwei Schaltern, die das
-// Spiel im Spielstand mitspeichert (SetGameEvent). Nach jedem Laden legt die Mod Quest und Dialoge neu an und stellt den Stand wieder her.
-// Hinweis: Jens hat im Spiel schon eine eigene Wolfsfell-Quest (KapDun_Hunter_Fur); diese Mod-Quest ist davon unabhaengig.
-// Die Mod jens_quest (Naehe + Rollen-Taste) sollte abgeschaltet sein: in g3asm\mods\load_order.txt "-jens_quest" eintragen.
+// Jens dialog: Jens gets two new dialog options (real dialogs of the game, with a connection to the quest log).
+//   "Hast du Arbeit fuer mich?"  -> Jens asks for a wolf skin, the quest starts (title, description and dialog text in the quest log).
+//   "Ich habe das Wolfsfell."     -> shows while the quest runs. Takes the skin, completes the quest, reward.
+// Save and load: the quest and the dialogs are run-time objects and are lost at a load. Thus the progress is in two switches that the
+// game saves in the saved game (SetGameEvent). After each load, the mod makes the quest and the dialogs again and restores the progress.
+// Note: Jens already has his own wolf skin quest in the game (KapDun_Hunter_Fur). This mod quest is independent of it.
+// Turn off the mod jens_quest (nearness + Scroll Lock key): write "-jens_quest" in g3asm\mods\load_order.txt.
 const bCString NPC = "Jens";
 const bCString QUEST = "G3ASM_Jens_Wolfsfell";
 const bCString ITEM = "It_Wolf_Fur";
 const bCString BOGEN = "It_Bow_Ranger";
 const bCString PFEILE = "Arrow";
-const bCString REWARD_ATTRIBUTE = "DEX";   // Attribut-Belohnung der Quest (Erfolgsmeldung "Jagdgeschick"); DescribeQuestRewards() listet alle Kennungen
+const bCString REWARD_ATTRIBUTE = "DEX";   // attribute reward of the quest (success message "Jagdgeschick"); DescribeQuestRewards() lists all tags
 const bCString INFO_JOB = "G3ASM_Jens_Job";
 const bCString INFO_TURNIN = "G3ASM_Jens_Turnin";
-const bCString EV_STARTED = "G3ASM_JensWolf_Started";   // Schalter im Spielstand
+const bCString EV_STARTED = "G3ASM_JensWolf_Started";   // switches in the saved game
 const bCString EV_DONE = "G3ASM_JensWolf_Done";
 const bCString EV_FAILED = "G3ASM_JensWolf_Failed";
 
@@ -22,10 +22,10 @@ bool angelegt = false;
 
 void Zeige(const bCString &in t, int r = 255, int g = 255, int b = 180) { print(t); PrintScreen(t, 5, r, g, b); }
 
-// Quest: Ist das Mod-Archiv installiert (ModFiles\Quests.m0x -> Data\Quests.mod/.m00/..., siehe docs\modkit\archives.md), liefert das Spiel die Quest selbst aus der
-// Datei G3_World_01\G3ASM_Jens_Wolfsfell_quest_G3_World_01.quest (Typ, XP 100, Belohnung DEX +1; Titel und Beschreibung stehen in ModFiles\stringtable.ini).
-// Ohne Archiv legt das Skript die Quest zur Laufzeit an (Rueckfall) und setzt dieselben Werte. Status zunaechst "offen".
-bool selbstErzeugt = false;   // Quest wurde von diesem Skript angelegt (nicht aus dem Archiv)
+// Quest: if the mod archive is installed (ModFiles\Quests.m0x -> Data\Quests.mod/.m00/..., see docs\modkit\archives.md), the game itself gives the quest from the
+// file G3_World_01\G3ASM_Jens_Wolfsfell_quest_G3_World_01.quest (type, XP 100, reward DEX +1; the title and the description are in ModFiles\stringtable.ini).
+// Without the archive, the script makes the quest at run time (fallback) and sets the same values. Status at first "open".
+bool selbstErzeugt = false;   // this script made the quest (not from the archive)
 void QuestVorbereiten() {
     if (!QuestExists(QUEST)) { CreateQuest(QUEST); selbstErzeugt = true; }
     if (selbstErzeugt) {
@@ -36,8 +36,8 @@ void QuestVorbereiten() {
     }
 }
 
-// Notfall-Wiederherstellung, falls das Spiel Quest/Questlog beim Laden nicht selbst zurueckgebracht hat: Stand aus den Schaltern im Spielstand.
-// (Normalfall: Quest und Dialoge werden schon waehrend des Ladens angelegt - OnQuestsLoaded/OnInfosLoaded - und das Spiel stellt Status und Log selbst her.)
+// Emergency recovery, if the game did not restore the quest and the quest log itself at the load: progress from the switches in the saved game.
+// (Normal case: the mod makes the quest and the dialogs during the load - OnQuestsLoaded and OnInfosLoaded - and the game restores the status and the log itself.)
 void Wiederherstellen() {
     bool fertig = IsGameEventSet(EV_DONE);
     bool begonnen = IsGameEventSet(EV_STARTED);
@@ -47,22 +47,22 @@ void Wiederherstellen() {
     if (gescheitert) {
         SetQuestXP(QUEST, 0);
         SetQuestReward(QUEST, REWARD_ATTRIBUTE, 0);
-        SetQuestStatus(QUEST, QUEST_FAILED);   // direkt setzen: keine "Quest angenommen"-Meldung wie bei RunQuest
+        SetQuestStatus(QUEST, QUEST_FAILED);   // set directly: no "Quest angenommen" message as with RunQuest
         SetInfoGiven(INFO_JOB, true);
     } else if (fertig) {
-        // abgeschlossen: Belohnung vorher auf 0, damit das Setzen des Status nichts doppelt auszahlt
+        // complete: set the reward to 0 first, so that the status change does not pay two times
         SetQuestXP(QUEST, 0);
         SetQuestReward(QUEST, REWARD_ATTRIBUTE, 0);
         SetQuestStatus(QUEST, QUEST_SUCCESS);
         SetInfoGiven(INFO_JOB, true);
         SetInfoGiven(INFO_TURNIN, true);
     } else if (begonnen) {
-        SetInfoGiven(INFO_JOB, true);   // Bitte schon gehoert: blendet die Option aus
+        SetInfoGiven(INFO_JOB, true);   // request already heard: hides the option
         SetQuestStatus(QUEST, QUEST_RUNNING);
     }
 }
 
-// Diagnose: was ist beim Laden schon da? (Protokoll)
+// diagnostics: what is already there at the load? (log)
 void Diagnose() {
     int n = GetQuestCount();
     int g3asm = 0;
@@ -74,12 +74,12 @@ void Diagnose() {
           ", Job gegeben " + IsInfoGiven(INFO_JOB));
 }
 
-// Die beiden Dialoge anlegen (ohne Zustand). Wird mehrfach aufgerufen (OnInfosLoaded und spaeter Anlegen). CreateInfo meldet bei einer vorhandenen Info "true" und aendert
-// nichts, AddInfoLine haengt aber jedes Mal weitere Zeilen an: ohne diese Pruefung wuerde jede Zeile doppelt gesprochen.
+// Make the two dialogs (without progress). The mod calls this more than 1 time (OnInfosLoaded and later Anlegen). CreateInfo gives "true" for an existing info and changes
+// nothing, but AddInfoLine adds more lines each time: without this check, the NPC would say each line two times.
 bool ErstelleInfos() {
     if (InfoExists(INFO_JOB) && InfoExists(INFO_TURNIN)) return true;
     if (!CreateInfo(INFO_JOB, NPC)) return false;
-    SetInfoQuest(INFO_JOB, QUEST);   // Dialogzeilen dieser Info landen im Questlog dieser Quest
+    SetInfoQuest(INFO_JOB, QUEST);   // the dialog lines of this info go into the quest log of this quest
     SetInfoType(INFO_JOB, INFO_TYPE_INFO);
     SetInfoCondition(INFO_JOB, INFO_COND_GENERAL);
     AddInfoLine(INFO_JOB, "Say", "player", "", "", "", "Hast du Arbeit fuer mich?");
@@ -88,7 +88,7 @@ bool ErstelleInfos() {
 
     CreateInfo(INFO_TURNIN, NPC);
     SetInfoType(INFO_TURNIN, INFO_TYPE_INFO);
-    SetInfoCondition(INFO_TURNIN, INFO_COND_RUNNING);   // erscheint, solange die Quest laeuft
+    SetInfoCondition(INFO_TURNIN, INFO_COND_RUNNING);   // shows while the quest runs
     SetInfoQuest(INFO_TURNIN, QUEST);
     AddInfoLine(INFO_TURNIN, "Say", "player", "", "", "", "Ich habe das Wolfsfell.");
     AddInfoLine(INFO_TURNIN, "Say", "npc", "", "", "", "Zeig her.");
@@ -107,19 +107,19 @@ bool Anlegen() {
     return ok;
 }
 
-// Ladevorgang des Spiels: Quests/Infos werden aus den ini-Dateien neu aufgebaut. Unsere muessen DANN schon da sein, bevor das Spiel die
-// gespeicherten Daten (Status, Questlog, "Info gegeben") einliest.
+// Load of the game: the game makes the quests and infos again from the ini files. Ours must be there AT THAT TIME, before the game reads the
+// saved data (status, quest log, "info given").
 void OnQuestsLoaded() {
-    // Im Hauptmenue ist der Quest-Manager leer (GetQuestCount() = -1, auch die Quests des Spiels fehlen): hier nichts anlegen, das Spiel baut ihn beim Laden neu auf.
+    // In the main menu, the quest manager is empty (GetQuestCount() = -1, the quests of the game are also missing): make nothing here. The game makes it again at the load.
     if (GetQuestCount() < 0) { print("OnQuestsLoaded: Quest-Manager noch nicht lesbar (Hauptmenue), uebersprungen"); return; }
-    selbstErzeugt = false;   // neuer Quest-Manager: war die Quest vorher schon da, stammt sie aus dem Archiv
+    selbstErzeugt = false;   // new quest manager: if the quest was already there, it comes from the archive
     bool imArchiv = QuestExists(QUEST);
     QuestVorbereiten();
     print("OnQuestsLoaded: Quest vorbereitet (" + (imArchiv ? "aus dem Mod-Archiv, XP " + GetQuestXP(QUEST) : "zur Laufzeit angelegt") + "), Status " + GetQuestStatus(QUEST));
 }
 void OnInfosLoaded() { print("OnInfosLoaded: Dialoge " + (ErstelleInfos() ? "angelegt" : "NICHT angelegt")); }
 
-// Belohnung: Jens schenkt einen Bogen samt Pfeilen (der Attributpunkt kommt ueber die Quest-Belohnung)
+// reward: Jens gives a bow and arrows (the attribute point comes through the quest reward)
 void Belohnung(Entity held) {
     int bogen = held.AddItems(BOGEN, 1);
     int pfeile = held.AddItems(PFEILE, 15);
@@ -134,7 +134,7 @@ void OnFrame(float dt) {
     if (timer < 1.0f) return;
     timer = 0;
     if (GetInfoCount() <= 0 || !GetHero().IsValid()) return;
-    // Nach dem Laden fehlen Quest oder Dialoge: neu anlegen (Schalter lesen geht erst, wenn der Held geladen ist)
+    // after the load, the quest or the dialogs are missing: make them again (the switches can be read only when the hero is loaded)
     if (!angelegt || !InfoExists(INFO_JOB) || !QuestExists(QUEST)) angelegt = Anlegen();
 }
 
@@ -147,7 +147,7 @@ void OnInfoFinished(const bCString &in info, const bCString &in owner, const bCS
         if (GetQuestStatus(QUEST) == QUEST_RUNNING) return;
         QuestVorbereiten();
         RunQuest(QUEST);
-        SetGameEvent(EV_STARTED);   // im Spielstand merken
+        SetGameEvent(EV_STARTED);   // keep in the saved game
         Zeige("Neue Quest: Wolfsfell fuer Jens", 140, 220, 255);
         print("Quest-Status: " + GetQuestStatus(QUEST));
     } else if (info == INFO_TURNIN) {
@@ -164,7 +164,7 @@ void OnInfoFinished(const bCString &in info, const bCString &in owner, const bCS
     }
 }
 
-// Jens getoetet, bevor die Quest abgegeben ist: Quest scheitert
+// Jens killed before the quest is delivered: the quest fails
 void OnNPCKilled(Entity opfer) {
     if (opfer.GetName() != NPC) return;
     int st = GetQuestStatus(QUEST);

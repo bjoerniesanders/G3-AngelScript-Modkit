@@ -1,7 +1,7 @@
-// Quest-Demo. Numblock 1 = Status der Demo-Quest zeigen, 2 = anlegen + starten, 3 = erfolgreich abschliessen, 4 = fehlgeschlagen, 5 = entfernen, 6 = XP auf 100 setzen.
-// Bild hoch = Quests auflisten (Statusverteilung, einzelne Eintraege im Protokoll), Bild runter = Infos/Dialoge im Protokoll ansehen, Einfg = Quest-Dateien neu laden.
-// (Numblock 7, 8, 9 sind Debug-Tasten des Spiels und werden von den Beispiel-Mods nicht benutzt; siehe docs/modkit/examples.md, Tastenbelegung.)
-// Zeigt, was das Questsystem des Spiels fuer Skripte kann. Abschalten: in g3asm\mods\load_order.txt "-demo_quest" eintragen.
+// Quest demo. Numeric keypad 1 = show the status of the demo quest, 2 = make + start, 3 = complete with success, 4 = failed, 5 = remove, 6 = set XP to 100.
+// Page Up = list the quests (status distribution, single entries in the log), Page Down = show infos and dialogs in the log, Insert = load the quest files again.
+// (Numeric keypad 7, 8, 9 are debug keys of the game. The example mods do not use them; see docs/modkit/examples.md, key assignments.)
+// Shows what the quest system of the game can do for scripts. To turn off: write "-demo_quest" in g3asm\mods\load_order.txt.
 const bCString Q = "G3ASM_DemoQuest";
 
 bCString StatusText(int s) {
@@ -40,7 +40,7 @@ void OnKey(int vk, bool down) {
     } else if (vk == 0x21) {
         int n = GetQuestCount();
         print("Quests im Spiel: " + n);
-        array<int> zaehler(9, 0);   // Status 0..7, 8 = unbekannt
+        array<int> zaehler(9, 0);   // status 0..7, 8 = not known
         int laufend = 0;
         for (int i = 0; i < n; i++) {
             bCString name = GetQuestNameAt(i);
@@ -55,7 +55,7 @@ void OnKey(int vk, bool down) {
         print(h);
         Zeige("Quests: " + n + ", laufend: " + laufend + " (Details im Protokoll)");
     } else if (vk == 0x22) {
-        // Bild runter: Infos (Dialoge) des Spiels ansehen
+        // Page Down: show the infos (dialogs) of the game
         int n = GetInfoCount();
         print("Infos im Spiel: " + n);
         print(DescribeCommands());

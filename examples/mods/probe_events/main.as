@@ -1,9 +1,9 @@
-// Mess-Mod fuer die Ereignisse ab API 35: Konsolenbefehle (Override_ConsoleCommand, SetConsoleReply) und Quest-Status (OnQuestStatus).
-//   Konsole: Befehl "g3asm" antwortet mit der API-Version; alle anderen Befehle laufen unveraendert ans Spiel.
-//   Strg + Ziffernblock * oeffnet die Konsole (OpenConsole), falls das Spiel keine Taste dafuer hat.
-//   Quests:  jeder Statuswechsel steht im Protokoll (0 Open, 1 Running, 2 Success, 3 Failed, 4 Obsolete, 5 Cancelled, 6 Lost, 7 Won).
-// Ab API 37: Beruehrungen mit dem Helden (OnTouch, gezaehlt je 10 s), Haendlerware (OnTradeGenerated), Verwandlung (OnTransformStart/End).
-//   Umschalt + Ziffernblock / erzeugt die Ware des anvisierten Haendlers neu (GenerateTradeGoods) und meldet die Stapel vorher/nachher.
+// Measurement mod for the events from API 35: console commands (Override_ConsoleCommand, SetConsoleReply) and quest status (OnQuestStatus).
+//   Console: the command "g3asm" answers with the API version. All other commands go to the game without changes.
+//   Ctrl + numeric keypad * opens the console (OpenConsole), if the game has no key for it.
+//   Quests:  each status change goes to the log (0 Open, 1 Running, 2 Success, 3 Failed, 4 Obsolete, 5 Cancelled, 6 Lost, 7 Won).
+// From API 37: touches with the hero (OnTouch, counted each 10 s), trader goods (OnTradeGenerated), transformation (OnTransformStart/End).
+//   Shift + numeric keypad / makes the goods of the focused trader again (GenerateTradeGoods) and reports the stacks before and after.
 bool Override_ConsoleCommand(const bCString &in line) {
     if (line.Find("g3asm", 0) != 0) return Super();
     SetConsoleReply("G3ASM, Skript-Schnittstelle " + GetApiVersion());

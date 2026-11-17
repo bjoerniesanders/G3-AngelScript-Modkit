@@ -1,24 +1,24 @@
-// Perk-Experiment (ab API 30): Ein eigenes Talent "Lebensraub" als Bonustalent des Orkschlaechters.
-// Hintergrund: Talente stehen im Inventar des Helden (gelernt) und haben dort einen Aktivierungszaehler; eine Waffe mit ActivateSkill1/2 zaehlt ihn hoch, solange sie gefuehrt wird.
-// ActivateSkill2 der Waffenvorlage laesst sich nicht per Text setzen (Referenz, siehe limitations.md), deshalb schaltet diese Mod das Talent selbst:
-// Wird PERK_WAFFE in der rechten Hand gefuehrt, bekommt der Held Perk_Lifesteal (Entity.LearnSkill + ActivateSkill), sonst wird es wieder deaktiviert.
-// Perk_Lifesteal ist ein Klon von Perk_OrcSlayer (CloneTemplate) mit Tag "Lifesteal"; der Name kommt aus stringtable.ini (FO_It_Perk_Lifesteal).
-// Zusaetzlich misst die Mod den Zustand echter Talente (Schwertkaempfer 1 = Perk_1H_1, Orktoeter) mit und ohne gezogene Waffe ("[perk_lifesteal] Messung ...").
+// Perk experiment (from API 30): a custom skill "Lebensraub" (life steal) as the bonus skill of the Orkschlaechter.
+// Background: skills are in the inventory of the hero (learned) and have an activation counter there. A weapon with ActivateSkill1/2 increases it while the hero uses the weapon.
+// ActivateSkill2 of the weapon template cannot be set as text (reference, see limitations.md), thus this mod turns the skill on itself:
+// if PERK_WAFFE is in the right hand, the hero gets Perk_Lifesteal (Entity.LearnSkill + ActivateSkill). If not, the mod turns it off again.
+// Perk_Lifesteal is a clone of Perk_OrcSlayer (CloneTemplate) with the tag "Lifesteal". The name comes from stringtable.ini (FO_It_Perk_Lifesteal).
+// The mod also measures the condition of real skills (Schwertkaempfer 1 = Perk_1H_1, Orktoeter) with and without a drawn weapon ("[perk_lifesteal] Messung ...").
 const bCString BASIS = "Perk_OrcSlayer";
 const bCString NEU = "Perk_Lifesteal";
 const bCString WAFFE = "It_1H_OrcSlayer_01";
-const bCString LERNITEM_BASIS = "It_Perk_Orcslayer";   // Lern-Item des Orktoeters (Name genau so geschrieben)
+const bCString LERNITEM_BASIS = "It_Perk_Orcslayer";   // learn item of the Orktoeter (name written exactly so)
 const bCString LERNITEM = "It_Perk_Lifesteal";
 const int LEBENSRAUB_PROZENT = 20;
 int heilLog = 0;
 float putzZeit = 0;
-// ENTFERNEN = true: Abschaltmodus. Nimmt den Lern-Item-Stapel und das Talent wieder aus dem Inventar des Helden. Danach speichern, DANN die Mod abschalten (load_order.txt: -perk_lifesteal).
-// Warum: Der Stapel steht im Spielstand. Fehlt die Mod, fehlt die Vorlage It_Perk_Lifesteal, und das Spiel stuerzt beim Oeffnen des Charakterbogens ab (gemessen 2026-11-06).
+// ENTFERNEN = true: turn-off mode. Removes the learn item stack and the skill from the inventory of the hero. Then save, THEN turn off the mod (load_order.txt: -perk_lifesteal).
+// Why: the stack is in the saved game. If the mod is missing, the template It_Perk_Lifesteal is missing, and the game crashes when you open the character sheet (measured 2026-11-06).
 const bool ENTFERNEN = false;
 bool entfernt = false;
 bool refGesetzt = false;
 bool stapelGeprueft = false;
-bool manuell = false;   // Die Mod hat das Talent selbst hochgezaehlt (Nachaktivierung): beim Ablegen auch selbst zuruecknehmen, die Engine kennt diese Zaehlung nicht
+bool manuell = false;   // the mod increased the skill counter itself (late activation): also decrease it itself when the hero puts the weapon away. The engine does not know this count
 bool fertig = false;
 bool aktiv = false;
 float zeit = 0;
@@ -27,7 +27,7 @@ bCString letzteMessung = "";
 
 void Versuch() {
     if (fertig) return;
-    if (!GetTemplateEntity(BASIS).IsValid()) return;   // Vorlagen noch nicht bereit (Hauptmenue)
+    if (!GetTemplateEntity(BASIS).IsValid()) return;   // templates not ready yet (main menu)
     int rc = CloneTemplate(BASIS, NEU);
     if (rc < 0) return;
     fertig = true;
@@ -35,20 +35,20 @@ void Versuch() {
     bool ok = neu.IsValid() && SetProperty(neu, "gCSkill_PS", "Tag", "Lifesteal");
     print("Talent " + NEU + " angelegt: rc=" + rc + ", Tag gesetzt " + ok);
 
-    // Lern-Item klonen (Icon/Kachel im Charakterbogen) und dessen Skill-Verweis auf das neue Talent setzen
+    // clone the learn item (icon and tile in the character sheet) and set its skill reference to the new skill
     int rci = CloneTemplate(LERNITEM_BASIS, LERNITEM);
     Entity li = GetTemplateEntity(LERNITEM);
     bool r1 = li.IsValid() && SetTemplateRef(li, "gCItem_PS", "Skill", NEU);
     print("Lern-Item " + LERNITEM + ": rc=" + rci + ", Skill-Verweis gesetzt " + r1 + ", gelesen: " + (li.IsValid() ? GetProperty(li, "Item", "Skill") : bCString("-")));
 
-    // Bonustalent der Waffe: ActivateSkill2 auf das neue Talent
+    // bonus skill of the weapon: ActivateSkill2 to the new skill
     Entity w = GetTemplateEntity(WAFFE);
     bool r2 = w.IsValid() && SetTemplateRef(w, "gCItem_PS", "ActivateSkill2", NEU);
     refGesetzt = r2 && GetProperty(w, "Item", "ActivateSkill2").Find(NEU, 0) >= 0;
     print("Waffe " + WAFFE + ": ActivateSkill2 gesetzt " + r2 + ", gelesen: " + (w.IsValid() ? GetProperty(w, "Item", "ActivateSkill2") : bCString("-")));
 }
 
-// Eine ';'-getrennte Liste in Zeilen von etwa 350 Zeichen ausgeben
+// write a list separated by ';' in lines of approximately 350 characters
 void Zeilen(const bCString &in titel, const bCString &in liste) {
     if (liste.IsEmpty()) { print(titel + ": (nicht lesbar oder leer)"); return; }
     print(titel + ":");
@@ -69,8 +69,8 @@ bCString Zustand(Entity hero, const bCString &in talent) {
 void OnQuestsLoaded() { Versuch(); }
 int ladeZaehler = 0;
 int gemessen = 0;
-// Nach jedem Laden neu pruefen: Der Stapel steht (wegen OnBeforeSave) nicht im Spielstand und muss wieder angelegt werden, sonst fehlen Kachel und Talent
-// bis zum naechsten Speichern (gemessen 2026-11-13). Die Nachaktivierung des alten Helden gilt fuer den neu geladenen nicht.
+// Check again after each load: because of OnBeforeSave, the stack is not in the saved game and must be made again. If not, the tile and the skill are missing
+// until the next save (measured 2026-11-13). The late activation of the old hero does not apply to the hero that the game loaded again.
 void OnWorldActivate() {
     Versuch();
     ladeZaehler++;
@@ -78,15 +78,15 @@ void OnWorldActivate() {
     manuell = false;
 }
 
-// Die frueheren Qualitaetszeile "(20 %) Lebensraub" (Bit QUALITY_LIFESTEAL aus demo_lifesteal) steckt im Spielstand an der Waffe: hier einmal pro Sekunde entfernen,
-// damit nur noch das Bonustalent an der Waffe steht.
+// The previous quality line "(20 %) Lebensraub" (bit QUALITY_LIFESTEAL from demo_lifesteal) is on the weapon in the saved game: remove it here 1 time each second,
+// so that only the bonus skill is on the weapon.
 void Aufraeumen(Entity hero, int slot) {
     uint q = hero.GetSlotQuality(slot);
     if ((q & QUALITY_LIFESTEAL) == 0) return;
     if (hero.SetSlotQuality(slot, q & ~QUALITY_LIFESTEAL)) print("Qualitaet Lebensraub entfernt (Slot " + slot + ")");
 }
 
-// Ausgeruestet = in der rechten Hand oder auf dem Ruecken; das ist die Bedingung, unter der auch das eingebaute Bonustalent (Perk_OrcSlayer) aktiv ist
+// equipped = in the right hand or on the back. This is the condition for the built-in bonus skill (Perk_OrcSlayer) too
 bool WaffeAusgeruestet(Entity hero) {
     Entity a = hero.GetSlotItem(SLOT_RIGHT_HAND);
     if (a.IsValid() && a.GetName() == WAFFE) return true;
@@ -96,8 +96,8 @@ bool WaffeAusgeruestet(Entity hero) {
     return c.IsValid() && c.GetName() == WAFFE;
 }
 
-// Wirkung: Der Held heilt sich um LEBENSRAUB_PROZENT des angerichteten Schadens, solange der Orkschlaechter ausgeruestet ist.
-// (Das Talent Perk_Lifesteal selbst laesst sich nicht aktivieren: LearnSkill/ActivateSkill liefern false, gemessen 2026-11-06.)
+// Effect: the hero heals by LEBENSRAUB_PROZENT of the damage while the Orkschlaechter is equipped.
+// (The skill Perk_Lifesteal itself cannot be activated: LearnSkill and ActivateSkill give false, measured 2026-11-06.)
 void OnDamage(Entity victim, Entity inflictor, Entity owner, int amount, int type) {
     Entity hero = GetHero();
     if (!hero.IsValid() || !owner.IsValid() || owner != hero || victim == hero) return;
@@ -114,7 +114,7 @@ void OnDamage(Entity victim, Entity inflictor, Entity owner, int amount, int typ
     }
 }
 
-// Messung fuer die Kachel im Charakterbogen: Hat der Held Stapel fuer Lern-Items (auch fuer nicht gelernte Talente)? Fehlt unser Item, einmal anlegen und beobachten.
+// Measurement for the tile in the character sheet: does the hero have stacks for learn items (also for skills that are not learned)? If the item of this mod is missing, make it 1 time and look.
 void StapelPruefen(Entity hero) {
     if (stapelGeprueft || !fertig) return;
     stapelGeprueft = true;
@@ -125,7 +125,7 @@ void StapelPruefen(Entity hero) {
     if (hero.GetItemCount(LERNITEM) <= 0) {
         int rc = hero.AddItems(LERNITEM, 1);
         print("Stapel angelegt: AddItems(" + LERNITEM + ") rc=" + rc + ", danach Anzahl " + hero.GetItemCount(LERNITEM) + " | " + Zustand(hero, NEU));
-        // Die Engine zaehlt Bonustalente nur beim Ausruesten. War die Waffe schon ausgeruestet, als der Stapel entstand, einmal nachholen
+        // The engine counts bonus skills only when the hero equips the weapon. If the weapon was already equipped when the stack was made, do it now 1 time
         if (WaffeAusgeruestet(hero) && !hero.IsSkillActive(NEU)) {
             bool a = hero.ActivateSkill(NEU);
             manuell = a;
@@ -142,14 +142,14 @@ void Entfernen(Entity hero) {
         print("Abschalten: DeactivateSkill=" + d + " | " + Zustand(hero, NEU));
     }
     int n = hero.GetItemCount(LERNITEM);
-    int r = n > 0 ? hero.DeleteItemStack(LERNITEM) : 0;   // RemoveItems laesst bei dauerhaften Items einen leeren Stapel stehen
+    int r = n > 0 ? hero.DeleteItemStack(LERNITEM) : 0;   // RemoveItems leaves an empty stack for permanent items
     entfernt = true;
     print("Abschalten: Stapel " + LERNITEM + " entfernt: vorher " + n + ", Stapel geloescht=" + r + ", jetzt " + hero.GetItemCount(LERNITEM) + " | " + Zustand(hero, NEU));
     PrintScreen("Lebensraub entfernt: jetzt speichern, dann die Mod abschalten", 8.0f, 255, 220, 80);
 }
 
-// Speichern (ab API 31): Der Lern-Item-Stapel steht sonst im Spielstand und kann dort mit fremden Mods oder ohne diese Mod den Charakterbogen zum Absturz bringen.
-// Darum vor dem Schreiben Talent deaktivieren und Stapel loeschen, danach (auch bei Fehlschlag) wieder anlegen und, wenn die Waffe ausgeruestet ist, neu aktivieren.
+// Save (from API 31): if not removed, the learn item stack is in the saved game. With other mods, or without this mod, it can crash the character sheet.
+// Thus, before the write, turn off the skill and delete the stack. After it (also after a failure), make it again and, if the weapon is equipped, turn it on again.
 bool stapelEntnommen = false;
 void OnBeforeSave(const bCString &in name) {
     if (ENTFERNEN || !fertig) return;
@@ -169,7 +169,7 @@ void OnAfterSave(const bCString &in name, int ok) {
     stapelEntnommen = false;
     Entity hero = GetHero();
     if (!hero.IsValid()) return;
-    stapelGeprueft = false;   // StapelPruefen legt den Stapel wieder an und holt die Aktivierung nach
+    stapelGeprueft = false;   // StapelPruefen makes the stack again and does the late activation
     StapelPruefen(hero);
     print("Gespeichert '" + name + "' (ok=" + ok + "): Stapel wiederhergestellt: " + hero.GetItemCount(LERNITEM) + " | " + Zustand(hero, NEU));
 }
@@ -202,7 +202,7 @@ void OnFrame(float dt) {
     Aufraeumen(hero, SLOT_BACK_LEFT);
     bool halten = hero.IsSkillActive(BASIS);
 
-    // Messung: bei jeder Aenderung eine Zeile, hoechstens 60 Zeilen
+    // measurement: one line for each change, maximum 60 lines
     bCString m = "Orktoeter " + (halten ? "aktiv" : "nicht aktiv") + " | " + Zustand(hero, "Perk_1H_1") + " | " + Zustand(hero, BASIS) + " | " + Zustand(hero, NEU);
     if (m != letzteMessung && messLog < 60) {
         messLog++;

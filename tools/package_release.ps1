@@ -19,16 +19,23 @@ foreach ($f in "g3asm.dll", "g3asm.map", "g3asm_packmod.exe") {
     $p = Join-Path $BuildDir "g3asm\$f"
     if (Test-Path $p) { Copy-Item $p (Join-Path $stage "bin\g3asm\") }
 }
-# Laufzeit als Script-DLL (Script_G3ASM_<API>.dll) fuer Mod-Pakete an Spieler
+# runtime as a script DLL (Script_G3ASM_<API>.dll) for mod packages for players
 Get-ChildItem (Join-Path $BuildDir "g3asm") -Filter "Script_G3ASM_*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $stage "bin\g3asm\")
 Copy-Item (Join-Path $root "tools\install_loader.ps1"), (Join-Path $root "tools\g3pak_read.py") (Join-Path $stage "tools\")
 Copy-Item (Join-Path $root "examples") $stage -Recurse
 Copy-Item (Join-Path $root "docs\modkit") (Join-Path $stage "docs") -Recurse
+# English documentation: same layout as the German documentation, in docs\en.
+New-Item -ItemType Directory -Force (Join-Path $stage "docs\en") | Out-Null
+Copy-Item (Join-Path $root "docs\en\modkit") (Join-Path $stage "docs\en") -Recurse
 # Private planning files live next to the public docs on the maintainer's machine only (git-excluded); never ship them in a package.
-foreach ($p in "roadmap.md", "plugin-analyse.md", "messnotizen.md") { Remove-Item (Join-Path $stage "docs\modkit\$p") -Force -ErrorAction SilentlyContinue }
+foreach ($p in "roadmap.md", "plugin-analyse.md", "messnotizen.md") {
+    Remove-Item (Join-Path $stage "docs\modkit\$p") -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $stage "docs\en\modkit\$p") -Force -ErrorAction SilentlyContinue
+}
 foreach ($f in "README.md", "README.en.md", "LICENSE", "LICENSE-EXCEPTIONS.md") { if (Test-Path (Join-Path $root $f)) { Copy-Item (Join-Path $root $f) $stage } }
-# Both READMEs link docs/compatibility.md
+# Both READMEs link docs/compatibility.md and docs/en/compatibility.md
 Copy-Item (Join-Path $root "docs\compatibility.md") (Join-Path $stage "docs\")
+Copy-Item (Join-Path $root "docs\en\compatibility.md") (Join-Path $stage "docs\en\")
 
 $install = @"
 G3 AngelScript Modkit (G3ASM) $Version for Gothic 3 (original game, 32-bit)
@@ -46,9 +53,9 @@ Example mods: copy examples\mods\<name> to <Gothic 3>\g3asm\mods\ and enable it 
 
 Share a mod with players (they do not need the modkit; the package brings the runtime bin\g3asm\Script_G3ASM_*.dll):
   bin\g3asm\g3asm_packmod.exe release "C:\Path\to\Gothic 3\g3asm\mods\my_mod" "C:\Path\to\output"
-Players: put the package folder into <Gothic 3>\MDS\Mods\ and install it with the Union Starter (README: "Using mods (for players)").
+Players: put the package folder into <Gothic 3>\MDS\Mods\ and install it with the Union Starter (README.en.md: "Use mods (for players)").
 Overview: README.en.md (English), README.md (German)
-Documentation (German): docs\modkit\index.md
+Documentation: docs\en\modkit\index.md (English), docs\modkit\index.md (German)
 "@
 [IO.File]::WriteAllText((Join-Path $stage "INSTALL.txt"), $install.Replace("`n", "`r`n"), (New-Object Text.UTF8Encoding($false)))
 

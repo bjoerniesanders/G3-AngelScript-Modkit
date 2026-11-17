@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-"""Liest G3V0-Archive (Gothic-3-.pak/.cpt/.p00/.m00/.mod): Verzeichnis anzeigen, Dateien ansehen und entpacken, auch komprimierte (zlib).
+# Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+"""Reads G3V0 archives (Gothic 3 .pak/.cpt/.p00/.m00/.mod): shows the directory, shows and unpacks files, also compressed files (zlib).
 
-Aufruf (nur Lesen; mit  python -I  starten):
-  python -I tools/g3pak_read.py list    <Archiv> [Teilname]            Dateien (mit Teilname im Pfad) auflisten
-  python -I tools/g3pak_read.py show    <Archiv> <Teilname> [Zeichen]   lesbare Zeichen der Datei(en) ausgeben (nicht lesbare Bytes als '.')
-  python -I tools/g3pak_read.py extract <Archiv> <Teilname> <Ordner>    Datei(en) in den Ordner schreiben (Pfade aus dem Archiv, unterhalb des Ordners)
+Usage (read only; start with  python -I):
+  python -I tools/g3pak_read.py list    <archive> [part of name]            list the files (with the part of the name in the path)
+  python -I tools/g3pak_read.py show    <archive> <part of name> [chars]   write the readable characters of the file(s) (bytes that are not readable as '.')
+  python -I tools/g3pak_read.py extract <archive> <part of name> <folder>   write the file(s) into the folder (paths from the archive, below the folder)
 
-Das Format ist das, das g3asm_packmod schreibt (siehe src/pack_mod.cpp): Kopf mit Verzeichnisversatz, Verzeichnis am Ende, je Datei Versatz, gepackte und
-echte Groesse, Komprimierung (0 gespeichert, sonst zlib). Dieses Werkzeug schliesst die Luecke, dass g3asm_packmod komprimierte Eintraege nur auflistet.
-Vorlagen (.tple) sind ein Eigenschaftsstrom (GENOMFLE/GENOMETP), kein Text; mit 'show' sieht man die Namen der Eigenschaften, die Werte stehen binaer.
+The format is the format that g3asm_packmod writes (see src/pack_mod.cpp): a header with the directory offset, the directory at the end, for each file the offset, the packed
+and the real size, the compression (0 stored, other values zlib). This tool closes the gap that g3asm_packmod only lists compressed entries.
+Templates (.tple) are a property stream (GENOMFLE/GENOMETP), not text. With 'show', you see the names of the properties. The values are binary.
 """
 import os
 import re
@@ -110,7 +110,7 @@ def main(argv):
         else:
             out_dir = os.path.abspath(argv[4])
             target = os.path.abspath(os.path.join(out_dir, *e[0].split('/')))
-            if os.path.commonpath([out_dir, target]) != out_dir:   # kein Ausbrechen aus dem Zielordner
+            if os.path.commonpath([out_dir, target]) != out_dir:   # no escape from the target folder
                 print('uebersprungen (Pfad ausserhalb):', e[0])
                 continue
             os.makedirs(os.path.dirname(target), exist_ok=True)

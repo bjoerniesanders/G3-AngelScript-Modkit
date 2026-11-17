@@ -1,26 +1,26 @@
-// Begleiter teleportieren mit (ab API 33): Teleportiert sich der Held per Rune oder Zauber, kommen seine Begleiter mit.
-// Ablauf: Das Spielskript "MagicTeleport" (Script_Game.dll) wird per WatchScript/Override_Script abgefangen. VOR dem Original merkt sich die Mod, wer
-// mitkommt; nach dem Original (Super) holt sie diese Mitglieder mit Entity.TeleportTo zum Helden. Weil der Held erst nach dem Ueberblenden am Ziel stehen
-// kann, prueft die Mod NACHHOLEN Sekunden spaeter noch einmal und holt alle nach, die weiter als WEIT entfernt sind.
-// Mitglieder: gCParty_PS.PartyMemberType 1 Party (Begleiter), 3 Slave, 5 Summoned (Beschwoerung) kommen mit; 4 Controlled (Verwandlung/Kontrolle) und 2 Mob nicht.
-// Wartende Begleiter (der Held hat "Warte hier" gesagt) bleiben, wenn WARTENDE_MIT = false.
-// Gemessen 2026-11-09: MagicTeleport selbst schaltet alle Begleiter auf Warten (im normalen Spiel bleiben sie so am alten Ort stehen). Darum zaehlt der
-// Wartestatus von VOR dem Teleport, und die Mod hebt das Warten der Mitgenommenen danach wieder auf (sofort und nach NACHHOLEN Sekunden).
-// Nach TeleportTo setzt die Mod jeden Begleiter NEBEN cm neben den Helden, mehrere im Kreis verteilt (genau auf dem Helden spricht er ihn sofort an).
-// Protokoll: g3asm.log (Positionen vor/nach, je Mitglied Typ, Abstand, Ergebnis).
+// Companions teleport with the hero (from API 33): if the hero teleports with a rune or a spell, the companions come too.
+// Sequence: the mod intercepts the game script "MagicTeleport" (Script_Game.dll) through WatchScript and Override_Script. BEFORE the original, the mod keeps a list of who
+// comes along. After the original (Super), it brings these members to the hero with Entity.TeleportTo. Because the hero can be at the target only after the fade,
+// the mod checks again NACHHOLEN seconds later and brings all members that are farther away than WEIT.
+// Members: gCParty_PS.PartyMemberType 1 Party (companion), 3 Slave, 5 Summoned (summon) come along. 4 Controlled (transformation or control) and 2 Mob do not.
+// Waiting companions (the hero said "Warte hier", wait here) stay if WARTENDE_MIT = false.
+// Measured 2026-11-09: MagicTeleport itself sets all companions to wait (in the normal game, they thus stay at the old location). Thus the
+// wait status from BEFORE the teleport counts, and the mod cancels the wait of the members that came along after this (immediately and after NACHHOLEN seconds).
+// After TeleportTo, the mod puts each companion NEBEN cm next to the hero, more than one in a circle (exactly on the hero, the companion speaks to the hero immediately).
+// Log: g3asm.log (positions before and after; for each member type, distance, result).
 const bool WARTENDE_MIT = false;
-const float NACHHOLEN = 1.5f;   // Sekunden
-const float WEIT = 1500.0f;     // Abstand in Spieleinheiten (cm)
-const float NEBEN = 150.0f;     // Abstand neben dem Helden
+const float NACHHOLEN = 1.5f;   // seconds
+const float WEIT = 1500.0f;     // distance in game units (cm)
+const float NEBEN = 150.0f;     // distance next to the hero
 
 float nachholen = -1;
-array<Entity> mitnehmen;   // vor dem Teleport bestimmt
+array<Entity> mitnehmen;   // set before the teleport
 
 void main() {
     WatchScript("MagicTeleport");
 }
 
-// Typ als Zahl aus dem Eigenschaftstext ("1 : gEPartyMemberType_Party")
+// type as a number from the property text ("1 : gEPartyMemberType_Party")
 int Typ(Entity m) {
     bCString t = GetProperty(m, "Party", "PartyMemberType");
     if (t.IsEmpty()) return -1;
@@ -39,7 +39,7 @@ bool KommtMit(Entity m) {
     return true;
 }
 
-// Mitglieder bestimmen, die mitkommen (vor dem Teleport, solange der Wartestatus noch der des Spielers ist)
+// find the members that come along (before the teleport, while the wait status is still the status from the player)
 void Bestimmen() {
     mitnehmen.resize(0);
     Entity held = GetHero();
@@ -54,7 +54,7 @@ void Bestimmen() {
     }
 }
 
-// die bestimmten Mitglieder holen; nurWeit: nur die, die weiter als WEIT weg sind. Rueckgabe: Zahl geholter
+// bring the selected members; nurWeit: only those that are farther away than WEIT. Return value: the number brought
 int Holen(bool nurWeit, const bCString &in anlass) {
     Entity held = GetHero();
     int geholt = 0;
@@ -66,7 +66,7 @@ int Holen(bool nurWeit, const bCString &in anlass) {
         if (nurWeit && d <= WEIT) continue;
         bool ok = m.TeleportTo(held);
         if (ok) {
-            float w = 2.4f * float(i) + 1.0f;   // je Begleiter ein anderer Platz im Kreis
+            float w = 2.4f * float(i) + 1.0f;   // a different place in the circle for each companion
             m.SetPosition(held.GetPosition() + bCVector(NEBEN * cos(w), 0, NEBEN * sin(w)));
             geholt++;
         }
@@ -100,7 +100,7 @@ void OnFrame(float dt) {
     mitnehmen.resize(0);
 }
 
-// Strg + Ziffernblock , (Komma/Entf-Taste des Ziffernblocks) zeigt die Gruppe des Helden im Protokoll
+// Ctrl + numeric keypad , (comma or Delete key of the numeric keypad) shows the group of the hero in the log
 void OnKey(int vk, bool down) {
     if (!down || vk != 0x6E || !IsKeyDown(0x11)) return;
     Entity held = GetHero();

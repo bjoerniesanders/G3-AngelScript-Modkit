@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Datei-Patches ("Script Patches"): Mods liefern Unified-Diff-Dateien <Mod>\ScriptPatches\*.patch, die auf die Datendateien des Spiels (Quests, Infos, ...) angewendet werden,
-// BEVOR das Spiel sie liest. Das Spiel liest seine Textdaten (z. B. Data\Quests.pak -> G3_World_01\<Name>_quest_G3_World_01.quest) ueber das Dateisystem-Modul, bei dem
-// physische Dateien Vorrang vor Archiveintraegen haben. Das Modkit erzeugt deshalb die gepatchte Fassung als physische Datei unter <Spiel>\Data\<Archiv>\<Pfad>
-// (Overlay); das Archiv selbst bleibt unveraendert. Bei jedem Start werden die zuletzt erzeugten Overlay-Dateien (Liste g3asm\patched_files.txt) entfernt und alles
-// neu aus dem Original berechnet - Mods lassen sich so ohne Spuren entfernen und mehrere Mods stapeln ihre Patches in Ladereihenfolge.
-// Liegt am Ziel schon eine fremde lose Datei (anderer Mod, eigene Aenderung), ist sie die Basis: sie wird nach g3asm\patch_backup\<Pfad> gesichert und beim
-// naechsten Start zurueckgespielt. Die Liste merkt je Datei Groesse und CRC32 des Geschriebenen; eine seitdem geaenderte Datei gehoert nicht mehr dem Modkit
-// und bleibt unangetastet.
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// File patches ("Script Patches"): mods give unified diff files <mod>\ScriptPatches\*.patch that the modkit applies to the data files of the game (quests, infos, ...)
+// BEFORE the game reads them. The game reads its text data (for example Data\Quests.pak -> G3_World_01\<name>_quest_G3_World_01.quest) through the file system module, in which
+// physical files have priority over archive entries. Thus the modkit makes the patched version as a physical file in <game>\Data\<archive>\<path>
+// (overlay). The archive itself does not change. At each start, the modkit removes the overlay files that it made the last time (list g3asm\patched_files.txt) and calculates everything
+// again from the original - thus you can remove mods without traces, and more than one mod stacks its patches in the load order.
+// If a loose file of another source is already at the target (another mod, your own change), it is the base: the modkit makes a backup of it in g3asm\patch_backup\<path> and
+// restores it at the next start. The list keeps the size and the CRC32 of the written data for each file. A file that changed since then does not belong to the modkit anymore
+// and stays without changes.
 //
-// Pfade im Diff: a/Data/<Archiv>/<Pfad im Archiv> bzw. b/..., z. B. b/Data/Quests/G3_World_01/Abbas_Artefakt_quest_G3_World_01.quest. Ein Eintrag --- /dev/null legt eine neue Datei an.
-// Archive werden direkt gelesen (G3V0-Format, unkomprimierte Eintraege); komprimierte Eintraege (Strings.pak\stringtable.ini) sind noch nicht unterstuetzt.
+// Paths in the diff: a/Data/<archive>/<path in the archive> or b/..., for example b/Data/Quests/G3_World_01/Abbas_Artefakt_quest_G3_World_01.quest. An entry --- /dev/null makes a new file.
+// The code reads archives directly (G3V0 format, entries that are not compressed). Compressed entries (Strings.pak\stringtable.ini) are not supported yet.
 #include <windows.h>
 
 #include <algorithm>
@@ -56,7 +56,7 @@ bool ReadFile(const std::string& path, std::string* out) {
     std::fclose(f);
     return ok;
 }
-void MakeDirs(const std::string& dir) {   // Windows-Pfad, legt alle Ebenen an
+void MakeDirs(const std::string& dir) {   // Windows path, makes all levels
     for (size_t i = 0; i < dir.size(); ++i)
         if (dir[i] == '\\' && i > 2) CreateDirectoryA(dir.substr(0, i).c_str(), nullptr);
     CreateDirectoryA(dir.c_str(), nullptr);
@@ -75,7 +75,7 @@ bool FileExists(const std::string& path) {
     const DWORD a = GetFileAttributesA(path.c_str());
     return a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY);
 }
-uint32_t Crc32(const std::string& d) {   // zlib-Polynom; die Dateien sind klein, darum ohne Tabelle
+uint32_t Crc32(const std::string& d) {   // zlib polynomial; the files are small, thus without a table
     uint32_t c = 0xFFFFFFFFu;
     for (const char ch : d) {
         c ^= static_cast<unsigned char>(ch);
@@ -83,12 +83,12 @@ uint32_t Crc32(const std::string& d) {   // zlib-Polynom; die Dateien sind klein
     }
     return ~c;
 }
-// Zielpfad relativ zum Spielordner: kein Laufwerk, kein fuehrender Trenner, kein ".." (Patches und Liste duerfen den Spielordner nicht verlassen)
+// target path relative to the game folder: no drive, no leading separator, no ".." (patches and the list must not leave the game folder)
 bool SafeRelPath(const std::string& p) {
     return !p.empty() && p[0] != '/' && p[0] != '\\' && p.find(':') == std::string::npos && p.find("..") == std::string::npos;
 }
 
-// ---------------------------------------------------------------- G3V0-Archiv lesen
+// ---------------------------------------------------------------- read a G3V0 archive
 struct PakReader {
     std::string path;
     std::string meta;
@@ -117,7 +117,7 @@ struct PakReader {
     std::string Str() {
         const uint32_t n = U32();
         std::string s;
-        if (pos > meta.size() || n > meta.size() - pos) {   // beschaedigtes Verzeichnis: ans Ende, damit alle Schleifen enden
+        if (pos > meta.size() || n > meta.size() - pos) {   // damaged directory: to the end, so that all loops end
             pos = meta.size();
             return s;
         }
@@ -158,7 +158,7 @@ struct PakReader {
         const uint64_t moff = uint64_t(h[6]) | (uint64_t(h[7]) << 32);
         _fseeki64(f, 0, SEEK_END);
         const int64_t size = _ftelli64(f);
-        // Verzeichnis vor dem Kopfende oder ueber 256 MB: kein gueltiges Archiv
+        // directory before the end of the header or above 256 MB: not a valid archive
         if (int64_t(moff) < 0x30 || int64_t(moff) >= size || size - int64_t(moff) > (int64_t(1) << 28)) return false;
         meta.resize(size_t(size - int64_t(moff)));
         _fseeki64(f, int64_t(moff), SEEK_SET);
@@ -171,12 +171,12 @@ struct PakReader {
     ~PakReader() {
         if (f) std::fclose(f);
     }
-    // Rueckgabe: 1 ok, 0 nicht gefunden, -1 komprimiert/nicht lesbar
+    // return value: 1 ok, 0 not found, -1 compressed or not readable
     int Read(const std::string& inner, std::string* out) {
         const std::string want = Lower(Slash(inner));
         for (const Entry& e : entries) {
             if (Lower(Slash(e.name)) != want) continue;
-            if (e.type != 0 || e.a > (uint64_t(64) << 20)) return -1;   // komprimiert, oder keine Textdatei (ueber 64 MB)
+            if (e.type != 0 || e.a > (uint64_t(64) << 20)) return -1;   // compressed, or not a text file (above 64 MB)
             out->resize(size_t(e.a));
             _fseeki64(f, int64_t(e.off), SEEK_SET);
             return std::fread(out->empty() ? nullptr : &(*out)[0], 1, out->size(), f) == out->size() ? 1 : -1;
@@ -320,7 +320,7 @@ bool MatchAt(const std::vector<std::string>& file, size_t at, const std::vector<
         if (!SameLine(file[at + k], old[k])) return false;
     return true;
 }
-// Wendet alle Hunks auf die Zeilenliste an. Hunks duerfen gegen die erwartete Stelle verschoben sein (+-300 Zeilen).
+// Applies all hunks to the line list. Hunks can have an offset from the expected location (+-300 lines).
 bool ApplyHunks(std::vector<std::string>* lines, const std::vector<Hunk>& hunks, std::string* err) {
     long delta = 0;
     int n = 0;
@@ -344,7 +344,7 @@ bool ApplyHunks(std::vector<std::string>* lines, const std::vector<Hunk>& hunks,
         lines->erase(lines->begin() + found, lines->begin() + found + long(h.oldLines.size()));
         lines->insert(lines->begin() + found, h.newLines.begin(), h.newLines.end());
         delta += long(h.newLines.size()) - long(h.oldLines.size());
-        delta += found - expect;   // tatsaechliche Verschiebung mitnehmen
+        delta += found - expect;   // keep the real offset
     }
     return true;
 }
@@ -358,7 +358,7 @@ std::string Join(const std::vector<std::string>& lines, bool crlf, bool finalNew
     return out;
 }
 
-// Original der Zieldatei: Archiv (Data/<Archiv>/<innen>) oder - falls eine eigene physische Datei existiert - diese
+// original of the target file: archive (Data/<archive>/<inner>) or - if an own physical file exists - that file
 bool LoadBase(const std::string& gameDir, const std::string& target, std::string* content, std::string* how, std::string* err) {
     if (ReadFile(gameDir + Win(target), content)) {
         *how = "physische Datei";
@@ -399,8 +399,8 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
     const std::string manifest = gameDir + "g3asm\\patched_files.txt";
     const std::string backupDir = gameDir + "g3asm\\patch_backup\\";
 
-    // 1) Overlay-Dateien des letzten Laufs entfernen bzw. die gesicherte fremde Datei zurueckspielen. Zeile: Pfad [Tab Groesse Tab CRC32]; aeltere Listen haben
-    //    nur den Pfad. Eine Datei, die nicht mehr dem Geschriebenen entspricht, hat jemand anderes ersetzt: sie bleibt, ihre Sicherung entfaellt.
+    // 1) Remove the overlay files of the last run, or restore the backed-up file of another source. Line: path [tab size tab CRC32]; older lists have
+    //    only the path. If a file is not the same as the written data anymore, another person replaced it: it stays, and its backup is discarded.
     std::string old;
     int removed = 0;
     if (ReadFile(manifest, &old)) {
@@ -466,7 +466,7 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
         return 0;
     }
 
-    // 3) je Zieldatei der Reihe nach anwenden
+    // 3) apply for each target file, in sequence
     struct Work {
         std::vector<std::string> lines;
         bool crlf = true, finalNewline = true;
@@ -508,7 +508,7 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
         ++w.applied;
     }
 
-    // 4) Ergebnis als physische Dateien schreiben und merken
+    // 4) write the result as physical files and keep a list
     std::string newManifest;
     int written = 0;
     for (const std::string& key : order) {
@@ -522,7 +522,7 @@ int ApplyScriptPatches(const std::string& gameDirIn, const std::string& modsDir,
             }
         const std::string data = Join(w.lines, w.crlf, w.finalNewline);
         const std::string path = gameDir + Win(target), backup = backupDir + Win(target);
-        const bool foreign = FileExists(path);   // eigene Dateien sind in Schritt 1 entfernt: was jetzt da liegt, gehoert jemand anderem
+        const bool foreign = FileExists(path);   // own files were removed in step 1: a file that is there now belongs to another source
         if (foreign) {
             MakeDirs(backup.substr(0, backup.find_last_of('\\')));
             if (!CopyFileA(path.c_str(), backup.c_str(), FALSE)) {

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// g3asm_packmod: Kommandozeilenwerkzeug zum Packen und Pruefen von Gothic-3-Mod-Archiven (G3V0), Gegenstueck zu G3PakDir.
-//   g3asm_packmod pack    <Ordner> <Archiv>                  Ordner als Archiv schreiben (z. B. Quests.mod)
-//   g3asm_packmod install <Ordner> <Data-Ordner> <Volume> [m|n]   als naechste freie Generation ablegen (Quests.mod, Quests.m00, ...; n = .nod/.n00)
-//   g3asm_packmod copy    <Archiv> <Spielordner|Data-Ordner> <Volume> [m|n]   fertiges Archiv (z. B. ModFiles\Quests.m0x) als naechste Generation einspielen
-//   g3asm_packmod next    <Data-Ordner> <Volume> [m|n]       naechsten freien Dateinamen anzeigen
-//   g3asm_packmod list    <Archiv>                           Inhalt anzeigen
-//   g3asm_packmod release <Mod-Ordner> <Ziel-Ordner> [--runtime <Script_G3ASM_NNN.dll>]
-//                                                            Paket fuer Spieler (Union-Starter-Aufbau) bauen, siehe Release()
-// Optionen (vor den Argumenten): --comments (Quellpfade speichern), --no-deleted (".deleted"-Dateien als normale Dateien packen)
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// g3asm_packmod: command-line tool to pack and check Gothic 3 mod archives (G3V0), the equivalent of G3PakDir.
+//   g3asm_packmod pack    <folder> <archive>                  write a folder as an archive (for example Quests.mod)
+//   g3asm_packmod install <folder> <Data folder> <volume> [m|n]   put it as the next free generation (Quests.mod, Quests.m00, ...; n = .nod/.n00)
+//   g3asm_packmod copy    <archive> <game folder|Data folder> <volume> [m|n]   install a complete archive (for example ModFiles\Quests.m0x) as the next generation
+//   g3asm_packmod next    <Data folder> <volume> [m|n]       show the next free file name
+//   g3asm_packmod list    <archive>                           show the contents
+//   g3asm_packmod release <mod folder> <target folder> [--runtime <Script_G3ASM_NNN.dll>]
+//                                                            make a package for players (Union Starter layout), see Release()
+// Options (before the arguments): --comments (keep the source paths), --no-deleted (pack ".deleted" files as normal files)
 #include <windows.h>
 
 #include <cstdio>
@@ -32,15 +32,15 @@ static int Usage() {
     return 2;
 }
 
-// ---------------------------------------------------------------- release: Paket fuer Spieler
-// Aus einem Mod-Ordner (wie unter g3asm\mods\) wird ein Paket im Aufbau des Union Starters (MDS\Mods\<Paket>\):
-//   <Ziel>\<Mod>\Mod.ini                                  [Main] Name, Category, Required (aus [mod] title/category/requires)
-//   <Ziel>\<Mod>\ScriptFiles\scripts\Script_G3ASM_NNN.dll  Laufzeit (das Spiel laedt sie selbst; kein Modkit beim Spieler noetig)
-//   <Ziel>\<Mod>\ModFiles\G3ASM.m0x                       Skripte, mod.ini, Texte unter <Mod>/ (das Modkit entpackt sie beim Start)
-//   <Ziel>\<Mod>\ModFiles\<Volume>.m0x / .n0x            Spieldaten-Archive der Mod (aus <Mod>\ModFiles\), unveraendert
-//   <Ziel>\<Mod>\G3ASM-LICENSE.txt                        Lizenz und Quellcode-Adresse der Laufzeit (GPL-Objektcode im Paket)
-// Nicht ins Skript-Archiv: ModFiles\*.m0x/.n0x (eigene Archive), Source\ (Quellen der Archive), ScriptPatches\ (Datei-Patches wirken nur mit dem Loader),
-// Dateien/Ordner mit Punkt am Anfang. enabled=0 in mod.ini wird im Paket zu enabled=1 (Spieler haben kein load_order.txt).
+// ---------------------------------------------------------------- release: package for players
+// A mod folder (as in g3asm\mods\) becomes a package in the layout of the Union Starter (MDS\Mods\<package>\):
+//   <target>\<mod>\Mod.ini                                  [Main] Name, Category, Required (from [mod] title/category/requires)
+//   <target>\<mod>\ScriptFiles\scripts\Script_G3ASM_NNN.dll  runtime (the game loads it itself; players do not need the modkit)
+//   <target>\<mod>\ModFiles\G3ASM.m0x                       scripts, mod.ini, texts below <mod>/ (the modkit unpacks them at the start)
+//   <target>\<mod>\ModFiles\<volume>.m0x / .n0x            game data archives of the mod (from <mod>\ModFiles\), without changes
+//   <target>\<mod>\G3ASM-LICENSE.txt                        license and source code address of the runtime (GPL object code in the package)
+// Not in the script archive: ModFiles\*.m0x/.n0x (own archives), Source\ (sources of the archives), ScriptPatches\ (file patches work only with the loader),
+// files and folders that start with a period. enabled=0 in mod.ini becomes enabled=1 in the package (players have no load_order.txt).
 namespace {
 bool IsDirA(const std::string& p) {
     const DWORD a = GetFileAttributesA(p.c_str());
@@ -97,7 +97,7 @@ void RemoveTree(const std::string& dir) {
     }
     RemoveDirectoryA(dir.c_str());
 }
-// [mod]-Abschnitt einer mod.ini: Schluessel klein -> Wert (UTF-8-BOM erlaubt)
+// [mod] section of a mod.ini: key in lower case -> value (UTF-8 BOM permitted)
 std::vector<std::pair<std::string, std::string>> ModSection(const std::string& text) {
     std::vector<std::pair<std::string, std::string>> out;
     bool in = false;
@@ -122,7 +122,7 @@ std::string Get(const std::vector<std::pair<std::string, std::string>>& sec, con
         if (kv.first == key) return kv.second;
     return std::string();
 }
-// mod.ini fuer das Paket: Zeilen "enabled=0" im [mod]-Abschnitt werden zu "enabled=1"
+// mod.ini for the package: lines "enabled=0" in the [mod] section become "enabled=1"
 std::string EnableModIni(const std::string& text, bool* changed) {
     std::string out;
     bool in = false;
@@ -150,7 +150,7 @@ struct Copied {
     int files = 0;
     std::vector<std::string> skipped;
 };
-// Mod-Ordner in den Bereitstellungsordner kopieren, ohne die Teile, die nicht ins Skript-Archiv gehoeren (rel = Pfad relativ zum Mod-Ordner)
+// copy the mod folder into the staging folder, without the parts that do not go into the script archive (rel = path relative to the mod folder)
 bool CopyModTree(const std::string& src, const std::string& dst, const std::string& rel, Copied* c, std::string* err) {
     WIN32_FIND_DATAA fd;
     HANDLE h = FindFirstFileA((src + "\\*").c_str(), &fd);
@@ -178,7 +178,7 @@ bool CopyModTree(const std::string& src, const std::string& dst, const std::stri
     FindClose(h);
     return ok;
 }
-// Laufzeit: --runtime oder die Script_G3ASM_<n>.dll mit der hoechsten Nummer neben diesem Programm
+// runtime: --runtime, or the Script_G3ASM_<n>.dll with the highest number next to this program
 std::string FindRuntime() {
     char exe[MAX_PATH];
     GetModuleFileNameA(nullptr, exe, MAX_PATH);
@@ -201,7 +201,7 @@ std::string FindRuntime() {
     return best;
 }
 
-// Lizenzhinweis fuer die mitgelieferte Laufzeit (liegt im Paketordner, der Union Starter kopiert ihn nicht ins Spiel)
+// license notice for the runtime in the package (it is in the package folder; the Union Starter does not copy it into the game)
 const char* const kLicenseFile = "G3ASM-LICENSE.txt";
 const char* const kSourceUrl = "https://github.com/bjoerniesanders/G3-AngelScript-Modkit";
 std::string LicenseNotice(const std::string& rtFile) {
@@ -278,7 +278,7 @@ int Release(std::string modDir, const std::string& outRoot, std::string runtime,
         }
     }
 
-    // Bereitstellen: <tmp>\<Mod>\... -> packen als <Mod>/... ; danach entfernen
+    // staging: <tmp>\<mod>\... -> pack as <mod>/... ; then remove
     char tmpBase[MAX_PATH];
     GetTempPathA(MAX_PATH, tmpBase);
     const std::string stage = std::string(tmpBase) + "g3asm_release_" + std::to_string(GetCurrentProcessId()),
@@ -305,7 +305,7 @@ int Release(std::string modDir, const std::string& outRoot, std::string runtime,
         RemoveTree(pkg);
         return 1;
     }
-    // Spieldaten-Archive der Mod unveraendert uebernehmen
+    // copy the game data archives of the mod without changes
     int archives = 0;
     WIN32_FIND_DATAA fd;
     HANDLE h = FindFirstFileA((modDir + "\\ModFiles\\*").c_str(), &fd);
@@ -345,7 +345,7 @@ int Release(std::string modDir, const std::string& outRoot, std::string runtime,
         RemoveTree(pkg);
         return 1;
     }
-    // Die Laufzeit ist GPL-Objektcode: wer das Paket weitergibt, gibt sie weiter und muss sagen, wo ihr Quellcode liegt (GPL-3.0 Abschnitt 6)
+    // The runtime is GPL object code: if you give the package to other persons, you give them the runtime, and you must tell them where its source code is (GPL-3.0 section 6)
     if (!WriteText(pkg + "\\" + kLicenseFile, LicenseNotice(rtFile))) {
         std::printf("Fehler: %s nicht schreibbar\n", kLicenseFile);
         RemoveTree(pkg);
@@ -406,7 +406,7 @@ int main(int argc, char** argv) {
         const char kind = a.size() == 5 && a[4] == "n" ? 'n' : 'm';
         std::string data = a[2];
         if (GetFileAttributesA((data + "\\Data").c_str()) != INVALID_FILE_ATTRIBUTES)
-            data += "\\Data";   // Spielordner statt Data-Ordner angegeben
+            data += "\\Data";   // game folder given in place of the Data folder
         const std::string out = PackMod(a[1], data, a[3], kind, opt, &st);
         if (out.empty()) {
             std::printf("Fehler: %s\n", st.error.c_str());
@@ -418,7 +418,7 @@ int main(int argc, char** argv) {
     }
     if (cmd == "copy" &&
         (a.size() == 4 ||
-         a.size() == 5)) {   // fertiges Archiv (z. B. ModFiles\Quests.m0x) als naechste Generation einspielen, wie der Union Starter
+         a.size() == 5)) {   // install a complete archive (for example ModFiles\Quests.m0x) as the next generation, as the Union Starter does
         const char kind = a.size() == 5 && a[4] == "n" ? 'n' : 'm';
         std::string data = a[2];
         if (GetFileAttributesA((data + "\\Data").c_str()) != INVALID_FILE_ATTRIBUTES) data += "\\Data";
@@ -427,7 +427,7 @@ int main(int argc, char** argv) {
         if (!ListArchive(a[1], &e, &err)) {
             std::printf("Fehler: kein gueltiges Archiv: %s\n", err.c_str());
             return 1;
-        }   // nichts Unbrauchbares ins Spiel kopieren
+        }   // do not copy unusable files into the game
         const std::string out = NextGenerationFile(data, a[3], kind);
         if (out.empty()) {
             std::printf("Fehler: kein freier Platz fuer '%s'\n", a[3].c_str());

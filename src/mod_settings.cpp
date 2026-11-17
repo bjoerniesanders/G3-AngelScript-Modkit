@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-// Einstellungen je Mod (Skript-Schnittstelle ab Version 44). Jede Mod liest und schreibt nur ihre eigenen Werte (Mod = die gerade laufende Mod).
-//   Vorgaben:  <Mod>\mod.ini, Abschnitt [settings] (liefert der Mod-Autor mit, wird nie geschrieben)
-//   Benutzer:  <Spiel>\g3asm\settings\<Mod>.ini, Abschnitt [settings] (schreibt SetModSetting; bleibt bei einem Update der Mod erhalten)
-// Lesen: Benutzerwert, sonst Vorgabe, sonst der Standard aus dem Aufruf. Schluessel ohne Beachtung von Gross-/Kleinschreibung.
-// Die Dateien werden einmal je Mod gelesen und zwischengespeichert; beim Neuladen der Mod (Hot-Reload) wird neu gelesen. Von Hand geaenderte
-// Dateien gelten also nach dem Neuladen der Mod oder einem Neustart. Ohne Mod-Ordner (Einzelskript) gibt es nur Vorgaben, Schreiben schlaegt fehl.
-// Testprogramm: Umgebungsvariable G3ASM_SETTINGS_DIR ersetzt den Ordner fuer Benutzerwerte.
+// Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+// Settings for each mod (script interface from version 44). Each mod reads and writes only its own values (mod = the mod that runs at this time).
+//   Defaults:  <mod>\mod.ini, section [settings] (the mod author supplies it, the modkit never writes it)
+//   User:      <game>\g3asm\settings\<mod>.ini, section [settings] (SetModSetting writes it; it stays during an update of the mod)
+// Read: the user value, if there is none the default, if there is none the default from the call. Keys without case sensitivity.
+// The modkit reads the files 1 time for each mod and keeps them in a cache. When the mod reloads (hot reload), it reads them again. Thus files that you
+// changed by hand apply after a reload of the mod or after a new start. Without a mod folder (single script), there are only defaults, and writes fail.
+// Test program: the environment variable G3ASM_SETTINGS_DIR replaces the folder for user values.
 #include <windows.h>
 
 #include <angelscript.h>
@@ -25,11 +25,11 @@ namespace g3asm {
 namespace {
 
 struct Entry {
-    std::string key, value;   // key in der Schreibweise der Mod
+    std::string key, value;   // key with the spelling of the mod
 };
 struct ModSettings {
     bool loaded = false;
-    std::map<std::string, Entry> user, defaults;   // Schluessel klein geschrieben
+    std::map<std::string, Entry> user, defaults;   // key in lower case
 };
 std::mutex g_mu;
 std::map<std::string, ModSettings> g_mods;   // Modname klein geschrieben
@@ -45,8 +45,8 @@ std::string Trim(const std::string& s) {
     return s.substr(a, b - a);
 }
 
-// Einen Abschnitt einer ini-Datei lesen (eigener Leser: ohne die 64-KB-Grenze und Eigenheiten von GetPrivateProfileString,
-// UTF-8-BOM am Anfang wird uebersprungen - GetPrivateProfile* fand dann den ersten Abschnitt nicht). Doppelte Schluessel: der letzte gilt.
+// Read one section of an ini file (own reader: without the 64 KB limit and the special behavior of GetPrivateProfileString;
+// a UTF-8 BOM at the start is skipped - GetPrivateProfile* then did not find the first section). Duplicate keys: the last one applies.
 void ReadSection(const std::string& path, const std::string& sectionLower, std::map<std::string, Entry>& out) {
     FILE* f = nullptr;
     if (path.empty() || fopen_s(&f, path.c_str(), "rb") != 0 || !f) return;
@@ -80,7 +80,7 @@ void ReadSection(const std::string& path, const std::string& sectionLower, std::
 }
 
 std::string UserDir() {
-    // Windows-Umgebung statt getenv: das Testprogramm setzt die Variable mit seiner eigenen C-Laufzeit, die DLL hat eine andere
+    // Windows environment in place of getenv: the test program sets the variable with its own C run time, and the DLL has a different one
     char env[MAX_PATH];
     const DWORD n = GetEnvironmentVariableA("G3ASM_SETTINGS_DIR", env, sizeof env);
     if (n > 0 && n < sizeof env) return std::string(env);
@@ -96,7 +96,7 @@ std::string UserFile(const std::string& mod) {
     return d.empty() ? std::string() : d + "\\" + mod + ".ini";
 }
 
-// Einstellungen der laufenden Mod (geladen bei Bedarf); nullptr ohne laufenden Mod. Aufrufer haelt g_mu.
+// settings of the running mod (loaded when necessary); nullptr without a running mod. The caller holds g_mu.
 ModSettings* Current(std::string* modOut) {
     if (!ScriptHost::s_current) return nullptr;
     const std::string mod = ScriptHost::s_current->CurrentMod();

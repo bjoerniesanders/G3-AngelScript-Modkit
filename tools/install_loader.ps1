@@ -1,18 +1,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
-# Baut G3ASM mit dem schlanken Loader (src/loader) in eine Gothic-3-Kopie ein bzw. aus. Eigenstaendig, ohne das OpenGothic3-Hauptrepo.
-#   powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner> [-BuildDir build32]      Einbau
-#   powershell -NoProfile -File tools\install_loader.ps1 -Game <Spielordner> -Uninstall               Rueckbau aus der juengsten Sicherung
-# Einbau: die vorhandene dbghelp.dll des Spiels wird als dbghelp_orig.dll beiseitegelegt (der Loader leitet MiniDumpWriteDump dorthin weiter), der Loader
-# (build32\loader\dbghelp.dll) wird zu dbghelp.dll, g3asm.dll und eine g3asm.ini kommen dazu, ausserdem eine Mini-Mod und der Ordner g3asm\mods.
-# Sicherung nach <Spiel>\g3asm_backup\loader_<Zeit>\. Ist dbghelp.dll schon ein Proxy (z. B. der des Hauptrepos) und gibt es kein dbghelp_orig.dll, bricht das Skript ab.
-# Dateien werden geloescht und neu angelegt (Hardlinks zu anderen Spielkopien werden getrennt, nicht mitveraendert).
-# Voraussetzung (nur beim Einbau geprueft): Community Patch 1.75 (PE-Zeitstempel der Gothic3.exe 4F959F4F) und Parallel-Universe-Patch (paru_s1.dll,
-# scripts\Script_paru.dll). Fehlt etwas, bricht das Skript ab; -Force baut trotzdem ein (ungetestet).
+# Copyright (C) 2026 G3ASM authors. Additional permissions: LICENSE-EXCEPTIONS.md
+# Installs G3ASM with the small loader (src/loader) into a Gothic 3 copy, or uninstalls it. Standalone, without the OpenGothic3 main repository.
+#   powershell -NoProfile -File tools\install_loader.ps1 -Game <game folder> [-BuildDir build32]      install
+#   powershell -NoProfile -File tools\install_loader.ps1 -Game <game folder> -Uninstall               uninstall from the newest backup
+# Install: the script renames the existing dbghelp.dll of the game to dbghelp_orig.dll (the loader sends MiniDumpWriteDump to it). The loader
+# (build32\loader\dbghelp.dll) becomes dbghelp.dll. g3asm.dll and a g3asm.ini are added, and also a mini mod and the folder g3asm\mods.
+# Backup in <game>\g3asm_backup\loader_<time>\. If dbghelp.dll is already a proxy (for example the proxy of the main repository) and there is no dbghelp_orig.dll, the script stops.
+# The script deletes files and makes them again (hard links to other game copies are separated, not changed).
+# Requirements (checked only during the install): Community Patch 1.75 (PE time stamp of Gothic3.exe 4F959F4F) and Parallel Universe Patch (paru_s1.dll,
+# scripts\Script_paru.dll). If something is missing, the script stops. -Force installs anyway (not tested).
 param([Parameter(Mandatory)][string]$Game, [switch]$Uninstall, [string]$BuildDir = "", [switch]$Force)
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot   # G3-AngelScript-Modkit
-# ohne -BuildDir: build32 im Repo (wie in der README gebaut), sonst build32 neben dem Repo (Build als Unterprojekt eines uebergeordneten CMake-Baums)
+# without -BuildDir: build32 in the repository (as built in the README), if not there build32 next to the repository (build as a subproject of a parent CMake tree)
 if (-not $BuildDir) {
     $BuildDir = Join-Path $root "build32"
     $outer = Join-Path (Split-Path -Parent $root) "build32"
@@ -24,17 +24,17 @@ $backupRoot = Join-Path $Game "g3asm_backup"
 if (-not (Test-Path (Join-Path $Game "Gothic3.exe"))) { throw "$Game enthaelt keine Gothic3.exe" }
 if (Get-Process -Name Gothic3 -ErrorAction SilentlyContinue) { throw "Gothic3.exe laeuft - bitte zuerst beenden" }
 function Replace-File([string]$src, [string]$dst) { if (Test-Path $dst) { Remove-Item $dst -Force }; Copy-Item $src $dst }
-function Looks-Like-Proxy([string]$file) {   # Loader und Proxy des Hauptrepos enthalten diese Zeichenketten
+function Looks-Like-Proxy([string]$file) {   # the loader and the proxy of the main repository contain these strings
     $t = [Text.Encoding]::GetEncoding(1252).GetString([IO.File]::ReadAllBytes($file))
     return $t.Contains("g3asm.dll") -or $t.Contains("og3_hooks.ini") -or $t.Contains("G3ASM-Loader")
 }
-function Is-Loader([string]$file) {   # nur der schlanke Loader dieses Repos (der Proxy des Hauptrepos hat diese Zeichenketten nicht)
+function Is-Loader([string]$file) {   # only the small loader of this repository (the proxy of the main repository does not have these strings)
     $t = [Text.Encoding]::GetEncoding(1252).GetString([IO.File]::ReadAllBytes($file))
     return $t.Contains("G3ASM-Loader")
 }
 
 if ($Uninstall) {
-    # neueste Sicherung, deren dbghelp.dll NICHT der Loader ist (Original oder ein frueherer Proxy des Hauptrepos; ein zweiter Einbau sichert den Loader nicht)
+    # newest backup whose dbghelp.dll is NOT the loader (the original or an earlier proxy of the main repository; a second install does not back up the loader)
     $last = Get-ChildItem $backupRoot -Directory -Filter "loader_*" -ErrorAction SilentlyContinue | Sort-Object Name -Descending |
         Where-Object { (Test-Path (Join-Path $_.FullName "dbghelp.dll")) -and -not (Is-Loader (Join-Path $_.FullName "dbghelp.dll")) } | Select-Object -First 1
     if ($last) {

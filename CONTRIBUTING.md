@@ -1,5 +1,7 @@
 # Mitarbeiten
 
+**Deutsch** | [English](CONTRIBUTING.en.md)
+
 Kurze Hausregeln für Änderungen an diesem Repository. Sie beschreiben, wie der Code heute gebaut ist; wer davon abweicht, schreibt den Grund dazu.
 Die Regeln für die Skript-Schnittstelle stehen in [docs/modkit/api-policy.md](docs/modkit/api-policy.md), die Doku für Modder unter [docs/modkit](docs/modkit/index.md).
 
@@ -9,7 +11,7 @@ Die Regeln für die Skript-Schnittstelle stehen in [docs/modkit/api-policy.md](d
 | `src/` | DLL-Quellen (`g3asm_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`, `packed_mods`), `script_dll.cpp` (Laufzeit als `Script_G3ASM_<API>.dll`), `src/loader/` (Loader = `dbghelp.dll`) |
 | `tests/` | `test_runner.cpp` (g3asm_test), `scripts/selftest.as`, `mods/` (Ordner-Test), `sb_stub/` (Ersatz-SharedBase.dll für Tests ohne Spieldateien) |
 | `examples/` | Beispiel-Mods (`mods/`) und Mini-Mod (`scripts/main.as`) |
-| `docs/` | `modkit/` (Modder-Doku), `compatibility.md` (geprüfte Installationen) |
+| `docs/` | `modkit/` (Modder-Doku, deutsch), `compatibility.md` (geprüfte Installationen), `en/` (englische Fassungen) |
 | `tools/` | `g3pak_read.py` (Archive lesen, auch komprimierte Einträge), `reference_from_log.py` (Referenz aus dem Dump), `install_loader.ps1` (Ein-/Ausbau), `package_release.ps1` (Release-Zip), `check_no_fninit.ps1`, `run_clang_tidy.ps1`, `packmod_main.cpp` (`g3asm_packmod`), `graphify_modding_sync.ps1` |
 | (beim Bauen geladen) | AngelScript (zlib) und MinHook: `G3ASM_ANGELSCRIPT_DIR` / `G3ASM_MINHOOK_DIR` oder automatischer Download |
 
@@ -57,10 +59,12 @@ des Spiels funktionieren weiter), stellt den Loader als `dbghelp.dll` hin und ko
    Ersatz-SharedBase (`tests/sb_stub`).
 
 ## Sprache
-- **Deutsch:** Doku (`docs/`), README, diese Datei, Kommentare im Code, Protokollmeldungen, Beispiel-Mods. Doku, README und diese Datei mit
-  Umlauten; Kommentare im Code und Protokollmeldungen in ASCII (ae, oe, ue, ss), damit sie in jeder Konsole und jedem Editor lesbar bleiben.
-- **Englisch:** `README.en.md` (die englische Fassung der README; bei Änderungen an der README beide anpassen), Commit-Texte, `.github/workflows`, Skripte für CI und Release (`tools/package_release.ps1`, `tools/check_no_fninit.ps1`,
-  `tools/run_clang_tidy.ps1`) und die erzeugte `INSTALL.txt`.
+- **Deutsch:** Doku (`docs/` ohne `docs/en/`), `README.md`, diese Datei, Protokollmeldungen, Texte in den Beispiel-Mods. Doku, README und
+  diese Datei mit Umlauten; Protokollmeldungen in ASCII (ae, oe, ue, ss), damit sie in jeder Konsole und jedem Editor lesbar bleiben.
+- **Englisch:** `docs/en/`, `README.en.md`, `CONTRIBUTING.en.md`, Kommentare im Code, Commit-Texte, `.github/workflows`, Skripte für CI und
+  Release (`tools/package_release.ps1`, `tools/check_no_fninit.ps1`, `tools/run_clang_tidy.ps1`) und die erzeugte `INSTALL.txt`. Englische Doku
+  und Kommentare in einfachem Englisch: kurze Sätze, Aktiv, ein Begriff für eine Sache.
+- Wer eine deutsche Seite ändert, ändert ihre englische Fassung unter `docs/en/` mit (und umgekehrt); ebenso README und CONTRIBUTING.
 - Commit-Texte nach dem Muster `feat: ...`, `fix: ...`, `docs: ...`, `ci: ...`, `refactor: ...`; `feat!:` wenn sich die Skript-Schnittstelle unverträglich ändert.
 
 ## Doku schreiben
@@ -132,7 +136,7 @@ falsch (verwaschene Gebäude-Texturen, gemessen 2026-11-06).
 - Jede Änderung an der Schnittstelle erhöht `G3ASM_SCRIPT_API_VERSION` um 1; was erlaubt ist, steht in `docs/modkit/api-policy.md`.
 - **Erst messen, dann dokumentieren.** Eine neue Funktion steht erst ohne Vermerk in der Referenz, wenn ihre Wirkung im Spiel gemessen ist; bis
   dahin trägt sie den Vermerk *Experimentell* oder *Im Spiel nicht geprüft*.
-- Zu jeder neuen Funktion gehören: Eintrag in `docs/modkit/api-reference.md` (oder `events.md`/`hooks.md`), eine Prüfung im Selbsttest
+- Zu jeder neuen Funktion gehören: Eintrag in `docs/modkit/api-reference.md` (oder `events.md`/`hooks.md`) und in der englischen Fassung, eine Prüfung im Selbsttest
   (`tests/scripts/selftest.as`), soweit sie ohne Spiel läuft, und bei Bedarf eine schlanke Mess-Mod unter `examples/mods` (`enabled=0`).
 - Beispiel-Mods sind standardmäßig aus (`mod.ini`: `enabled=0`) und stehen unter CC0. Namen: `demo_<thema>` für Lern-Beispiele,
   `probe_<thema>` für Mess-Mods (englisch, klein, mit Unterstrich); Mods mit Spielinhalt dürfen einen eigenen Namen tragen.
