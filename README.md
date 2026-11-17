@@ -13,7 +13,7 @@ nicht getestet. Das Modkit schreibt das Ergebnis der Prüfung ins Protokoll, in 
 Für Mitwirkende: [CONTRIBUTING.md](CONTRIBUTING.md) beschreibt den Aufbau, das Bauen, die Tests, die Continuous Integration (CI), das Release
 und die Hausregeln.
 
-## Eine Mod machen
+## Eine Mod erstellen
 
 1. **G3ASM einbauen.** Beende das Spiel. Gib im entpackten Release-Ordner diesen Befehl ein:
 
