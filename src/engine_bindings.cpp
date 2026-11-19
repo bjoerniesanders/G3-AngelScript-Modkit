@@ -1862,44 +1862,61 @@ bool EntLookAt(Entity& e, const Entity& target, float yawOffsetDeg) {
     const SQuat q{0.0f, std::sin(yaw * 0.5f), 0.0f, std::cos(yaw * 0.5f)};
     return EntSetRotation(e, q);
 }
-// find template names (part of the name, no case sensitivity): "Name1;Name2;..." (maximum max results, empty = none)
-bool SafeTemplateNames(void* admin, const void* part, int maxn, std::string* out) {
-    __try {
-        const int n = g_i.countPart(admin, part, 2);
-        for (int i = 0; i < n && i < maxn; ++i) {
-            void* c = g_i.byPart(admin, part, 2, i);
-            const char* nm = c ? g_sb.strGetText(g_e.getName(c)) : nullptr;
-            if (nm) {
-                if (!out->empty()) *out += ";";
-                *out += nm;
-            }
-        }
-        return true;
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
-}
-// number of templates whose name starts with part (cheap, without reading the names); -1 without the game
-int SafeCountTemplates(void* admin, const void* part) {
+// Template names whose name starts with part (no case sensitivity). The engine gives each template two times (measured 2026-11-19 in the game:
+// CountTemplateNames("Perk_1H") 12 for 6 templates, FindTemplateNames each name two times). Thus the names are read and merged.
+// SEH part: the raw count, and the name texts of the entries [from, from + cap) (the texts belong to the templates and stay valid)
+int SafeTemplateRawCount(void* admin, const void* part) {
     __try {
         return g_i.countPart(admin, part, 2);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
 }
-int CountTemplateNames(const SStr& part) {
-    if (!ResolveInv() || !g_i.countPart || !g_i.byPart) return -1;
+int SafeTemplateNameChunk(void* admin, const void* part, int from, int to, const char** names) {
+    __try {
+        int k = 0;
+        for (int i = from; i < to; ++i) {
+            void* c = g_i.byPart(admin, part, 2, i);
+            names[k++] = c ? g_sb.strGetText(g_e.getName(c)) : nullptr;
+        }
+        return k;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+void* TemplateAdmin() {
+    if (!ResolveInv() || !g_i.countPart || !g_i.byPart) return nullptr;
     if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
         SStr mod("eCSceneAdmin");
         g_e.sceneAdmin = SafeSceneAdmin(&mod);
     }
-    return g_e.sceneAdmin ? SafeCountTemplates(g_e.sceneAdmin, &part) : -1;
+    return g_e.sceneAdmin;
+}
+// different template names in the order of the engine; stops at maxUnique; false without the game or if there is an error
+bool TemplateNamesUnique(const SStr& part, int maxUnique, std::vector<std::string>* out) {
+    void* admin = TemplateAdmin();
+    if (!admin) return false;
+    const int raw = SafeTemplateRawCount(admin, &part);
+    if (raw < 0) return false;
+    std::set<std::string> seen;
+    const char* chunk[256];
+    for (int from = 0; from < raw && from < 40000 && int(out->size()) < maxUnique; from += 256) {
+        const int to = from + 256 < raw ? from + 256 : raw;
+        const int got = SafeTemplateNameChunk(admin, &part, from, to, chunk);
+        if (got < 0) return false;
+        for (int i = 0; i < got && int(out->size()) < maxUnique; ++i)
+            if (chunk[i] && seen.insert(chunk[i]).second) out->push_back(chunk[i]);
+    }
+    return true;
+}
+int CountTemplateNames(const SStr& part) {
+    std::vector<std::string> names;
+    return TemplateNamesUnique(part, 40000, &names) ? int(names.size()) : -1;
 }
 SStr FindTemplateNames(const SStr& part, int maxn) {
+    std::vector<std::string> names;
     std::string r;
-    if (ResolveInv() && g_i.countPart && g_i.byPart) {
-        if (!g_e.sceneAdmin || !Valid(g_e.sceneAdmin)) {
-            SStr mod("eCSceneAdmin");
-            g_e.sceneAdmin = SafeSceneAdmin(&mod);
+    if (TemplateNamesUnique(part, maxn < 1 ? 1 : maxn > 20000 ? 20000 : maxn, &names))
+        for (const std::string& n : names) {
+            if (!r.empty()) r += ";";
+            r += n;
         }
-        if (g_e.sceneAdmin) SafeTemplateNames(g_e.sceneAdmin, &part, maxn < 1 ? 1 : maxn > 20000 ? 20000 : maxn, &r);
-    }
     return SStr(r);
 }
 int EntRemoveItems(Entity& e, const SStr& name, int count) {   // return value: number of removed items (-1 if there is an error)

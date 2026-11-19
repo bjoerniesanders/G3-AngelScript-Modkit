@@ -70,7 +70,8 @@ Diese Punkte habe ich im Spiel gemessen oder im Spielcode untersucht:
 - **Direkt ins Questlog schreiben:** Einträge entstehen über Dialogzeilen (`SetInfoQuest`).
 - **Bedingungen eigener Infos** (Items, Reputation, Fähigkeiten) lassen sich nicht setzen. Das Skript prüft sie selbst in `Override_InfoAvailable`.
 - **Text für Umgebungsgerede:** `GetSpeechText` findet für `SVM_..._Smalltalk_NN` keinen Text.
-- **Attribut `"XP"`** liest 0. Quest-XP zahlt das Spiel selbst aus.
+- **Attribut `"XP"`** liest 0. Die Erfahrung steht in `GetProperty(GetHero(), "PlayerMemory", "XP")`. Quest-XP zahlt das Spiel selbst aus.
+- **Attribute von NPCs:** `GetAttribute` und `SetAttribute` wirken nur beim Helden. NPCs geben `-1`.
 
 ## Gibt es nicht
 

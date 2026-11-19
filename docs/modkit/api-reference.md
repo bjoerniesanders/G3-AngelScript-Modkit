@@ -121,7 +121,7 @@ Standardwerte.
 | `bool DestroyNPC(const Entity &in)` | Entfernt einen NPC, den `SpawnNPC` erzeugt hat |
 | `bool IsNPC(const Entity &in)` | Ist das Entity ein NPC? |
 | `bool IsDynamicSpawn(const Entity &in)` | Ist es ein erzeugter NPC (nicht Held, nicht Spieler)? |
-| `int CountTemplateNames(const bCString &in prefix)` (ab Version 28) | Anzahl der Vorlagen, deren Name so beginnt. Schnell. `-1` ohne Spiel |
+| `int CountTemplateNames(const bCString &in prefix)` (ab Version 28) | Anzahl der Vorlagen, deren Name so beginnt, jede Vorlage einmal. `-1` ohne Spiel |
 | `bCString FindTemplateNames(const bCString &in prefix, int max = 20)` | Namen der Vorlagen, die so beginnen, als `"Name1;Name2;..."`. Leer ohne Treffer |
 | `Entity GetTemplateEntity(const bCString &in name)` (ab Version 29) | Die Vorlage mit genau diesem Namen (`"It_1H_OrcSlayer_01"`). Ungültig, wenn es sie nicht gibt |
 | `int CloneTemplate(const bCString &in base, const bCString &in newName)` | Kopiert eine Item-Vorlage unter neuem Namen. `0` angelegt, `1` gab es schon, negativ = Fehler |
@@ -131,8 +131,11 @@ Standardwerte.
 - **`DestroyNPC`** entfernt nur erzeugte NPCs, auch aus früheren Sitzungen. NPCs der Spielwelt, den Helden, den Spieler und Gegenstände der Welt
   lehnt die Funktion ab (`false`, Grund im Protokoll). Verwende das `Entity` danach nicht mehr.
 - **`GetEntityByPart`:** Entfernst du beim Durchlaufen Entities, laufe rückwärts.
+- **Laufzeit:** `CountEntities`, `GetEntityByPart` und `FindTemplateNames` durchsuchen die ganze Welt bzw. alle Vorlagen. Ein Aufruf kann bis zu
+  0,5 s dauern, das Spiel steht so lange. Rufe sie nicht in jedem Bild auf, sondern einmal und merke dir das Ergebnis. Ein leerer Suchteil
+  (`""`) passt auf alle Entities, auch auf namenlose Teile der Landschaft.
 - **`FindTemplateNames`:** Der Anfang muss passen (`Teleport` findet `Teleport_Ardea`, aber nicht `Spl_Teleport_Ardea`). Groß- und Kleinschreibung
-  zählt nicht. Namen kommen oft doppelt vor. Jeder Treffer kostet etwa 3 ms. Verteile lange Listen (`max` bis 20000) auf mehrere Bilder. Sonst greift
+  zählt nicht. Jeder Name kommt einmal vor (ab v0.46.1; vorher oft doppelt). Jeder Treffer kostet etwa 3 ms. Verteile lange Listen (`max` bis 20000) auf mehrere Bilder. Sonst greift
   die Grenze von 5 Sekunden je Aufruf (Beispiel `probe_reference`).
 - **`CloneTemplate`:** Rufe es in `OnQuestsLoaded` auf. Dann bleiben Items aus dem Klon in Spielständen erhalten, weil der Klon bei jedem Spielstart
   dieselbe ID bekommt. In `main()` ist das Spiel noch nicht bereit (Code `-4`). Weitere Codes: `-2` Basis unbekannt, `-6` und `-7` Kopieren
@@ -184,6 +187,13 @@ Standardwerte.
 
 - Attribut-Kennungen: `"STR"`, `"DEX"`, `"INT"`, `"HP"`, `"MP"`, `"SP"` (Ausdauer), `"LP"`, `"ALC"`, `"SMT"`, `"THF"` und weitere. Die geprüfte Liste
   steht in der [Referenz](reference.md#7-attribute). `"XP"` liest 0.
+- **Nur der Held:** Die Attribut-Funktionen lesen und schreiben über das Spielergedächtnis (`PlayerMemory`). Das hat nur der Held. Bei NPCs
+  geben sie `-1` bzw. `false`.
+- **Erfahrung und Lernpunkte** liest du über die Eigenschaften des Spielergedächtnisses:
+
+      bCString xp = GetProperty(GetHero(), "PlayerMemory", "XP");   // Text, zum Beispiel "13050"
+
+  Den Text wandelt eine kleine Hilfsfunktion im Skript in eine Zahl um (Beispiel `jens_quest`, Funktion `Zahl`). Weitere Eigenschaften: `"LPAttribs"` (Lernpunkte für Attribute), `"LPPerks"`. Die Stufe steht in `GetProperty(held, "NPC", "Level")`.
 - Item-Namen sind Namen von Item-Vorlagen (`It_Wolf_Fur`, `It_Water`, `It_1H_Longsword_01`). `OnReceiveItem` zeigt sie im Protokoll.
 - `RemoveItems` verringert nur die Menge. Dauerhafte Items (Lern-Items von Talenten) hinterlassen dabei einen leeren Stapel. Diese Stapel entfernt
   `DeleteItemStack`.

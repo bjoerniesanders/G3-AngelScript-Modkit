@@ -73,7 +73,8 @@ I measured these items in the game or examined them in the game code:
 - **Write directly to the quest log:** Entries come from dialog lines (`SetInfoQuest`).
 - **Conditions of custom infos** (items, reputation, skills): you cannot set them. The script does the check itself in `Override_InfoAvailable`.
 - **Text for ambient talk:** `GetSpeechText` finds no text for `SVM_..._Smalltalk_NN`.
-- **Attribute `"XP"`** reads 0. The game itself gives the quest XP.
+- **Attribute `"XP"`** reads 0. The experience is in `GetProperty(GetHero(), "PlayerMemory", "XP")`. The game itself gives the quest XP.
+- **Attributes of NPCs:** `GetAttribute` and `SetAttribute` have an effect only on the hero. NPCs give `-1`.
 
 ## Not available
 

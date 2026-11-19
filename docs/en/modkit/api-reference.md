@@ -121,7 +121,7 @@ give default values.
 | `bool DestroyNPC(const Entity &in)` | Removes an NPC that `SpawnNPC` made |
 | `bool IsNPC(const Entity &in)` | Is the entity an NPC? |
 | `bool IsDynamicSpawn(const Entity &in)` | Is it a spawned NPC (not the hero, not the player)? |
-| `int CountTemplateNames(const bCString &in prefix)` (from version 28) | The number of templates with a name that starts with this text. Fast. `-1` without the game |
+| `int CountTemplateNames(const bCString &in prefix)` (from version 28) | The number of templates with a name that starts with this text, each template one time. `-1` without the game |
 | `bCString FindTemplateNames(const bCString &in prefix, int max = 20)` | The names of the templates that start with this text, as `"Name1;Name2;..."`. Empty if nothing is found |
 | `Entity GetTemplateEntity(const bCString &in name)` (from version 29) | The template with exactly this name (`"It_1H_OrcSlayer_01"`). Not valid if it does not exist |
 | `int CloneTemplate(const bCString &in base, const bCString &in newName)` | Copies an item template with a new name. `0` made, `1` already existed, negative = error |
@@ -131,8 +131,11 @@ give default values.
 - **`DestroyNPC`** removes only spawned NPCs, also from previous sessions. The function refuses NPCs of the game world, the hero, the player and
   objects of the world (`false`, reason in the log). Do not use the `Entity` after this.
 - **`GetEntityByPart`:** If you remove entities during the loop, go backward.
+- **Run time:** `CountEntities`, `GetEntityByPart` and `FindTemplateNames` search the full world or all templates. One call can take up to
+  0.5 s, and the game stops for this time. Do not call them in each frame. Call them one time and keep the result. An empty part (`""`)
+  agrees with all entities, also with landscape parts without a name.
 - **`FindTemplateNames`:** The start must agree (`Teleport` finds `Teleport_Ardea`, but not `Spl_Teleport_Ardea`). Upper case and lower case have
-  no effect. Names frequently occur two times. Each result costs approximately 3 ms. Divide long lists (`max` up to 20000) across many frames. If
+  no effect. Each name occurs one time (from v0.46.1; before, frequently two times). Each result costs approximately 3 ms. Divide long lists (`max` up to 20000) across many frames. If
   you do not, the limit of 5 seconds for each call stops the script (example `probe_reference`).
 - **`CloneTemplate`:** call it in `OnQuestsLoaded`. Then items from the clone stay in saved games, because the clone gets the same ID at each game
   start. In `main()`, the game is not ready yet (code `-4`). Other codes: `-2` unknown base, `-6` and `-7` the copy failed. Set the name and the
@@ -184,6 +187,13 @@ give default values.
 
 - Attribute tags: `"STR"`, `"DEX"`, `"INT"`, `"HP"`, `"MP"`, `"SP"` (stamina), `"LP"`, `"ALC"`, `"SMT"`, `"THF"` and more. The checked list is in
   the [Reference](reference.md#7-attributes). `"XP"` reads 0.
+- **Only the hero:** The attribute functions read and write through the player memory (`PlayerMemory`). Only the hero has it. For NPCs, they
+  give `-1` or `false`.
+- **Experience and learning points:** read them through the properties of the player memory:
+
+      bCString xp = GetProperty(GetHero(), "PlayerMemory", "XP");   // text, for example "13050"
+
+  A small helper function in the script changes the text into a number (example `jens_quest`, function `Zahl`). More properties: `"LPAttribs"` (learning points for attributes), `"LPPerks"`. The level is in `GetProperty(hero, "NPC", "Level")`.
 - Item names are the names of item templates (`It_Wolf_Fur`, `It_Water`, `It_1H_Longsword_01`). `OnReceiveItem` shows them in the log.
 - `RemoveItems` decreases only the quantity. Permanent items (learn items of skills) then leave an empty stack. `DeleteItemStack` removes these
   stacks.

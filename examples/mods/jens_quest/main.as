@@ -17,15 +17,29 @@ bool InReichweite(Entity held, Entity jens) {
     return d >= 0 && d <= REICHWEITE;
 }
 
+// text with digits -> number ("13050" -> 13050; stops at the first character that is not a digit)
+int Zahl(const bCString &in s) {
+    int v = 0;
+    for (int i = 0; i < s.GetLength(); i++) {
+        bCString c = s.Mid(i, 1);
+        int d = -1;
+        for (int k = 0; k < 10; k++)
+            if (c == ToString(k)) d = k;
+        if (d < 0) break;
+        v = v * 10 + d;
+    }
+    return v;
+}
+// The attribute "XP" reads 0. The experience of the hero is in the player memory.
+int HeldXP(Entity held) { return Zahl(GetProperty(held, "PlayerMemory", "XP")); }
+
 void Abschliessen(Entity held) {
     SetQuestXP(QUEST, 100);
-    int xpVorher = held.GetAttribute("XP");
-    print("XP-Attribute vorher: Wert " + xpVorher + ", Basis " + held.GetAttributeBase("XP") + ", Maximum " + held.GetAttributeMax("XP"));
+    int xpVorher = HeldXP(held);
     print("Quest-XP laut Quest: " + GetQuestXP(QUEST) + ", Held-XP vorher: " + xpVorher);
     if (SucceedQuest(QUEST)) {
-        int xpNachher = held.GetAttribute("XP");
         Zeige("Quest abgeschlossen: Wolfsfell fuer Jens (Quest-XP " + GetQuestXP(QUEST) + ")", 140, 255, 140);
-        print("Held-XP nachher: " + xpNachher + ", Basis " + held.GetAttributeBase("XP"));
+        print("Held-XP nachher: " + HeldXP(held) + " (+" + (HeldXP(held) - xpVorher) + ")");
     } else Zeige("Quest konnte nicht abgeschlossen werden", 255, 140, 140);
     print("Status danach: " + GetQuestStatus(QUEST));
 }
