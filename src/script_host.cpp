@@ -688,6 +688,7 @@ bool ScriptHost::Init(LogFn log) {
 void ScriptHost::Shutdown() {
     for (Mod& m : mods_) Unload(m);
     mods_.clear();
+    devModule_ = nullptr;   // the engine releases the module
     if (ctx_) {
         ctx_->Release();
         ctx_ = nullptr;
@@ -1045,6 +1046,53 @@ void ScriptHost::CallKey(int vk, bool down) {
             Execute(mods_[i].fKey, nullptr, &vk, &down);
         }
     busyKey_ = false;
+}
+
+// ---------------------------------------------------------------- dev pipe (dev_pipe.cpp)
+bool ScriptHost::RunSnippet(const std::string& code, const std::string& mod, std::string* out) {
+    if (!engine_ || !ctx_) return false;
+    if (ctx_->GetState() == asEXECUTION_ACTIVE) {   // only between script calls, never nested
+        if (out) *out += "Skript laeuft gerade - Anfrage nicht ausgefuehrt\n";
+        return false;
+    }
+    asIScriptModule* module = nullptr;
+    if (!mod.empty()) {
+        Mod* m = Find(mod);
+        if (!m || !m->module) {
+            if (out) *out += "Mod nicht geladen: " + mod + "\n";
+            return false;
+        }
+        module = m->module;
+    } else {
+        if (!devModule_) {
+            devModule_ = engine_->GetModule("g3asm_dev", asGM_ALWAYS_CREATE);
+            if (devModule_) devModule_->Build();   // empty module, so that CompileFunction has a built module
+        }
+        module = devModule_;
+    }
+    if (!module) return false;
+    struct Restore {   // also on early return: capture off, previous mod name back
+        ScriptHost* h;
+        std::string savedMod;
+        ~Restore() {
+            h->capture_ = nullptr;
+            h->curMod_ = savedMod;
+        }
+    } restore{this, curMod_};
+    capture_ = out;
+    captureThread_ = std::this_thread::get_id();
+    curMod_ = mod.empty() ? "dev" : mod;
+    asIScriptFunction* f = nullptr;
+    // line offset -1: the line "void dev() {" is line 0, the first line of the code is line 1 in the error messages
+    const std::string src = "void dev() {\n" + code + "\n}";
+    const int r = module->CompileFunction("dev", src.c_str(), -1, 0, &f);
+    if (r < 0 || !f) {
+        if (f) f->Release();
+        return false;
+    }
+    const bool ok = Execute(f, nullptr);
+    f->Release();
+    return ok;
 }
 
 // ---------------------------------------------------------------- between mods (from version 44)

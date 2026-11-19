@@ -38,7 +38,7 @@ Mit **Version 46** ist die Skript-Schnittstelle für die Beta eingefroren. Das h
 - Ausgenommen sind nur die Funktionen mit Vermerk **Experimentell** (Liste unten). Sie dürfen sich noch ändern oder wegfallen. Jede Änderung steht
   in den Änderungen.
 - Nicht zur Schnittstelle gehören und dürfen sich jederzeit ändern: Wortlaut und Menge der Protokollzeilen, die Mess-Schalter der ini (`scriptlog`,
-  `aitrace`, `anispeedlog`, `memlog` und ähnliche) und die Mess-Mods unter `examples/mods`.
+  `aitrace`, `anispeedlog`, `tradelog`, `memlog` und ähnliche, dazu die Dev-Pipe `[dev] pipe`) und die Mess-Mods unter `examples/mods`.
 - Nach der Beta kommt Version 47. Neue Funktionen kommen dann wieder nach der Tabelle oben dazu.
 
 ## Veraltete Funktionen

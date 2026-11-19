@@ -872,6 +872,7 @@ int InstallGameHooks(ScriptHost& host) {
     InstallDrawHooks(host);
     InstallMoreEventHooks(host);
     InstallAiTrace(host);   // only with ini [g3asm] aitrace=1
+    InstallTradeTrace(host);   // only with ini [g3asm] tradelog=1
     return n;
 }
 

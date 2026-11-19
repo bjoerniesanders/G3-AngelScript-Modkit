@@ -15,7 +15,7 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force (Join-Path $stage "bin\loader"), (Join-Path $stage "bin\g3asm"), (Join-Path $stage "tools"), (Join-Path $stage "docs") | Out-Null
 
 Copy-Item (Join-Path $BuildDir "loader\dbghelp.dll") (Join-Path $stage "bin\loader\")
-foreach ($f in "g3asm.dll", "g3asm.map", "g3asm_packmod.exe") {
+foreach ($f in "g3asm.dll", "g3asm.map", "g3asm_packmod.exe", "g3asm_dev.exe") {
     $p = Join-Path $BuildDir "g3asm\$f"
     if (Test-Path $p) { Copy-Item $p (Join-Path $stage "bin\g3asm\") }
 }

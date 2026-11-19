@@ -9,17 +9,17 @@ The rules for the script interface are in [docs/en/modkit/api-policy.md](docs/en
 ## Layout
 | Folder | Contents |
 |---|---|
-| `src/` | DLL sources (`g3asm_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`, `packed_mods`), `script_dll.cpp` (runtime as `Script_G3ASM_<API>.dll`), `src/loader/` (loader = `dbghelp.dll`) |
+| `src/` | DLL sources (`g3asm_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`, `packed_mods`), `dev_pipe.cpp` (dev pipe, only in `g3asm.dll`), `script_dll.cpp` (runtime as `Script_G3ASM_<API>.dll`), `src/loader/` (loader = `dbghelp.dll`) |
 | `tests/` | `test_runner.cpp` (g3asm_test), `scripts/selftest.as`, `mods/` (folder test), `sb_stub/` (replacement SharedBase.dll for tests without game files) |
 | `examples/` | Example mods (`mods/`) and mini mod (`scripts/main.as`) |
 | `docs/` | `modkit/` (modder documentation, German), `compatibility.md` (checked installations), `en/` (English versions) |
-| `tools/` | `g3pak_read.py` (read archives, also compressed entries), `reference_from_log.py` (reference from the dump), `install_loader.ps1` (install and uninstall), `package_release.ps1` (release zip), `check_no_fninit.ps1`, `run_clang_tidy.ps1`, `packmod_main.cpp` (`g3asm_packmod`), `graphify_modding_sync.ps1` |
+| `tools/` | `g3pak_read.py` (read archives, also compressed entries), `reference_from_log.py` (reference from the dump), `install_loader.ps1` (install and uninstall), `package_release.ps1` (release zip), `check_no_fninit.ps1`, `run_clang_tidy.ps1`, `packmod_main.cpp` (`g3asm_packmod`), `dev_main.cpp` (`g3asm_dev`), `graphify_modding_sync.ps1` |
 | (downloaded during the build) | AngelScript (zlib) and MinHook: `G3ASM_ANGELSCRIPT_DIR` and `G3ASM_MINHOOK_DIR`, or automatic download |
 
 ## Build (32 bit)
     cmake -S . -B build32 -A Win32
-    cmake --build build32 --config Release --target g3asm g3asm_script g3asm_test g3asm_packmod g3asm_loader g3asm_loader_test g3asm_sb_stub
-Output: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, tests, g3asm_packmod) and `build32/loader/dbghelp.dll` (loader).
+    cmake --build build32 --config Release --target g3asm g3asm_script g3asm_test g3asm_packmod g3asm_dev g3asm_loader g3asm_loader_test g3asm_sb_stub
+Output: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, tests, g3asm_packmod, g3asm_dev) and `build32/loader/dbghelp.dll` (loader).
 
 ## Test
     g3asm_test.exe <SharedBase.dll> tests\scripts\selftest.as
@@ -28,6 +28,7 @@ Output: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, tests, g3asm_packmo
     python -I tests\file_patches_overlay.py g3asm_test.exe <SharedBase.dll>   (file patches in a temporary folder)
     python -I tests\packed_mods.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (unpack packed mods, keep them current, remove them)
     python -I tests\packmod_release.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (make, install and start a package for players)
+    python -I tests\dev_pipe.py g3asm_test.exe <SharedBase.dll> g3asm_dev.exe   (dev pipe: output, errors, 5-s stop)
 Without game files: as `<SharedBase.dll>`, use the replacement DLL `build32\sbstub\SharedBase.dll` (target `g3asm_sb_stub`). As
 `<dbghelp_orig.dll>`, use the system DLL `%WINDIR%\SysWOW64\dbghelp.dll`. The replacement DLL has only the exports that the modkit needs for
 bCString and the math types. It does not calculate bit for bit as the original does. Measure the behavior of the original only with the real
@@ -37,7 +38,7 @@ SharedBase.dll.
 - `.github/workflows/ci.yml` (each push to `main`, pull requests, manual): builds 32 bit with MSVC. It makes sure that `g3asm.dll` contains no
   `fninit` (`tools/check_no_fninit.ps1`, protection for the FPU fix). It runs the self-test, the test mods, the compile check of the example mods
   and the loader test with the replacement SharedBase, and also `tests/packmod_generations.py`, `tests/file_patches_overlay.py`,
-  `tests/packed_mods.py` and `tests/packmod_release.py`. It packs a test zip (artifact, 7 days).
+  `tests/packed_mods.py`, `tests/packmod_release.py` and `tests/dev_pipe.py`. It packs a test zip (artifact, 7 days).
 - `.github/workflows/release.yml`: when you push a tag `v*`, the same steps, and a GitHub release with the zip:
       git tag -a v0.46.0-beta.1 -m "G3 AngelScript Modkit v0.46.0-beta.1"
       git push origin v0.46.0-beta.1
@@ -45,7 +46,7 @@ SharedBase.dll.
   [Version rules](docs/en/modkit/api-policy.md). The workflow sets the title ("G3 AngelScript Modkit <tag>"). Write the release notes by hand on
   GitHub after this. The project status goes there.
 - Local package: `powershell -NoProfile -File tools\package_release.ps1 -BuildDir build32 -Version v0.46.0-beta.1` (result in `dist\`). Contents:
-  loader, `g3asm.dll`, `Script_G3ASM_<API>.dll` (runtime for mod packages), `g3asm_packmod.exe`, `tools\install_loader.ps1`, `tools\g3pak_read.py`,
+  loader, `g3asm.dll`, `Script_G3ASM_<API>.dll` (runtime for mod packages), `g3asm_packmod.exe`, `g3asm_dev.exe`, `tools\install_loader.ps1`, `tools\g3pak_read.py`,
   example mods (off by default), documentation, `INSTALL.txt`. No game files.
 - Not in the CI: all items that need the real game (measurements with the original `SharedBase.dll`, game tests). Game files must not go into the
   repository.
@@ -56,12 +57,47 @@ SharedBase.dll.
 The installer renames the existing `dbghelp.dll` of the game to `dbghelp_orig.dll`. The loader sends `MiniDumpWriteDump` to it, so the crash
 reports of the game continue to work. The installer puts the loader as `dbghelp.dll` and copies `g3asm.dll`, a `g3asm.ini` and a mini mod. Backup
 in `<game>\g3asm_backup\loader_<time>\`. Logs: `g3asm_loader.log` (loader, crash candidates) and `g3asm.log` (modkit). Settings in `g3asm.ini`
-(`[g3asm] enable/script/hotreload/mods`, `[loader] crashlog`).
+(`[g3asm] enable/script/hotreload/mods`, `[loader] crashlog`, `[dev] pipe`).
+
+## Dev pipe (run code in the running game)
+With the dev pipe, you run AngelScript in the running game, without a measurement mod and without a restart. It is for developers of the
+modkit and for tools, not for mods.
+
+1. Add this section to `<game folder>\g3asm.ini`:
+
+       [dev]
+       pipe=1
+
+2. Start the game. `g3asm.log` shows `Dev-Pipe bereit: \.\pipe\g3asm_dev` (dev pipe ready).
+3. Send code:
+
+       g3asm_dev "print(GetHero().GetName());"
+       g3asm_dev -m my_mod "print(\"Counter: \" + counter);"
+       g3asm_dev -f probe.as
+
+   Result (one line of JSON):
+
+       {"ok":true,"out":"[dev] Hero
+","ms":0.31}
+
+| Option | Meaning |
+|---|---|
+| `-m <mod>` | Run the code in the module of this mod. Its global variables and functions are visible |
+| `-f <file>` | Code from a file (UTF-8) |
+| `-w <seconds>` | Wait for the pipe for this time (default 5) |
+
+Exit code: 0 = ok, 1 = error in the script (message in `out`), 2 = no connection.
+
+The code is the body of a function `void dev()`. It runs in the next frame on the game thread, with the same 5-second stop as each script.
+`out` contains all log lines of the call (`print`, compile errors with line and column, script exceptions).
+
+**Caution:** A person who can open the pipe runs code in the game. Thus the pipe accepts only local connections of the user who runs the game,
+and it is off by default. The script DLL for players (`Script_G3ASM_<API>.dll`) does not contain the pipe.
 
 ## Before each commit
 1. [Build](#build-32-bit) and do the [test runs](#test): self-test, `tests\mods`, compile check of `examples\mods` (there, exactly one error
-   "Override-Kette über mehrere Mods" is expected), loader test, `tests\file_patches_overlay.py`, `tests\packed_mods.py` and
-   `tests\packmod_release.py`.
+   "Override-Kette über mehrere Mods" is expected), loader test, `tests\file_patches_overlay.py`, `tests\packed_mods.py`,
+   `tests\packmod_release.py` and `tests\dev_pipe.py`.
 2. `powershell -NoProfile -File tools\check_no_fninit.ps1 -Dll <build>\g3asm\g3asm.dll`, and the same for `Script_G3ASM_<API>.dll` (see Floating
    point).
 3. `powershell -NoProfile -File tools\run_clang_tidy.ps1 -BuildDir <build> -Changed -Strict` (see Static analysis).

@@ -10,6 +10,7 @@
 #include <map>
 #include <unordered_map>
 #include <string>
+#include <thread>
 #include <vector>
 
 #define G3ASM_SCRIPT_API_VERSION 46
@@ -73,8 +74,16 @@ public:
     int Failures() const { return failures_; }
     int Checks() const { return checks_; }
     void Log(const std::string& s) {
+        if (capture_ && std::this_thread::get_id() == captureThread_) {   // dev pipe: also collect the lines of the running snippet
+            *capture_ += s;
+            *capture_ += '\n';
+        }
         if (log_) log_(s);
     }
+    // Dev pipe (dev_pipe.cpp, only in g3asm.dll): compile code as the body of "void dev()" and run it one time. mod = name of a loaded mod (the
+    // code can then use the globals of this mod), empty = a separate module "dev". out gets all log lines of the call (print, compile errors,
+    // script exceptions). Only in the game thread. false for a compile error or an error during execution.
+    bool RunSnippet(const std::string& code, const std::string& mod, std::string* out);
     const char* CurrentMod() const { return curMod_.c_str(); }
     // mod folder (empty in single-script mode) and the folder of a loaded mod (directory of its main.as; empty if not known)
     const std::string& ModsDir() const { return modsDir_; }
@@ -125,6 +134,9 @@ private:
     unsigned lastCheckTick_ = 0;
     int failures_ = 0, checks_ = 0;
     bool busyKey_ = false;
+    std::string* capture_ = nullptr;   // RunSnippet: target for the log lines of the call
+    std::thread::id captureThread_;
+    asIScriptModule* devModule_ = nullptr;
 };
 
 // check a registration with AngelScript: if there is an error (r < 0), write to the log and set ok to false
@@ -197,12 +209,20 @@ std::map<std::string, std::string> ReadIniSection(const std::string& path, const
 void SetAiTraceOptions(bool enabled, const char* filter, int maxLines);
 void SetAniSpeedLog(bool enabled);   // ini [g3asm] anispeedlog: Messung SetPlaySpeed/GetPlaySpeed (Roadmap 6.3)
 int InstallAiTrace(ScriptHost& host);
+// Trade measurement (trade_trace.cpp): only log, ini [g3asm] tradelog=1; InstallTradeTrace installs only if turned on
+void SetTradeLog(bool enabled);
+int InstallTradeTrace(ScriptHost& host);
 // Changes in the middle of game scripts (combat_patches.cpp, original bytes checked): Override_MonsterDamage; call at each world activation (effect only 1 time)
 int InstallScriptGamePatches(ScriptHost& host);   // 1 time for each frame (game cycle): OnTouch handler, transformation hooks, measurement
 // build a Script.dll entity object (0xA8 bytes, measured) with the constructor of Script.dll; buffer with kScriptEntityBytes, alignment 8
 constexpr unsigned kScriptEntityBytes = 0x100;
 bool MakeScriptEntity(void* buf, void* ent);                // write the measurement now (when a world unloads)
 int CallGameScript(const char* name, void* self, void* other, int arg);   // game script by name (script_calls.cpp), 0 if not possible
+
+// Dev pipe (dev_pipe.cpp): only g3asm.dll contains it, the script DLL for players does not. The pointers stay nullptr there.
+// DevPipeStart: start the server thread (ini [dev] pipe=1); DevPipeFrame: run the waiting requests, 1 time for each frame in the game thread.
+extern bool (*g_devPipeStart)(ScriptHost& host);
+extern void (*g_devPipeFrame)();
 
 // game window (largest visible main window of the process), nullptr if there is none yet
 HWND__* GameWindow();

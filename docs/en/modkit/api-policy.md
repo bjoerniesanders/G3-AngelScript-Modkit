@@ -38,7 +38,7 @@ With **version 46**, the script interface is frozen for the beta. This means:
 - The only exceptions are the functions with the label **Experimental** (list below). They can still change or be removed. Each change has a
   note in the changes.
 - These items are not part of the interface and can change at all times: the text and the quantity of the log lines, the measurement switches
-  in the ini (`scriptlog`, `aitrace`, `anispeedlog`, `memlog` and similar switches), and the measurement mods in `examples/mods`.
+  in the ini (`scriptlog`, `aitrace`, `anispeedlog`, `tradelog`, `memlog` and similar switches, and the dev pipe `[dev] pipe`), and the measurement mods in `examples/mods`.
 - After the beta, version 47 comes. New functions then come again in accordance with the table above.
 
 ## Deprecated functions

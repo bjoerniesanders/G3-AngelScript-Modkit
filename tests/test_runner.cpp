@@ -73,6 +73,10 @@ int main(int argc, char** argv) {
     }
     const int r = run(argv[2]);
     std::printf("Ergebnis: %s\n", r == 0 ? "alle Pruefungen bestanden" : r < 0 ? "Skript nicht geladen" : "Pruefungen fehlgeschlagen");
+    if (const char* dp = std::getenv("G3ASM_TEST_DEVPIPE")) {   // <ms>: Dev-Pipe starten und Anfragen so lange ausfuehren (tests/dev_pipe.py)
+        auto serve = reinterpret_cast<int (*)(int)>(GetProcAddress(p, "g3asm_dev_serve"));
+        std::printf("Dev-Pipe-Test: %s\n", serve && serve(std::atoi(dp)) ? "beendet" : "nicht gestartet");
+    }
     std::fflush(stdout);
     TerminateProcess(GetCurrentProcess(), DWORD(r < 0 ? 104 : r));   // Original-DLL nicht aufraeumen lassen (bekanntes Haengen)
 }

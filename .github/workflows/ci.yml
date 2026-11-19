@@ -20,14 +20,14 @@ jobs:
         run: cmake -S . -B build -A Win32
 
       - name: Build
-        run: cmake --build build --config Release --parallel --target g3asm g3asm_script g3asm_loader g3asm_packmod g3asm_test g3asm_loader_test g3asm_sb_stub
+        run: cmake --build build --config Release --parallel --target g3asm g3asm_script g3asm_loader g3asm_packmod g3asm_dev g3asm_test g3asm_loader_test g3asm_sb_stub
 
       - name: Check build output
         shell: pwsh
         run: |
           $script = Get-ChildItem build/g3asm -Filter 'Script_G3ASM_*.dll' | Select-Object -First 1
           if (-not $script) { throw "Script_G3ASM_*.dll is missing" }
-          foreach ($f in 'build/g3asm/g3asm.dll', "build/g3asm/$($script.Name)", 'build/loader/dbghelp.dll', 'build/g3asm/g3asm_packmod.exe', 'build/g3asm/g3asm_test.exe', 'build/g3asm/g3asm_loader_test.exe', 'build/sbstub/SharedBase.dll') {
+          foreach ($f in 'build/g3asm/g3asm.dll', "build/g3asm/$($script.Name)", 'build/loader/dbghelp.dll', 'build/g3asm/g3asm_packmod.exe', 'build/g3asm/g3asm_dev.exe', 'build/g3asm/g3asm_test.exe', 'build/g3asm/g3asm_loader_test.exe', 'build/sbstub/SharedBase.dll') {
             if (-not (Test-Path $f)) { throw "$f is missing" }
             "{0,-32} {1,9} bytes" -f $f, (Get-Item $f).Length
           }
@@ -97,6 +97,10 @@ jobs:
       # Player package: g3asm_packmod release -> install like the Union Starter -> the mod's main() runs
       - name: Release package (stub SharedBase)
         run: python -I tests/packmod_release.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll build/g3asm/g3asm_packmod.exe
+
+      # Dev pipe (developer channel into the running game): print, code in the module of a mod, compile errors, exceptions, 5-s stop.
+      - name: Dev pipe (stub SharedBase)
+        run: python -I tests/dev_pipe.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll build/g3asm/g3asm_dev.exe
 
       - name: Build a sample release package
         shell: pwsh

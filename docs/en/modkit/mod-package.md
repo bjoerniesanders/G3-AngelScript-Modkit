@@ -191,6 +191,7 @@ aitrace=0                   ; 1 = AI tracer: log changes of AI state, AI task, A
 aitracefilter=              ; only NPCs with a name that contains this text (empty = all)
 aitracemax=2000             ; maximum number of AI lines for each game start
 anispeedlog=0               ; 1 = measurement: log which code sets or reads the playback speed of animations (SetPlaySpeed/GetPlaySpeed)
+tradelog=0                  ; 1 = measurement: log purchases and sales on the trade page (items, quantities, gold)
 printgame=1                 ; 0 = print() writes only to the modkit log, not also to the log of the game
 ; only for troubleshooting:
 asynclog=0                  ; 1 = write log lines through a queue (separate thread)
@@ -199,6 +200,8 @@ loadpause=0                 ; for this number of seconds after a load, the modki
 memlog=0                    ; 1 = each 30 s, log the free memory and the address space
 [loader]
 crashlog=1                  ; 0 = at a crash, the loader writes no line to g3asm_loader.log
+[dev]
+pipe=0                      ; 1 = dev pipe: run code in the running game (only for developers, see CONTRIBUTING.en.md)
 ```
 
 ## Log

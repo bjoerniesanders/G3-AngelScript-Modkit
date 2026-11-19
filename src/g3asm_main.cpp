@@ -42,6 +42,9 @@ bool g_mainRan = false;
 }   // namespace
 // which component started the modkit (log line); script_dll.cpp sets it before g3asm_start
 const char* g_startOrigin = "Loader (dbghelp.dll)";
+// dev pipe: dev_pipe.cpp sets the pointers (only in g3asm.dll, see script_host.h)
+bool (*g3asm::g_devPipeStart)(ScriptHost& host) = nullptr;
+void (*g3asm::g_devPipeFrame)() = nullptr;
 namespace {
 
 // Log. Default: write immediately. Optionally asynchronous (ini [g3asm] asynclog=1): the calling thread only puts the line into a queue, and a
@@ -349,6 +352,7 @@ void __fastcall HProcess(void* self, void*) {
     ScriptCallsFrame();
     DrawFrameTick();
     MoreEventsFrame();
+    if (g_devPipeFrame) g_devPipeFrame();   // also during the load pause: the dev pipe only runs code that a developer sends
     if (InLoadPause()) return;
     g_host.CallFrame(FrameTime());
 }
@@ -560,6 +564,17 @@ extern "C" __declspec(dllexport) int g3asm_run_file(const char* path) {
     return g_host.Failures();
 }
 
+// for tests (tests/dev_pipe.py): start the dev pipe and run its requests for ms milliseconds, as the game frames would do
+extern "C" __declspec(dllexport) int g3asm_dev_serve(int ms) {
+    if (!g_devPipeStart || !g_devPipeFrame || !g_devPipeStart(g_host)) return 0;
+    const DWORD end = GetTickCount() + DWORD(ms);
+    while (int(GetTickCount() - end) < 0) {
+        g_devPipeFrame();
+        Sleep(10);
+    }
+    return 1;
+}
+
 // game mode (from the proxy): make the host and connect it to the import table of the EXE
 extern "C" __declspec(dllexport) int g3asm_start(HMODULE sharedBase, const char* ini, const char* gameDir,
                                                      void (*hostLog)(const char*)) {
@@ -587,8 +602,13 @@ extern "C" __declspec(dllexport) int g3asm_start(HMODULE sharedBase, const char*
         cfg.Str(sec, "aitracefilter", "", aiFilter, sizeof aiFilter);
         SetAiTraceOptions(cfg.Int(sec, "aitrace", 0) != 0, aiFilter, cfg.Int(sec, "aitracemax", 2000));
         SetAniSpeedLog(cfg.Int(sec, "anispeedlog", 0) != 0);
+        SetTradeLog(cfg.Int(sec, "tradelog", 0) != 0);
         cfg.Str(sec, "mods", modsRel, modsRel, MAX_PATH);
         packedMods = cfg.Int(sec, "packedmods", 1) != 0;
+        if (cfg.Int("dev", "pipe", 0) != 0) {   // [dev] pipe=1: developer channel into the running game (default off)
+            if (!g_devPipeStart) Log("Dev-Pipe: gibt es nur im Modkit (g3asm.dll ueber den Loader), nicht in der Script-DLL");
+            else g_devPipeStart(g_host);
+        }
     }
     g_modsDir = (modsRel[1] == ':' || modsRel[0] == '\\') ? std::string(modsRel) : g_gameDir + modsRel;
     while (!g_modsDir.empty() && (g_modsDir.back() == '\\' || g_modsDir.back() == '/')) g_modsDir.pop_back();

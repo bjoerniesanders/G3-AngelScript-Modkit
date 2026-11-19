@@ -8,17 +8,17 @@ Die Regeln für die Skript-Schnittstelle stehen in [docs/modkit/api-policy.md](d
 ## Aufbau
 | Ordner | Inhalt |
 |---|---|
-| `src/` | DLL-Quellen (`g3asm_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`, `packed_mods`), `script_dll.cpp` (Laufzeit als `Script_G3ASM_<API>.dll`), `src/loader/` (Loader = `dbghelp.dll`) |
+| `src/` | DLL-Quellen (`g3asm_main`, `script_host`, `*_bindings`, `game_hooks`, `file_patches`, `packed_mods`), `dev_pipe.cpp` (Dev-Pipe, nur in `g3asm.dll`), `script_dll.cpp` (Laufzeit als `Script_G3ASM_<API>.dll`), `src/loader/` (Loader = `dbghelp.dll`) |
 | `tests/` | `test_runner.cpp` (g3asm_test), `scripts/selftest.as`, `mods/` (Ordner-Test), `sb_stub/` (Ersatz-SharedBase.dll für Tests ohne Spieldateien) |
 | `examples/` | Beispiel-Mods (`mods/`) und Mini-Mod (`scripts/main.as`) |
 | `docs/` | `modkit/` (Modder-Doku, deutsch), `compatibility.md` (geprüfte Installationen), `en/` (englische Fassungen) |
-| `tools/` | `g3pak_read.py` (Archive lesen, auch komprimierte Einträge), `reference_from_log.py` (Referenz aus dem Dump), `install_loader.ps1` (Ein-/Ausbau), `package_release.ps1` (Release-Zip), `check_no_fninit.ps1`, `run_clang_tidy.ps1`, `packmod_main.cpp` (`g3asm_packmod`), `graphify_modding_sync.ps1` |
+| `tools/` | `g3pak_read.py` (Archive lesen, auch komprimierte Einträge), `reference_from_log.py` (Referenz aus dem Dump), `install_loader.ps1` (Ein-/Ausbau), `package_release.ps1` (Release-Zip), `check_no_fninit.ps1`, `run_clang_tidy.ps1`, `packmod_main.cpp` (`g3asm_packmod`), `dev_main.cpp` (`g3asm_dev`), `graphify_modding_sync.ps1` |
 | (beim Bauen geladen) | AngelScript (zlib) und MinHook: `G3ASM_ANGELSCRIPT_DIR` / `G3ASM_MINHOOK_DIR` oder automatischer Download |
 
 ## Bauen (32 Bit)
     cmake -S . -B build32 -A Win32
-    cmake --build build32 --config Release --target g3asm g3asm_script g3asm_test g3asm_packmod g3asm_loader g3asm_loader_test g3asm_sb_stub
-Ausgabe: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, Tests, g3asm_packmod) und `build32/loader/dbghelp.dll` (Loader).
+    cmake --build build32 --config Release --target g3asm g3asm_script g3asm_test g3asm_packmod g3asm_dev g3asm_loader g3asm_loader_test g3asm_sb_stub
+Ausgabe: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, Tests, g3asm_packmod, g3asm_dev) und `build32/loader/dbghelp.dll` (Loader).
 
 ## Test
     g3asm_test.exe <SharedBase.dll> tests\scripts\selftest.as
@@ -27,19 +27,20 @@ Ausgabe: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, Tests, g3asm_packm
     python -I tests\file_patches_overlay.py g3asm_test.exe <SharedBase.dll>   (Datei-Patches in einem Wegwerf-Ordner)
     python -I tests\packed_mods.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (gepackte Mods entpacken, aktuell halten, entfernen)
     python -I tests\packmod_release.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (Paket für Spieler bauen, einspielen, starten)
+    python -I tests\dev_pipe.py g3asm_test.exe <SharedBase.dll> g3asm_dev.exe   (Dev-Pipe: Ausgabe, Fehler, 5-s-Abbruch)
 Ohne Spieldateien: als `<SharedBase.dll>` die Ersatz-DLL `build32\sbstub\SharedBase.dll` nehmen (Ziel `g3asm_sb_stub`), als `<dbghelp_orig.dll>`
 die System-DLL `%WINDIR%\SysWOW64\dbghelp.dll`. Die Ersatz-DLL hat nur die Exporte, die das Modkit für bCString und die Mathe-Typen braucht,
 und rechnet nicht bitgenau wie das Original; Messungen am Verhalten des Originals nur mit der echten SharedBase.dll.
 
 ## CI und Release (GitHub Actions)
 - `.github/workflows/ci.yml` (jeder Push auf `main`, Pull-Requests, von Hand): baut 32 Bit mit MSVC, prüft, dass `g3asm.dll` kein `fninit` enthält
-  (`tools/check_no_fninit.ps1`, Schutz für den FPU-Fix), führt Selbsttest, Test-Mods, Kompilierprüfung der Beispiel-Mods und Loader-Test mit der Ersatz-SharedBase aus, dazu `tests/packmod_generations.py`, `tests/file_patches_overlay.py`, `tests/packed_mods.py` und `tests/packmod_release.py`, und packt probeweise ein Zip (Artefakt, 7 Tage).
+  (`tools/check_no_fninit.ps1`, Schutz für den FPU-Fix), führt Selbsttest, Test-Mods, Kompilierprüfung der Beispiel-Mods und Loader-Test mit der Ersatz-SharedBase aus, dazu `tests/packmod_generations.py`, `tests/file_patches_overlay.py`, `tests/packed_mods.py`, `tests/packmod_release.py` und `tests/dev_pipe.py`, und packt probeweise ein Zip (Artefakt, 7 Tage).
 - `.github/workflows/release.yml`: beim Push eines Tags `v*` dasselbe plus GitHub-Release mit dem Zip:
       git tag -a v0.46.0-beta.1 -m "G3 AngelScript Modkit v0.46.0-beta.1"
       git push origin v0.46.0-beta.1
   Tags mit Bindestrich (`-alpha.N`, `-beta.N`) werden als Vorabversion veröffentlicht; Namensschema siehe [Versionsregeln](docs/modkit/api-policy.md). Den Titel setzt der Workflow („G3 AngelScript Modkit <Tag>“); die Release-Notizen danach auf GitHub von Hand schreiben, dort gehört der Projektstand hin.
 - Paket lokal: `powershell -NoProfile -File tools\package_release.ps1 -BuildDir build32 -Version v0.46.0-beta.1` (Ergebnis in `dist\`). Inhalt: Loader, `g3asm.dll`,
-  `Script_G3ASM_<API>.dll` (Laufzeit für Mod-Pakete), `g3asm_packmod.exe`, `tools\install_loader.ps1`, `tools\g3pak_read.py`, Beispiel-Mods (standardmäßig aus), Doku, `INSTALL.txt`; keine Spieldateien.
+  `Script_G3ASM_<API>.dll` (Laufzeit für Mod-Pakete), `g3asm_packmod.exe`, `g3asm_dev.exe`, `tools\install_loader.ps1`, `tools\g3pak_read.py`, Beispiel-Mods (standardmäßig aus), Doku, `INSTALL.txt`; keine Spieldateien.
 - Nicht in der CI: alles, was das echte Spiel braucht (Messungen mit der Original-`SharedBase.dll`, Spieltests). Spieldateien gehören nicht ins Repo.
 
 ## Einbau aus dem eigenen Build
@@ -48,11 +49,46 @@ und rechnet nicht bitgenau wie das Original; Messungen am Verhalten des Original
 Der Installer legt die vorhandene `dbghelp.dll` des Spiels als `dbghelp_orig.dll` beiseite (der Loader leitet `MiniDumpWriteDump` dorthin weiter, die Absturzberichte
 des Spiels funktionieren weiter), stellt den Loader als `dbghelp.dll` hin und kopiert `g3asm.dll`, eine `g3asm.ini` und eine Mini-Mod. Sicherung unter
 `<Spiel>\g3asm_backup\loader_<Zeit>\`. Protokolle: `g3asm_loader.log` (Loader, Absturzkandidaten) und `g3asm.log` (Modkit). Einstellungen in `g3asm.ini`
-(`[g3asm] enable/script/hotreload/mods`, `[loader] crashlog`).
+(`[g3asm] enable/script/hotreload/mods`, `[loader] crashlog`, `[dev] pipe`).
+
+## Dev-Pipe (Code im laufenden Spiel ausführen)
+Mit der Dev-Pipe führst du AngelScript im laufenden Spiel aus, ohne Mess-Mod und ohne Neustart. Sie ist für Entwickler des Modkits und für
+Werkzeuge gedacht, nicht für Mods.
+
+1. In `<Spielordner>\g3asm.ini` diesen Abschnitt ergänzen:
+
+       [dev]
+       pipe=1
+
+2. Das Spiel starten. In `g3asm.log` steht `Dev-Pipe bereit: \.\pipe\g3asm_dev`.
+3. Code schicken:
+
+       g3asm_dev "print(GetHero().GetName());"
+       g3asm_dev -m meine_mod "print(\"Zaehler: \" + zaehler);"
+       g3asm_dev -f probe.as
+
+   Ergebnis (eine Zeile JSON):
+
+       {"ok":true,"out":"[dev] Held
+","ms":0.31}
+
+| Schalter | Bedeutung |
+|---|---|
+| `-m <Mod>` | Code im Modul dieser Mod ausführen; ihre globalen Variablen und Funktionen sind sichtbar |
+| `-f <Datei>` | Code aus einer Datei (UTF-8) |
+| `-w <Sekunden>` | so lange auf die Pipe warten (Standard 5) |
+
+Exit-Code: 0 = ok, 1 = Fehler im Skript (Meldung in `out`), 2 = keine Verbindung.
+
+Der Code ist der Rumpf einer Funktion `void dev()`. Er läuft im nächsten Bild auf dem Spiel-Thread, mit demselben 5-Sekunden-Abbruch wie
+jedes Skript. `out` enthält alle Protokollzeilen des Aufrufs (`print`, Übersetzungsfehler mit Zeile und Spalte, Skript-Ausnahmen).
+
+**Achtung:** Wer die Pipe öffnen kann, führt Code im Spiel aus. Die Pipe nimmt deshalb nur lokale Verbindungen des Benutzers an, unter dem
+das Spiel läuft, und ist standardmäßig aus. Die Script-DLL für Spieler (`Script_G3ASM_<API>.dll`) enthält die Pipe nicht.
 
 ## Vor jedem Commit
 1. [Bauen](#bauen-32-bit) und die [Testläufe](#test): Selbsttest, `tests\mods`, Kompilierprüfung `examples\mods`
-   (dort ist genau der eine Fehler "Override-Kette über mehrere Mods" erwartet), Loader-Test, `tests\file_patches_overlay.py`, `tests\packed_mods.py` und `tests\packmod_release.py`.
+   (dort ist genau der eine Fehler "Override-Kette über mehrere Mods" erwartet), Loader-Test, `tests\file_patches_overlay.py`, `tests\packed_mods.py`, `tests\packmod_release.py` und `tests\dev_pipe.py`.
 2. `powershell -NoProfile -File tools\check_no_fninit.ps1 -Dll <Build>\g3asm\g3asm.dll` und dasselbe für `Script_G3ASM_<API>.dll` (siehe Gleitkomma).
 3. `powershell -NoProfile -File tools\run_clang_tidy.ps1 -BuildDir <Build> -Changed -Strict` (siehe Statische Prüfung).
 4. Was das Verhalten im Spiel ändert, im Spiel prüfen und das Protokoll (`g3asm.log`) lesen. Ohne Spieldateien geht nur der Teil mit der

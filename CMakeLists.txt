@@ -60,15 +60,17 @@ set_target_properties(g3asm_angelscript PROPERTIES MSVC_RUNTIME_LIBRARY MultiThr
 enable_language(C)
 file(GLOB G3ASM_MINHOOK_SRCS ${G3ASM_MINHOOK_DIR}/src/*.c ${G3ASM_MINHOOK_DIR}/src/hde/*.c)
 set(G3ASM_SRCS src/g3asm_main.cpp src/script_host.cpp src/sb_api.cpp src/engine_bindings.cpp src/game_hooks.cpp
-              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/packed_mods.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp src/combat_patches.cpp src/schema_dump.cpp src/ai_trace.cpp src/mod_settings.cpp)
+              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/packed_mods.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp src/combat_patches.cpp src/schema_dump.cpp src/ai_trace.cpp src/trade_trace.cpp src/mod_settings.cpp)
 list(TRANSFORM G3ASM_SRCS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
 # Gemeinsame Objekte fuer g3asm.dll (Loader-Weg) und Script_G3ASM_<API>.dll (Script-DLL fuer Spieler); einmal uebersetzt
 add_library(g3asm_core OBJECT ${G3ASM_SRCS} ${G3ASM_MINHOOK_SRCS})
 target_include_directories(g3asm_core PRIVATE src ${G3ASM_MINHOOK_DIR}/include)
 target_link_libraries(g3asm_core PRIVATE g3asm_angelscript)
 set_target_properties(g3asm_core PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded)
-add_library(g3asm SHARED $<TARGET_OBJECTS:g3asm_core>)
-target_link_libraries(g3asm PRIVATE g3asm_angelscript)
+# dev_pipe.cpp only here (developer channel, ini [dev] pipe=1), not in the script DLL for players
+add_library(g3asm SHARED $<TARGET_OBJECTS:g3asm_core> ${CMAKE_CURRENT_SOURCE_DIR}/src/dev_pipe.cpp)
+target_include_directories(g3asm PRIVATE src)
+target_link_libraries(g3asm PRIVATE g3asm_angelscript advapi32)
 # Map-Datei neben der DLL (g3asm.map): ordnet Adressen aus og3_hooks.log ("g3asm.dll+0x...") Funktionen zu
 target_link_options(g3asm PRIVATE /MAP)
 
@@ -93,8 +95,10 @@ set_target_properties(g3asm_script PROPERTIES OUTPUT_NAME ${G3ASM_SCRIPT_DLL_NAM
 add_executable(g3asm_test tests/test_runner.cpp)
 # Kommandozeilenwerkzeug zum Packen/Pruefen von Mod-Archiven (Gegenstueck zu G3PakDir), teilt sich src/pack_mod.cpp mit der DLL
 add_executable(g3asm_packmod tools/packmod_main.cpp src/pack_mod.cpp)
+# Client for the dev pipe (src/dev_pipe.cpp): g3asm_dev "<code>"
+add_executable(g3asm_dev tools/dev_main.cpp)
 
-foreach(t g3asm g3asm_test g3asm_packmod)
+foreach(t g3asm g3asm_test g3asm_packmod g3asm_dev)
     set_target_properties(${t} PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/g3asm)
 endforeach()
 
