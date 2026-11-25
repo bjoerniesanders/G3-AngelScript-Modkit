@@ -12,7 +12,7 @@ Overrides ändern eine Spielfunktion oder brechen sie ab. Sie stehen auf der Sei
 
 | Funktion | Wann |
 |---|---|
-| `void main()` | Einmal beim Start der Mod und nach jedem Neuladen (Hot-Reload) |
+| `void main()` | Einmal beim Start der Mod und nach jedem Neuladen (Hot-Reload). Beim Neuladen haben die globalen Variablen schon ihre Werte von vorher ([Hot-Reload](mod-package.md#globale-variablen-behalten-ab-version-47)) |
 | `void OnFrame(float dt)` | Jedes Bild. `dt` in Sekunden |
 | `void OnKey(int vk, bool down)` | Eine Taste wird gedrückt (`down = true`) oder losgelassen. Tastenwiederholung meldet das Modkit nicht |
 | `void OnDraw()` (ab Version 34) | Jedes Bild, zum Zeichnen über HUD und Inventar |

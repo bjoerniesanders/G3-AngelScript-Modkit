@@ -29,12 +29,16 @@ Use this page for reference. It gives all functions and types that a script can 
 | `bCString ToString(int / uint / float / double / bool)` | A number or a bool as text |
 | `float GetFrameTime()` | The duration of the last frame in seconds (game time) |
 | `uint GetTimeStamp()` | The time stamp of the game |
-| `int GetApiVersion()` | The version of the script interface (46) |
+| `int GetApiVersion()` | The version of the script interface (47) |
 | `bCString GetGameDir()` | The game folder, with `\` at the end |
 | `void check(bool, const bCString &in)` | For tests: writes to the log if the condition is false |
 
 From the AngelScript add-ons: `array<T>` (`insertLast`, `length`, `[]`, ...) and `scriptmath` (`sin`, `cos`, `sqrt`, `abs`, `pow`, `floor`, ...
-with `float`).
+with `float`). From version 47 also `string` (`scriptstdstring` with `split`, `join`, `parseInt`, `formatInt`, ...) and `dictionary`. The
+[scripting guide](scripting-guide.md#strings-string-from-version-47) gives examples.
+
+Coroutines (from version 47): `StartCoroutine`, `Wait`, `Yield`, `StopCoroutine`, `StopAllCoroutines`, `IsCoroutineRunning`. The
+[scripting guide](scripting-guide.md#coroutines-from-version-47) gives the description and examples.
 
 ## Other mods and settings
 
@@ -389,7 +393,8 @@ The math functions of the types use the library of the game. Thus they calculate
 
 ### `bCString`
 Text (Windows-1252). `+`, `+=`, `==`, `<`, `+ int/uint/float/double/bool`, `GetLength()`, `IsEmpty()`, `Compare(s)`, `CompareNoCase(s)`,
-`Find(s, start = 0)`, `Contains(s)`, `Left(n)`, `Right(n)`, `Mid(start, n)`, `ToUpper()`, `ToLower()`, `GetUpper()`, `GetLower()`.
+`Find(s, start = 0)`, `Contains(s)`, `Left(n)`, `Right(n)`, `Mid(start, n)`, `ToUpper()`, `ToLower()`, `GetUpper()`, `GetLower()`. From version 47,
+`bCString` changes into `string` automatically, and the opposite.
 
 ### `bCVector` (`x`, `y`, `z`)
 A point or a direction. Y is up. The unit is centimeters. `GetMagnitude()`, `GetSquareMagnitude()`, `Normalize()`, `GetNormalized()`,

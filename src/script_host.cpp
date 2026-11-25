@@ -21,7 +21,9 @@
 #include "sb_api.h"
 #include "scriptarray/scriptarray.h"
 #include "scriptbuilder/scriptbuilder.h"
+#include "scriptdictionary/scriptdictionary.h"
 #include "scriptmath/scriptmath.h"
+#include "scriptstdstring/scriptstdstring.h"
 
 namespace g3asm {
 
@@ -424,6 +426,52 @@ void LineCallback(asIScriptContext* ctx, Timeout* t) {
     if (GetTickCount() - t->startTick > 5000) ctx->Abort();
 }
 
+// ---- string and dictionary (API 47): conversion in both directions between bCString and string (std::string, add-on scriptstdstring)
+std::string StrToStd(const SStr& s) { return std::string(s.c_str()); }
+SStr StdToStr(const std::string& s) { return SStr(s); }
+void StdConstructFromStr(const SStr& s, std::string* self) { new (self) std::string(s.c_str()); }
+void StrConstructFromStd(const std::string& s, SStr* self) { new (self) SStr(s); }
+bool RegisterStringConversions(asIScriptEngine* e) {
+    bool ok = true;
+    G3ASM_REG(e->RegisterObjectMethod("bCString", "string opImplConv() const", asFUNCTION(StrToStd), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("string", "bCString opImplConv() const", asFUNCTION(StdToStr), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectBehaviour("string", asBEHAVE_CONSTRUCT, "void f(const bCString &in)", asFUNCTION(StdConstructFromStr),
+                                       asCALL_CDECL_OBJLAST));
+    G3ASM_REG(e->RegisterObjectBehaviour("bCString", asBEHAVE_CONSTRUCT, "void f(const string &in)", asFUNCTION(StrConstructFromStd),
+                                       asCALL_CDECL_OBJLAST));
+    return ok;
+}
+
+// ---- coroutines (API 47): the work is in ScriptHost (StartCoroutine ... TickCoroutines)
+int StartCoroutineScript(asIScriptFunction* f) { return ScriptHost::s_current ? ScriptHost::s_current->StartCoroutine(f, nullptr) : -1; }
+int StartCoroutineArgsScript(asIScriptFunction* f, CScriptDictionary* args) {
+    return ScriptHost::s_current ? ScriptHost::s_current->StartCoroutine(f, args) : -1;
+}
+void WaitScript(float seconds) {
+    if (ScriptHost::s_current) ScriptHost::s_current->WaitCoroutine(seconds);
+}
+void YieldScript() {
+    if (ScriptHost::s_current) ScriptHost::s_current->WaitCoroutine(0.0f);
+}
+bool StopCoroutineScript(int id) { return ScriptHost::s_current && ScriptHost::s_current->StopCoroutine(id); }
+int StopAllCoroutinesScript() { return ScriptHost::s_current ? ScriptHost::s_current->StopAllCoroutines() : 0; }
+bool IsCoroutineRunningScript(int id) { return ScriptHost::s_current && ScriptHost::s_current->IsCoroutineRunning(id); }
+bool RegisterCoroutines(asIScriptEngine* e) {   // after dictionary
+    bool ok = true;
+    G3ASM_REG(e->RegisterFuncdef("void Coroutine()"));
+    G3ASM_REG(e->RegisterFuncdef("void CoroutineArgs(dictionary@ args)"));
+    // @+: AngelScript handles the reference counters of the handles (the function only uses them during the call)
+    G3ASM_REG(e->RegisterGlobalFunction("int StartCoroutine(Coroutine@+ f)", asFUNCTION(StartCoroutineScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int StartCoroutine(CoroutineArgs@+ f, dictionary@+ args)", asFUNCTION(StartCoroutineArgsScript),
+                                        asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("void Wait(float seconds)", asFUNCTION(WaitScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("void Yield()", asFUNCTION(YieldScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool StopCoroutine(int id)", asFUNCTION(StopCoroutineScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int StopAllCoroutines()", asFUNCTION(StopAllCoroutinesScript), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool IsCoroutineRunning(int id)", asFUNCTION(IsCoroutineRunningScript), asCALL_CDECL));
+    return ok;
+}
+
 bool RegisterAll(asIScriptEngine* e) {
     bool ok = true;
     // bCString
@@ -676,18 +724,27 @@ bool ScriptHost::Init(LogFn log) {
     engine_->SetEngineProperty(asEP_ALLOW_UNSAFE_REFERENCES, false);
     RegisterScriptArray(engine_, true);
     RegisterScriptMath(engine_);
-    const bool ok = RegisterAll(engine_) && RegisterEngineBindings(engine_);
+    // string BEFORE bCString: the engine uses the string factory that was registered last, so string literals stay bCString
+    RegisterStdString(engine_);
+    RegisterStdStringUtils(engine_);
+    const bool ok = RegisterAll(engine_) && RegisterStringConversions(engine_) && RegisterEngineBindings(engine_);
+    RegisterScriptDictionary(engine_);   // needs array and string
+    const bool coOk = RegisterCoroutines(engine_);
     ctx_ = engine_->CreateContext();
     char b[160];
     std::snprintf(b, sizeof b, "AngelScript %s bereit (Skript-Schnittstelle Version %d)%s", asGetLibraryVersion(), G3ASM_SCRIPT_API_VERSION,
-                  ok ? "" : " - mit Registrierungsfehlern");
+                  ok && coOk ? "" : " - mit Registrierungsfehlern");
     Log(b);
-    return ok;
+    return ok && coOk;
 }
+
+void ForgetKeptGlobals(const std::string& mod);   // below, at Unload
 
 void ScriptHost::Shutdown() {
     for (Mod& m : mods_) Unload(m);
     mods_.clear();
+    StopCoroutinesOf(std::string());   // the rest (for example from the dev pipe), before the engine goes
+    ForgetKeptGlobals(std::string());
     devModule_ = nullptr;   // the engine releases the module
     if (ctx_) {
         ctx_->Release();
@@ -711,12 +768,41 @@ bool ScriptHost::Loaded() const {
     return false;
 }
 
-void ScriptHost::Unload(Mod& m) {
+// kept globals for each mod name until the next successful Build (also across a build with compile errors)
+std::map<std::string, SavedGlobals*> g_keptGlobals;
+void ForgetKeptGlobals(const std::string& mod) {   // empty = all
+    for (auto it = g_keptGlobals.begin(); it != g_keptGlobals.end();)
+        if (mod.empty() || it->first == mod) {
+            FreeSavedGlobals(it->second);
+            it = g_keptGlobals.erase(it);
+        } else {
+            ++it;
+        }
+}
+// mod.ini [mod] keepglobals=0 turns it off for a mod (default: on)
+bool KeepGlobalsWanted(const std::string& scriptPath) {
+    const size_t s = scriptPath.find_last_of("\\/");
+    if (s == std::string::npos) return true;
+    const std::map<std::string, std::string> ini = ReadIniSection(scriptPath.substr(0, s) + "\\mod.ini", "mod");
+    const auto it = ini.find("keepglobals");
+    return it == ini.end() || it->second != "0";
+}
+
+void ScriptHost::Unload(Mod& m, bool keepGlobals) {
     if (!m.module) return;
     if (asIScriptFunction* f = m.module->GetFunctionByDecl("void OnShutdown()")) {
         curMod_ = m.name;
         Execute(f, nullptr);
     }
+    if (keepGlobals) {   // after OnShutdown: what the mod resets there is not kept
+        if (SavedGlobals* g = SaveGlobals(m.module)) {
+            ForgetKeptGlobals(m.name);
+            g_keptGlobals[m.name] = g;
+        } else {
+            Log("[" + m.name + "] Hot-Reload: globale Variablen konnten nicht gesichert werden");
+        }
+    }
+    StopCoroutinesOf(m.name);   // before Discard: the contexts refer to functions of the module
     m.module->Discard();
     m.module = nullptr;
     ModSettingsForget(m.name);
@@ -726,7 +812,7 @@ void ScriptHost::Unload(Mod& m) {
 }
 
 bool ScriptHost::Build(Mod& m) {
-    Unload(m);
+    Unload(m, m.module && KeepGlobalsWanted(m.path));
     m.mtime = FileTime(m.path);   // keep it also for errors: try again only at a new change
     if (!m.mtime) {
         Log("[" + m.name + "] Skript nicht gefunden: " + m.path);
@@ -749,6 +835,13 @@ bool ScriptHost::Build(Mod& m) {
         return false;
     }
     m.module = engine_->GetModule(modName.c_str());
+    const auto kept = g_keptGlobals.find(m.name);
+    if (kept != g_keptGlobals.end()) {   // hot reload: the globals get their values from before (main() runs after this)
+        const int n = RestoreGlobals(kept->second, m.module);
+        Log(n >= 0 ? "[" + m.name + "] Hot-Reload: " + std::to_string(n) + " globale Variablen uebernommen"
+                   : "[" + m.name + "] Hot-Reload: Fehler beim Uebernehmen der globalen Variablen");
+        ForgetKeptGlobals(m.name);
+    }
     m.fMain = m.module->GetFunctionByDecl("void main()");
     m.fFrame = m.module->GetFunctionByDecl("void OnFrame(float)");
     m.fKey = m.module->GetFunctionByDecl("void OnKey(int, bool)");
@@ -770,6 +863,7 @@ bool ScriptHost::AddScript(const std::string& name, const std::string& path) {
 bool ScriptHost::Load(const std::string& path) {
     for (Mod& m : mods_) Unload(m);
     mods_.clear();
+    ForgetKeptGlobals(std::string());
     return AddScript("main", path);
 }
 
@@ -1048,6 +1142,142 @@ void ScriptHost::CallKey(int vk, bool down) {
             Execute(mods_[i].fKey, nullptr, &vk, &down);
         }
     busyKey_ = false;
+}
+
+// ---------------------------------------------------------------- coroutines (from version 47)
+namespace {
+const int kMaxCoroutinesPerMod = 256;   // protection: StartCoroutine in OnFrame without an end
+}
+
+int ScriptHost::StartCoroutine(asIScriptFunction* f, void* args) {
+    if (!f || !engine_) return -1;
+    int own = 0;
+    for (const Coroutine& c : coroutines_)
+        if (!c.stop && c.mod == curMod_) ++own;
+    if (own >= kMaxCoroutinesPerMod) {
+        static std::set<std::string> told;
+        if (told.insert(curMod_).second)
+            Log("[" + curMod_ + "] StartCoroutine abgelehnt: schon " + std::to_string(kMaxCoroutinesPerMod) + " Koroutinen aktiv");
+        return -1;
+    }
+    asIScriptContext* c = engine_->CreateContext();
+    if (!c) return -1;
+    if (c->Prepare(f) < 0) {
+        c->Release();
+        return -1;
+    }
+    if (args) c->SetArgObject(0, args);   // handle parameter: the context keeps its own reference
+    const int id = nextCoId_++;
+    // the first part runs at the next tick (also if StartCoroutine itself runs in a coroutine during a tick)
+    coroutines_.push_back({id, curMod_, c, coClock_, coTick_, false});
+    return id;
+}
+
+void ScriptHost::WaitCoroutine(float seconds) {
+    asIScriptContext* active = asGetActiveContext();
+    for (Coroutine& c : coroutines_)
+        if (c.id == runningCo_ && c.ctx == active) {
+            c.wakeAt = coClock_ + (seconds > 0.0f ? seconds : 0.0f);
+            active->Suspend();   // takes effect when this function returns to the script
+            return;
+        }
+    if (active) active->SetException("Wait() und Yield() gehen nur in einer Koroutine (StartCoroutine)");
+}
+
+bool ScriptHost::StopCoroutine(int id) {
+    for (Coroutine& c : coroutines_)
+        if (c.id == id && !c.stop && c.mod == curMod_) {
+            c.stop = true;
+            c.ctx->Abort();   // also for the running coroutine itself: it stops at the next possible point
+            if (!coTicking_) SweepCoroutines();
+            return true;
+        }
+    return false;
+}
+
+int ScriptHost::StopAllCoroutines() {
+    int n = 0;
+    for (Coroutine& c : coroutines_)
+        if (!c.stop && c.mod == curMod_) {
+            c.stop = true;
+            c.ctx->Abort();
+            ++n;
+        }
+    if (!coTicking_) SweepCoroutines();
+    return n;
+}
+
+bool ScriptHost::IsCoroutineRunning(int id) const {
+    for (const Coroutine& c : coroutines_)
+        if (c.id == id) return !c.stop;
+    return false;
+}
+
+void ScriptHost::SweepCoroutines() {
+    for (size_t i = 0; i < coroutines_.size();)
+        if (coroutines_[i].stop) {
+            coroutines_[i].ctx->Release();
+            coroutines_.erase(coroutines_.begin() + static_cast<std::ptrdiff_t>(i));
+        } else {
+            ++i;
+        }
+}
+
+void ScriptHost::StopCoroutinesOf(const std::string& mod) {   // empty = all
+    for (Coroutine& c : coroutines_)
+        if (mod.empty() || c.mod == mod) {
+            if (!c.stop) c.ctx->Abort();
+            c.stop = true;
+        }
+    if (!coTicking_) SweepCoroutines();
+}
+
+void ScriptHost::TickCoroutines(float dt) {
+    if (dt > 0.0f) coClock_ += dt;
+    ++coTick_;
+    if (coroutines_.empty() || coTicking_) return;
+    coTicking_ = true;
+    const std::string savedMod = curMod_;
+    const size_t n = coroutines_.size();   // coroutines that start now run at the next tick
+    for (size_t i = 0; i < n; ++i) {
+        if (coroutines_[i].stop || coroutines_[i].lastTick == coTick_ || coroutines_[i].wakeAt > coClock_) continue;
+        coroutines_[i].lastTick = coTick_;
+        asIScriptContext* c = coroutines_[i].ctx;
+        curMod_ = coroutines_[i].mod;
+        runningCo_ = coroutines_[i].id;
+        int r;
+        {
+            FpuRestore fpu(this, c->GetFunction());
+            Timeout t{GetTickCount()};
+            c->SetLineCallback(asFUNCTION(LineCallback), &t, asCALL_CDECL);
+            r = c->Execute();
+            c->ClearLineCallback();
+        }
+        runningCo_ = 0;
+        Coroutine& co = coroutines_[i];   // the vector can be larger now (StartCoroutine in the coroutine)
+        if (r == asEXECUTION_SUSPENDED && !co.stop) continue;
+        if (!co.stop) {
+            char b[1024];
+            const asIScriptFunction* f = c->GetFunction();
+            if (r == asEXECUTION_EXCEPTION) {
+                const asIScriptFunction* ef = c->GetExceptionFunction();
+                std::snprintf(b, sizeof b, "[%s] Skript-Ausnahme in Koroutine %s (Zeile %d): %s", co.mod.c_str(), ef ? ef->GetDeclaration() : "?",
+                              c->GetExceptionLineNumber(), c->GetExceptionString());
+                Log(b);
+            } else if (r == asEXECUTION_ABORTED) {
+                std::snprintf(b, sizeof b, "[%s] Koroutine abgebrochen (laenger als 5 s ohne Wait in %s - Endlosschleife?)", co.mod.c_str(),
+                              f ? f->GetDeclaration() : "?");
+                Log(b);
+            } else if (r != asEXECUTION_FINISHED) {
+                std::snprintf(b, sizeof b, "[%s] Koroutine beendet mit Code %d in %s", co.mod.c_str(), r, f ? f->GetDeclaration() : "?");
+                Log(b);
+            }
+        }
+        co.stop = true;
+    }
+    curMod_ = savedMod;
+    coTicking_ = false;
+    SweepCoroutines();
 }
 
 // ---------------------------------------------------------------- dev pipe (dev_pipe.cpp)
@@ -1586,6 +1816,7 @@ int ScriptHost::ScanMods() {
         }
         Log("[" + m.name + "] Mod entfernt/abgeschaltet - entladen");
         Unload(m);
+        ForgetKeptGlobals(m.name);
         mods_.erase(mods_.begin() + i);
     }
     for (const std::string& n : want) {   // build new mods, reload changed mods

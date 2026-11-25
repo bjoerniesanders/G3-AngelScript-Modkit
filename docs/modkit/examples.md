@@ -156,6 +156,7 @@ Kreis 1,5 m neben ihn. Dazu fängt sie das Spielskript `MagicTeleport` ab (`Watc
 | `demo_text` | Eigene Texte nur über `stringtable.ini`, ohne Skript ([Mod-Ordner](mod-package.md#eigene-texte-stringtableini)) | – |
 | `demo_patch` | Datei-Patch auf eine Quest-Datei ([Datei-Patches](patches.md)) | – |
 | `demo_packmod` | Mod-Archiv schreiben und prüfen, ob das Spiel es liest ([Mod-Archive](archives.md)) | – |
+| `demo_coroutine` | Koroutinen: Countdown mit `Wait`, Abbruch mit `StopCoroutine`, Uhr im Protokoll ([Koroutinen](scripting-guide.md#koroutinen-ab-version-47)) | F10: Countdown starten. F11: abbrechen |
 
 **`demo_lifesteal`:** „Lebensraub“ ist eine Eigenschaft der Waffe, wie „geschärft“. Sie steht als Zeile `(20 %) Lebensraub` in der Beschreibung der
 Waffe. Schlägt der Held damit zu, bekommt er 20 % des Schadens als Lebenspunkte zurück. Bei einem tödlichen Treffer zählt nur der Rest der

@@ -26,6 +26,7 @@ The log messages of the modkit are in German. This documentation quotes them in 
 | [Hooks](hooks.md) | Change or cancel game functions with Override and Super() |
 | [File patches](patches.md) | Unified diff patches for the quest files and info files of the game |
 | [Pack mod archives](archives.md) | `PackMod`: write a folder as a `.mod` or `.m00` archive, compatible with G3PakDir and the Union Starter |
+| [Command line](cli.md) | `g3asm.exe`: make a new mod, check a script without the game, pack, read the log, each also as JSON |
 | [Dialogs](dialogs.md) | Read dialogs (infos) and make your own, commands, the connection to the quest log |
 | [Save and load](saving.md) | Load events, switches in the saved game, restore |
 | [Examples](examples.md) | Complete mods to learn from and to copy |

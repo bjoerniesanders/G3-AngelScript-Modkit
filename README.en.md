@@ -26,7 +26,8 @@ the release procedure and the house rules.
        void OnNPCKilled(Entity victim) { PrintScreen("Killed: " + victim.GetName(), 3, 255, 120, 120); }
 
 3. **Start the game.** The modkit writes output and errors to `<game folder>\g3asm.log`. Each error shows the line and the column. If you save
-   `main.as` while the game runs, the new version is active after approximately 1 second (hot reload).
+   `main.as` while the game runs, the new version is active after approximately 1 second (hot reload). The global variables keep their
+   values. To check the script without the game, use `bin\g3asm\g3asm.exe check <mod folder>` ([Command line](docs/en/modkit/cli.md)).
 
 4. **Set the sequence and the switches** in `g3asm\mods\load_order.txt`:
    - `-name` turns a mod off.

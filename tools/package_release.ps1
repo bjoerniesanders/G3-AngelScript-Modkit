@@ -15,9 +15,15 @@ if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force (Join-Path $stage "bin\loader"), (Join-Path $stage "bin\g3asm"), (Join-Path $stage "tools"), (Join-Path $stage "docs") | Out-Null
 
 Copy-Item (Join-Path $BuildDir "loader\dbghelp.dll") (Join-Path $stage "bin\loader\")
-foreach ($f in "g3asm.dll", "g3asm.map", "g3asm_packmod.exe", "g3asm_dev.exe") {
+foreach ($f in "g3asm.dll", "g3asm.map", "g3asm.exe", "g3asm_packmod.exe", "g3asm_dev.exe") {
     $p = Join-Path $BuildDir "g3asm\$f"
     if (Test-Path $p) { Copy-Item $p (Join-Path $stage "bin\g3asm\") }
+}
+# g3asm check compiles a mod with the replacement SharedBase.dll (no game files); install_loader.ps1 does not copy it into the game
+$stub = Join-Path $BuildDir "sbstub\SharedBase.dll"
+if (Test-Path $stub) {
+    New-Item -ItemType Directory -Force (Join-Path $stage "bin\g3asm\sbstub") | Out-Null
+    Copy-Item $stub (Join-Path $stage "bin\g3asm\sbstub\")
 }
 # runtime as a script DLL (Script_G3ASM_<API>.dll) for mod packages for players
 Get-ChildItem (Join-Path $BuildDir "g3asm") -Filter "Script_G3ASM_*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $stage "bin\g3asm\")
@@ -53,6 +59,8 @@ Example mods: copy examples\mods\<name> to <Gothic 3>\g3asm\mods\ and enable it 
 
 Share a mod with players (they do not need the modkit; the package brings the runtime bin\g3asm\Script_G3ASM_*.dll):
   bin\g3asm\g3asm_packmod.exe release "C:\Path\to\Gothic 3\g3asm\mods\my_mod" "C:\Path\to\output"
+Command line for modders (new mod, check without the game, pack, release, log; docs\en\modkit\cli.md):
+  bin\g3asm\g3asm.exe check "C:\Path\to\Gothic 3\g3asm\mods\my_mod"
 Players: put the package folder into <Gothic 3>\MDS\Mods\ and install it with the Union Starter (README.en.md: "Use mods (for players)").
 Overview: README.en.md (English), README.md (German)
 Documentation: docs\en\modkit\index.md (English), docs\modkit\index.md (German)

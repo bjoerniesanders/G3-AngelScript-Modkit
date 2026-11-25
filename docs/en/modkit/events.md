@@ -12,7 +12,7 @@ Overrides change or cancel a game function. The page [Hooks](hooks.md) describes
 
 | Function | When |
 |---|---|
-| `void main()` | 1 time when the mod starts, and after each reload (hot reload) |
+| `void main()` | 1 time when the mod starts, and after each reload (hot reload). During a reload, the global variables already have their values from before ([Hot reload](mod-package.md#keep-the-global-variables-from-version-47)) |
 | `void OnFrame(float dt)` | Each frame. `dt` is in seconds |
 | `void OnKey(int vk, bool down)` | A key goes down (`down = true`) or up. The modkit does not report key repeat |
 | `void OnDraw()` (from version 34) | Each frame, to draw above the HUD and the inventory |

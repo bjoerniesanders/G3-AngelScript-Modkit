@@ -24,6 +24,7 @@ Aktuelle Skript-Schnittstelle: **Version 47** (`GetApiVersion()`).
 | [Hooks](hooks.md) | Spielfunktionen mit Override und Super() ändern oder abbrechen |
 | [Datei-Patches](patches.md) | Unified-Diff-Patches auf Quest- und Info-Dateien des Spiels |
 | [Mod-Archive packen](archives.md) | `PackMod`: einen Ordner als `.mod`- oder `.m00`-Archiv schreiben, kompatibel zu G3PakDir und Union Starter |
+| [Kommandozeile](cli.md) | `g3asm.exe`: neue Mod anlegen, Skript ohne Spiel prüfen, packen, Protokoll lesen, jeweils auch als JSON |
 | [Dialoge](dialogs.md) | Gespräche (Infos) lesen und eigene anlegen, Befehle, Verbindung zum Questlog |
 | [Speichern und Laden](saving.md) | Lade-Ereignisse, Schalter im Spielstand, Wiederherstellung |
 | [Beispiele](examples.md) | Fertige Mods zum Lernen und Kopieren |

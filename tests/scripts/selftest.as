@@ -158,13 +158,140 @@ void TestPackMod() {
     check(NextModFile("a/b").IsEmpty() && NextModFile("").IsEmpty(), "NextModFile: ungueltiger Volumename");
 }
 
+void TestStdString() {
+    string s = "Gothic";   // literal is bCString, converts to string
+    check(s.length() == 6, "string: length");
+    check(s == "Gothic", "string: opEquals mit Literal");
+    check(s + " 3" == "Gothic 3" && "Ein " + s == "Ein Gothic", "string: opAdd mit Literal");
+    check(s.substr(1, 3) == "oth" && s.findFirst("hic") == 3, "string: substr/findFirst");
+    bCString b = s;   // string converts to bCString
+    check(b == "Gothic" && b.GetLength() == 6, "string -> bCString");
+    string zurueck = b;
+    check(zurueck == s, "bCString -> string");
+    check(bCString(s) == b && string(b) == s, "explizite Umwandlung");
+    s += 3;
+    check(s == "Gothic3", "string: opAddAssign(int)");
+    Entity e;
+    string item = "It_Wolf_Fur";
+    check(e.GetItemCount(item) == -1, "string an Engine-Funktion mit bCString");
+    array<string> teile = string("a,b,c").split(",");   // a literal is bCString: string methods need string(...)
+    check(teile.length() == 3 && teile[1] == "b" && join(teile, "-") == "a-b-c", "string: split/join");
+    check(parseInt("42") == 42 && formatInt(7, "0", 3) == "007", "string: parseInt/formatInt");
+}
+
+void TestDictionary() {
+    dictionary d;
+    d.set("gold", 100);
+    d["name"] = bCString("Diego");
+    d["text"] = string("Myrtana");
+    int64 gold = 0;
+    check(d.get("gold", gold) && gold == 100, "dictionary: set/get int");
+    check(int(d["gold"]) == 100, "dictionary: opIndex int");
+    int goldInt = 0;
+    check(d.get("gold", goldInt) && goldInt == 100, "dictionary: get in int");
+    float f = 0;
+    check(d.get("gold", f) && f == 100, "dictionary: get in float");
+    bCString name;
+    check(d.get("name", name) && name == "Diego", "dictionary: bCString als Wert");
+    string text;
+    check(d.get("text", text) && text == "Myrtana", "dictionary: string als Wert");
+    int fehlt;
+    check(!d.get("fehlt", fehlt), "dictionary: get ohne Schluessel gibt false");
+    check(d.exists("gold") && !d.exists("fehlt") && d.getSize() == 3, "dictionary: exists/getSize");
+    bCString schluessel = "gold";
+    check(d.exists(schluessel), "dictionary: bCString als Schluessel");
+    Entity e;
+    d.set("held", e);
+    Entity e2;
+    check(d.get("held", e2) && !e2.IsValid(), "dictionary: Entity als Wert");
+    array<string>@ keys = d.getKeys();
+    check(keys.length() == 4, "dictionary: getKeys");
+    check(d.delete("gold") && !d.exists("gold") && d.getSize() == 3, "dictionary: delete");
+    dictionary liste = {{"a", 1}, {"b", 2}};
+    check(int(liste["b"]) == 2 && liste.getSize() == 2, "dictionary: Initialisierungsliste");
+    d.deleteAll();
+    check(d.isEmpty(), "dictionary: deleteAll");
+}
+
+// Coroutines: main() starts them, the test program then runs 60 ticks of 0.1 s, OnShutdown checks the result
+int coCount = 0, coFrames = 0, coArgs = 0, coSelfStop = 0, coSelfId = 0, coEndlessId = 0, coLongId = 0, coStarts = 0;
+void CoCount() { for (int i = 0; i < 3; i++) { Wait(0.25f); coCount++; } }
+void CoFrames() { for (int i = 0; i < 5; i++) { Yield(); coFrames++; } }
+void CoArgs(dictionary@ a) { int n; if (!a.get("n", n)) n = -1; Wait(0.1f); coArgs = n; }
+void CoEndless() { while (true) {} }   // the 5-s stop must end it
+void CoLong() { Wait(1000.0f); }       // still waits at the end: the reload must stop it
+void CoStopSelf() { coSelfStop = 1; StopCoroutine(coSelfId); Yield(); coSelfStop = 2; }
+void CoNothing() {}
+
+void TestCoroutines() {
+    check(StartCoroutine(CoCount) > 0 && StartCoroutine(CoFrames) > 0, "StartCoroutine: ID > 0");
+    dictionary args = {{"n", 42}};
+    check(StartCoroutine(CoArgs, args) > 0, "StartCoroutine mit dictionary");
+    coEndlessId = StartCoroutine(CoEndless);
+    coLongId = StartCoroutine(CoLong);
+    coSelfId = StartCoroutine(CoStopSelf);
+    check(coFrames == 0 && IsCoroutineRunning(coLongId), "Koroutine startet erst im naechsten Bild");
+    int stopped = StartCoroutine(CoLong);
+    check(StopCoroutine(stopped) && !IsCoroutineRunning(stopped) && !StopCoroutine(stopped), "StopCoroutine");
+    check(!IsCoroutineRunning(99999) && !StopCoroutine(99999), "unbekannte Koroutinen-ID");
+    for (int i = 0; i < 300; i++)
+        if (StartCoroutine(CoNothing) > 0) coStarts++;
+    check(coStarts == 250, "hoechstens 256 Koroutinen je Mod: " + coStarts);
+}
+
+// Hot reload: TestKeep() sets the globals, the test program loads the script again and calls AfterReload()
+class Punkt { int x = 0; bCString name; }
+int keepInt = 0;
+float keepFloat = 0;
+bool keepBool = false;
+bCString keepText;
+string keepStd;
+array<int> keepArr;
+array<bCString> keepNames;
+dictionary keepDict;
+Entity keepEnt;
+bCVector keepVec;
+Punkt keepObj;
+Punkt@ keepRef;
+Coroutine@ keepFn;
+const int KEEP_CONST = 3;
+
+void TestKeep() {
+    keepInt = 7; keepFloat = 2.5f; keepBool = true;
+    keepText = "Myrtana"; keepStd = "Nordmar";
+    keepArr = {1, 2, 3}; keepNames = {"Diego", "Milten"};
+    keepDict.set("gold", 100); keepDict["name"] = bCString("Gorn"); keepDict["std"] = string("Lester"); keepDict["vec"] = bCVector(1, 2, 3);
+    keepVec = bCVector(4, 5, 6);
+    keepObj.x = 4; keepObj.name = "Punkt A";
+    @keepRef = Punkt(); keepRef.x = 9;
+    @keepFn = CoNothing;
+}
+
+void AfterReload() {
+    check(keepInt == 7 && keepFloat == 2.5f && keepBool, "Hot-Reload: Zahlen und bool behalten");
+    check(keepText == "Myrtana" && keepStd == "Nordmar", "Hot-Reload: bCString und string behalten");
+    check(keepArr.length() == 3 && keepArr[2] == 3 && keepNames.length() == 2 && keepNames[1] == "Milten", "Hot-Reload: Arrays behalten");
+    int gold; bCString name; string s; bCVector v;
+    check(keepDict.get("gold", gold) && gold == 100 && keepDict.get("name", name) && name == "Gorn", "Hot-Reload: dictionary mit Zahl und bCString");
+    check(keepDict.get("std", s) && s == "Lester" && keepDict.get("vec", v) && v == bCVector(1, 2, 3), "Hot-Reload: dictionary mit string und bCVector");
+    check(keepVec == bCVector(4, 5, 6) && !keepEnt.IsValid(), "Hot-Reload: POD-Typen behalten");
+    check(keepObj.x == 4 && keepObj.name == "Punkt A", "Hot-Reload: Objekt einer Skriptklasse behalten");
+    check(keepRef !is null && keepRef.x == 9, "Hot-Reload: Handle auf Skriptobjekt behalten");
+    check(keepFn is null, "Hot-Reload: Funktions-Handle wird geleert");
+    check(KEEP_CONST == 3 && frames == 1 && coCount == 3, "Hot-Reload: const und Zaehler aus dem ersten Lauf");
+}
+
 void main() {
     print("Selbsttest startet (API-Version " + GetApiVersion() + ")");
     TestString();
+    TestStdString();
+    TestDictionary();
     TestVector();
     TestRotation();
     TestMatrix4();
     TestPackMod();
+    TestCoroutines();
+    TestKeep();
     check(!SetOverrideArg(0, 1), "SetOverrideArg ausserhalb eines Overrides wird abgelehnt");
     check(AI_STATE == 1 && AI_FUNCTION == 2 && AI_CALLBACK == 3 && AI_ROUTINE == 4, "KI-Konstanten");
     check(GetLocText("G3ASM_Gibt_Es_Nicht").IsEmpty() && !IsModActive("gibts_nicht") && GetModVersion("gibts_nicht").IsEmpty() && GetSpeechText("INFO_A_B_German").IsEmpty(), "GetLocText/GetSpeechText/IsModActive ohne Spiel");
@@ -203,4 +330,8 @@ void OnShutdown() {
     check(keysDown == 1 && keysUp == 1, "OnKey: je einmal gedrueckt und losgelassen");
     check(items == 1 && kills == 1 && enters == 1, "Spielereignisse genau einmal zugestellt");
     check(buys == 1 && sells == 1, "OnTrade: bool kommt als true und false an");
+    check(coCount == 3 && coFrames == 5 && coArgs == 42, "Koroutinen: Wait, Yield und dictionary-Argument");
+    check(coSelfStop == 1, "Koroutine stoppt sich selbst mit StopCoroutine");
+    check(!IsCoroutineRunning(coEndlessId), "Endlosschleife in Koroutine nach 5 s abgebrochen");
+    check(IsCoroutineRunning(coLongId), "lange Wartezeit laeuft bis zum Entladen");
 }

@@ -12,7 +12,7 @@ Diese Seite legt fest, was sich an der Skript-Schnittstelle zwischen zwei Versio
 - Ein Release heißt `v0.<API>.<Fix>`, zum Beispiel `v0.42.0-alpha.1`. Die mittlere Zahl ist die Skript-Schnittstelle. Die letzte Zahl zählt
   Fehlerbehebungen, die die Schnittstelle nicht ändern. `-alpha.N` und `-beta.N` sind Vorabversionen.
 - Solange die erste Zahl 0 ist, gilt das Modkit nicht als fertig. Ein fertiges Modkit hat die Version 1.0. `-alpha.N`: Der Umfang wächst noch mit
-  jeder Version. `-beta.N`: Die Skript-Schnittstelle ist eingefroren (siehe unten). Es kommen nur Fehlerbehebungen.
+  jeder Version. `-beta.N`: Was es gibt, ändert sich nicht mehr (siehe unten). Neue Funktionen kommen nur mit einer neuen Nummer.
 
 ## Was eine neue Version darf
 
@@ -27,19 +27,20 @@ Diese Seite legt fest, was sich an der Skript-Schnittstelle zwischen zwei Versio
 | Reihenfolge oder Bedeutung von Override-Argumenten (`SetOverrideArg(index, ...)`) ändern | Nein |
 | Zahlenwerte von Konstanten (`QUEST_*`, `STATUS_*`, `QUALITY_*`, `SLOT_*`) ändern | Nein |
 
-## Eingefroren ab Version 46
+## Beta: Bestehendes bleibt (ab Version 46)
 
-Mit **Version 46** ist die Skript-Schnittstelle für die Beta eingefroren. Das heißt:
+Seit **Version 46** ist das Modkit in der Beta. Das heißt:
 
 - Alles, was **ohne Vermerk** in der [API-Referenz](api-reference.md), bei den [Ereignissen](events.md) und bei den [Hooks](hooks.md) steht, bleibt
   so, wie es dort beschrieben ist. Eine Mod, die nur solche Funktionen benutzt und mit Version 46 läuft, läuft auch mit jeder späteren Version. Die
   Tabelle oben gilt dafür ohne Ausnahme.
-- Während der Beta kommen **keine neuen Funktionen** dazu. Es erscheinen nur Fehlerbehebungen (`v0.46.x-beta.N`). Die Zahl 46 bleibt.
+- Neue Funktionen kommen nur mit einer **neuen Nummer** der Skript-Schnittstelle dazu (Version 47, 48, ...). Innerhalb einer Nummer erscheinen
+  nur Fehlerbehebungen (zum Beispiel `v0.47.1-beta.1`).
 - Ausgenommen sind nur die Funktionen mit Vermerk **Experimentell** (Liste unten). Sie dürfen sich noch ändern oder wegfallen. Jede Änderung steht
   in den Änderungen.
 - Nicht zur Schnittstelle gehören und dürfen sich jederzeit ändern: Wortlaut und Menge der Protokollzeilen, die Mess-Schalter der ini (`scriptlog`,
-  `aitrace`, `anispeedlog`, `tradelog`, `memlog` und ähnliche, dazu die Dev-Pipe `[dev] pipe`) und die Mess-Mods unter `examples/mods`.
-- Nach der Beta kommt Version 47. Neue Funktionen kommen dann wieder nach der Tabelle oben dazu.
+  `aitrace`, `anispeedlog`, `tradelog`, `memlog` und ähnliche, dazu die Dev-Pipe `[dev] pipe`), die Mess-Mods unter `examples/mods` und der
+  Wortlaut der Textausgabe von `g3asm.exe` ([Kommandozeile](cli.md)). Die Felder der Ausgabe mit `--json` gehören zur Schnittstelle.
 
 ## Veraltete Funktionen
 

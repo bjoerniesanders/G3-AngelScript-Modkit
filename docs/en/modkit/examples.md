@@ -156,6 +156,7 @@ in a circle 1.5 m next to the hero. For this, it intercepts the game script `Mag
 | `demo_text` | Custom texts only through `stringtable.ini`, without a script ([Mod folder](mod-package.md#your-own-texts-stringtableini)) | – |
 | `demo_patch` | A file patch on a quest file ([File patches](patches.md)) | – |
 | `demo_packmod` | Write a mod archive and do a check if the game reads it ([Mod archives](archives.md)) | – |
+| `demo_coroutine` | Coroutines: countdown with `Wait`, stop with `StopCoroutine`, a clock in the log ([Coroutines](scripting-guide.md#coroutines-from-version-47)) | F10: start the countdown. F11: stop it |
 
 **`demo_lifesteal`:** "Lebensraub" (life steal) is a property of the weapon, as "geschärft" (sharpened) is. It shows as a line
 `(20 %) Lebensraub` in the description of the weapon. When the hero hits with the weapon, the hero gets 20 % of the damage back as hit points.

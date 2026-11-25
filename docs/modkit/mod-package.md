@@ -125,6 +125,7 @@ api=40                                 ; mindestens nötige Skript-Schnittstelle
 requires=basis_mod >= 1.1, andere_mod  ; benötigte Mods, Komma-getrennt, Mindestversion optional
 title=Meine Mod                        ; nur für release: Name im Union Starter (Standard: Ordnername)
 category=Kampf                         ; nur für release: Kategorie im Union Starter (Standard: G3ASM)
+keepglobals=0                          ; ab Version 47: globale Variablen beim Hot-Reload nicht behalten (Standard: 1)
 ```
 
 Alle Einträge sind freiwillig. Sind die Bedingungen einer Mod nicht erfüllt, **lädt das Modkit die Mod nicht**: weder ihr Skript noch ihre
@@ -210,9 +211,34 @@ pipe=0                      ; 1 = Dev-Pipe: Code im laufenden Spiel ausführen (
 
 Speicherst du `main.as` (oder legst einen neuen Mod-Ordner an), erkennt das Modkit das innerhalb von 1 Sekunde:
 
-1. Beim Neuladen einer Mod läuft ihr `OnShutdown()`.
+1. Beim Neuladen einer Mod läuft ihr `OnShutdown()`. Ihre Koroutinen enden.
 2. Das Modkit übersetzt das neue Skript. Bei Fehlern bleibt die Mod entladen, bis du die Datei wieder änderst.
-3. Danach läuft `main()` erneut.
+3. Ab Version 47 bekommen die globalen Variablen ihre Werte von vorher zurück (siehe unten).
+4. Danach läuft `main()` erneut.
+
+### Globale Variablen behalten (ab Version 47)
+
+Die globalen Variablen einer Mod behalten beim Hot-Reload ihren Wert. Zähler, Listen und Tabellen fangen also nicht bei null an, wenn du das Skript
+änderst. Das Modkit sichert die Werte nach `OnShutdown()`. Was du dort zurücksetzt, bleibt also zurückgesetzt.
+
+| Behalten | Nicht behalten |
+|---|---|
+| Zahlen, `bool`, `bCString`, `string` | `const`-Variablen: Es gilt der neue Wert im Code |
+| `Entity`, `bCVector` und die anderen Mathe-Typen | Funktions-Handles (zum Beispiel `Coroutine@`): Sie sind danach `null` |
+| `array<T>`, Objekte eigener Klassen und Handles darauf | Handles und Objekte eigener Klassen als Wert in einem `dictionary` |
+| `dictionary` mit Zahlen, Texten und Mathe-Typen | Variablen, deren Typ du geändert hast |
+
+Das Protokoll meldet:
+
+```
+[meine_mod] Hot-Reload: 12 globale Variablen uebernommen
+```
+
+**Achtung:** Änderst du nur den Startwert einer Variable (`int max = 5;` zu `int max = 10;`), bleibt nach dem Hot-Reload der alte Wert 5. Für
+feste Werte nimm `const int max = 10;`. Willst du für eine Mod immer einen frischen Start, schreibe `keepglobals=0` in ihre `mod.ini`.
+
+Bei einem Syntaxfehler bleiben die gesicherten Werte erhalten, bis das Skript wieder fehlerfrei ist. Beim Start des Spiels fangen alle Variablen
+mit ihren Startwerten an.
 
 Entfernst du den Ordner oder trägst `-Name` ein, entlädt das Modkit die Mod (mit `OnShutdown()`).
 

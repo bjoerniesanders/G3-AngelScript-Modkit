@@ -18,8 +18,8 @@ The rules for the script interface are in [docs/en/modkit/api-policy.md](docs/en
 
 ## Build (32 bit)
     cmake -S . -B build32 -A Win32
-    cmake --build build32 --config Release --target g3asm g3asm_script g3asm_test g3asm_packmod g3asm_dev g3asm_loader g3asm_loader_test g3asm_sb_stub
-Output: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, tests, g3asm_packmod, g3asm_dev) and `build32/loader/dbghelp.dll` (loader).
+    cmake --build build32 --config Release --target g3asm g3asm_script g3asm_test g3asm_packmod g3asm_dev g3asm_cli g3asm_loader g3asm_loader_test g3asm_sb_stub
+Output: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, tests, g3asm_packmod, g3asm_dev, command line g3asm.exe) and `build32/loader/dbghelp.dll` (loader).
 
 ## Test
     g3asm_test.exe <SharedBase.dll> tests\scripts\selftest.as
@@ -29,6 +29,8 @@ Output: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, tests, g3asm_packmo
     python -I tests\packed_mods.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (unpack packed mods, keep them current, remove them)
     python -I tests\packmod_release.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (make, install and start a package for players)
     python -I tests\dev_pipe.py g3asm_test.exe <SharedBase.dll> g3asm_dev.exe   (dev pipe: output, errors, 5-s stop)
+    python -I tests\keep_globals.py g3asm_test.exe <SharedBase.dll> g3asm_dev.exe   (hot reload keeps the globals)
+    python -I tests\cli.py g3asm.exe <SharedBase.dll>   (command line: new, check, pack, release, log)
 Without game files: as `<SharedBase.dll>`, use the replacement DLL `build32\sbstub\SharedBase.dll` (target `g3asm_sb_stub`). As
 `<dbghelp_orig.dll>`, use the system DLL `%WINDIR%\SysWOW64\dbghelp.dll`. The replacement DLL has only the exports that the modkit needs for
 bCString and the math types. It does not calculate bit for bit as the original does. Measure the behavior of the original only with the real
@@ -38,7 +40,7 @@ SharedBase.dll.
 - `.github/workflows/ci.yml` (each push to `main`, pull requests, manual): builds 32 bit with MSVC. It makes sure that `g3asm.dll` contains no
   `fninit` (`tools/check_no_fninit.ps1`, protection for the FPU fix). It runs the self-test, the test mods, the compile check of the example mods
   and the loader test with the replacement SharedBase, and also `tests/packmod_generations.py`, `tests/file_patches_overlay.py`,
-  `tests/packed_mods.py`, `tests/packmod_release.py` and `tests/dev_pipe.py`. It packs a test zip (artifact, 7 days).
+  `tests/packed_mods.py`, `tests/packmod_release.py`, `tests/dev_pipe.py`, `tests/keep_globals.py` and `tests/cli.py`. It packs a test zip (artifact, 7 days).
 - `.github/workflows/release.yml`: when you push a tag `v*`, the same steps, and a GitHub release with the zip:
       git tag -a v0.46.0-beta.1 -m "G3 AngelScript Modkit v0.46.0-beta.1"
       git push origin v0.46.0-beta.1
@@ -97,7 +99,7 @@ and it is off by default. The script DLL for players (`Script_G3ASM_<API>.dll`) 
 ## Before each commit
 1. [Build](#build-32-bit) and do the [test runs](#test): self-test, `tests\mods`, compile check of `examples\mods` (there, exactly one error
    "Override-Kette über mehrere Mods" is expected), loader test, `tests\file_patches_overlay.py`, `tests\packed_mods.py`,
-   `tests\packmod_release.py` and `tests\dev_pipe.py`.
+   `tests\packmod_release.py`, `tests\dev_pipe.py`, `tests\keep_globals.py` and `tests\cli.py`.
 2. `powershell -NoProfile -File tools\check_no_fninit.ps1 -Dll <build>\g3asm\g3asm.dll`, and the same for `Script_G3ASM_<API>.dll` (see Floating
    point).
 3. `powershell -NoProfile -File tools\run_clang_tidy.ps1 -BuildDir <build> -Changed -Strict` (see Static analysis).

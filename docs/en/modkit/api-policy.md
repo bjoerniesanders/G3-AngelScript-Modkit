@@ -12,7 +12,7 @@ This page gives the changes that are permitted in the script interface between t
 - The name of a release is `v0.<API>.<Fix>`, for example `v0.42.0-alpha.1`. The middle number is the script interface. The last number counts
   bug fixes that do not change the interface. `-alpha.N` and `-beta.N` are pre-release versions.
 - While the first number is 0, the modkit is not complete. A complete modkit has version 1.0. `-alpha.N`: the scope increases with each version.
-  `-beta.N`: the script interface is frozen (see below). Only bug fixes come.
+  `-beta.N`: the items that exist do not change (see below). New functions come only with a new number.
 
 ## Permitted changes in a new version
 
@@ -27,19 +27,21 @@ This page gives the changes that are permitted in the script interface between t
 | Change the sequence or the meaning of override arguments (`SetOverrideArg(index, ...)`) | No |
 | Change the values of constants (`QUEST_*`, `STATUS_*`, `QUALITY_*`, `SLOT_*`) | No |
 
-## Frozen from version 46
+## Beta: the items that exist stay (from version 46)
 
-With **version 46**, the script interface is frozen for the beta. This means:
+From **version 46**, the modkit is in the beta. This means:
 
 - All items **without a label** in the [API reference](api-reference.md), in [Events](events.md) and in [Hooks](hooks.md) stay as their
   description tells. A mod that uses only these functions and runs with version 46 also runs with each later version. The table above applies
   to these functions without exceptions.
-- During the beta, **no new functions** come. Only bug fixes come (`v0.46.x-beta.N`). The number 46 stays.
+- New functions come only with a **new number** of the script interface (version 47, 48, ...). In one number, only bug fixes come (for
+  example `v0.47.1-beta.1`).
 - The only exceptions are the functions with the label **Experimental** (list below). They can still change or be removed. Each change has a
   note in the changes.
 - These items are not part of the interface and can change at all times: the text and the quantity of the log lines, the measurement switches
-  in the ini (`scriptlog`, `aitrace`, `anispeedlog`, `tradelog`, `memlog` and similar switches, and the dev pipe `[dev] pipe`), and the measurement mods in `examples/mods`.
-- After the beta, version 47 comes. New functions then come again in accordance with the table above.
+  in the ini (`scriptlog`, `aitrace`, `anispeedlog`, `tradelog`, `memlog` and similar switches, and the dev pipe `[dev] pipe`), the measurement
+  mods in `examples/mods` and the text output of `g3asm.exe` ([Command line](cli.md)). The fields of the output with `--json` are part of the
+  interface.
 
 ## Deprecated functions
 

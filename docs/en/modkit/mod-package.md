@@ -128,6 +128,7 @@ api=40                                 ; minimum necessary script interface (Get
 requires=base_mod >= 1.1, other_mod    ; needed mods, separated by commas, minimum version optional
 title=My Mod                           ; only for release: name in the Union Starter (default: folder name)
 category=Combat                        ; only for release: category in the Union Starter (default: G3ASM)
+keepglobals=0                          ; from version 47: do not keep the global variables during a hot reload (default: 1)
 ```
 
 All entries are optional. If the conditions of a mod are not met, the modkit **does not load the mod**: not its script, not its file patches and
@@ -217,9 +218,34 @@ pipe=0                      ; 1 = dev pipe: run code in the running game (only f
 
 If you save `main.as` (or make a new mod folder), the modkit sees this in 1 second or less:
 
-1. When a mod reloads, its `OnShutdown()` runs.
+1. When a mod reloads, its `OnShutdown()` runs. Its coroutines stop.
 2. The modkit compiles the new script. If there are errors, the mod stays unloaded until you change the file again.
-3. Then `main()` runs again.
+3. From version 47, the global variables get their values from before again (see below).
+4. Then `main()` runs again.
+
+### Keep the global variables (from version 47)
+
+The global variables of a mod keep their values during a hot reload. Thus counters, lists and tables do not start at zero when you change the
+script. The modkit keeps the values after `OnShutdown()`. Thus a value that you reset there stays reset.
+
+| Kept | Not kept |
+|---|---|
+| Numbers, `bool`, `bCString`, `string` | `const` variables: the new value in the code applies |
+| `Entity`, `bCVector` and the other math types | Function handles (for example `Coroutine@`): they are `null` after the reload |
+| `array<T>`, objects of your classes and handles to them | Handles and objects of your classes as values in a `dictionary` |
+| `dictionary` with numbers, texts and math types | Variables with a changed type |
+
+The log shows:
+
+```
+[my_mod] Hot-Reload: 12 globale Variablen uebernommen
+```
+
+**Caution:** If you change only the start value of a variable (`int max = 5;` to `int max = 10;`), the old value 5 stays after the hot reload.
+For fixed values, use `const int max = 10;`. If a mod must always start fresh, write `keepglobals=0` in its `mod.ini`.
+
+If there is a syntax error, the kept values stay until the script has no errors again. When the game starts, all variables start with their
+start values.
 
 If you remove the folder or write `-Name`, the modkit unloads the mod (with `OnShutdown()`).
 

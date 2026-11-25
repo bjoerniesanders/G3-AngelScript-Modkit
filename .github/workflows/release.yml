@@ -18,7 +18,7 @@ jobs:
         run: cmake -S . -B build -A Win32
 
       - name: Build
-        run: cmake --build build --config Release --parallel --target g3asm g3asm_script g3asm_loader g3asm_packmod g3asm_dev g3asm_test g3asm_loader_test g3asm_sb_stub
+        run: cmake --build build --config Release --parallel --target g3asm g3asm_script g3asm_loader g3asm_packmod g3asm_dev g3asm_cli g3asm_test g3asm_loader_test g3asm_sb_stub
 
       - name: FPU fix active (no fninit)
         shell: pwsh
@@ -55,6 +55,14 @@ jobs:
 
       - name: Dev pipe (stub SharedBase)
         run: python -I tests/dev_pipe.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll build/g3asm/g3asm_dev.exe
+
+      # Hot reload: the globals keep their values, main() runs again, const values from the new code, keepglobals=0, a run with a syntax error.
+      - name: Hot reload keeps globals (stub SharedBase)
+        run: python -I tests/keep_globals.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll build/g3asm/g3asm_dev.exe
+
+      # Command line g3asm.exe: new, check (without the game, also all example mods), pack, release, log, each with --json.
+      - name: Command line g3asm (stub SharedBase)
+        run: python -I tests/cli.py build/g3asm/g3asm.exe build/sbstub/SharedBase.dll
 
       - name: Determine version
         id: ver

@@ -140,6 +140,34 @@ float FrameTime() {
     return g_appFrameTime(g_appInstance());
 }
 
+// Pause of the game (for coroutines, from version 47): gCSession::IsPaused (Game.dll, bit 0 at +0xD0, set by gCSession::Pause) and
+// eCApplication::IsPaused(bool) (Engine.dll, byte +0x609; the argument is not used). Both are simple getters (disassembly 2026-11-25).
+// Measured 2026-11-25: the ESC menu (page 17) sets both flags. The inventory and the other measured pages (0, 2, 3, 6) do not pause.
+typedef bool(__thiscall* SessionIsPausedFn)(const void*);
+typedef bool(__thiscall* AppIsPausedFn)(void*, bool);
+bool GamePaused() {
+    static AppInstanceFn sessionInstance = nullptr;
+    static SessionIsPausedFn sessionPaused = nullptr;
+    static AppIsPausedFn appPaused = nullptr;
+    static bool tried = false;
+    if (!tried) {
+        HMODULE game = GetModuleHandleA("Game.dll");
+        HMODULE eng = GetModuleHandleA("Engine.dll");
+        if (!game || !eng) return false;   // try again at the next frame
+        tried = true;
+        sessionInstance = reinterpret_cast<AppInstanceFn>(GetProcAddress(game, "?GetInstance@gCSession@@SGAAV1@XZ"));
+        sessionPaused = reinterpret_cast<SessionIsPausedFn>(GetProcAddress(game, "?IsPaused@gCSession@@QBE_NXZ"));
+        appPaused = reinterpret_cast<AppIsPausedFn>(GetProcAddress(eng, "?IsPaused@eCApplication@@QAE_N_N@Z"));
+        if (!sessionInstance || !sessionPaused || !appPaused) Log("Pause-Abfrage: Exporte fehlen, Koroutinen laufen auch in Pausen");
+    }
+    bool s = false, a = false;
+    if (sessionInstance && sessionPaused)
+        if (void* sess = sessionInstance()) s = sessionPaused(sess);
+    if (g_appInstance && appPaused)
+        if (void* app = g_appInstance()) a = appPaused(app, false);
+    return s || a;
+}
+
 // ---------------------------------------------------------------- import table of the EXE
 typedef void(__thiscall* VoidMethod)(void*);
 enum HookId { kPostInit = 0, kProcess, kWorldActivate, kWorldDeactivate, kHookCount };
@@ -354,7 +382,10 @@ void __fastcall HProcess(void* self, void*) {
     MoreEventsFrame();
     if (g_devPipeFrame) g_devPipeFrame();   // also during the load pause: the dev pipe only runs code that a developer sends
     if (InLoadPause()) return;
-    g_host.CallFrame(FrameTime());
+    const float dt = FrameTime();
+    g_host.CallFrame(dt);
+    // after OnFrame; the coroutines stop while the game pauses, and with the load pause. The clock uses the scaled frame time.
+    if (!GamePaused()) g_host.TickCoroutines(dt);
 }
 void __fastcall HWorldActivate(void* self, void*) {
     g_orig[kWorldActivate](self);
@@ -562,19 +593,38 @@ extern "C" __declspec(dllexport) int g3asm_run_file(const char* path) {
     g_host.CallKey(0x7A, true);
     g_host.CallKey(0x7A, false);
     g_host.CallFrame(0.016f);
-    g_host.CallSimple("void OnShutdown()");
+    // coroutines: 60 ticks of 0.1 s (6 s on the coroutine clock); the self test checks the result in OnShutdown
+    for (int i = 0; i < 60; ++i) g_host.TickCoroutines(0.1f);
+    if (dirMode) {
+        g_host.CallSimple("void OnShutdown()");
+    } else {   // load the script again (as hot reload does): Unload runs OnShutdown and must stop the coroutines that still wait
+        const int waiting = g_host.CoroutineCount();
+        g_host.AddScript("main", path);
+        g_host.Check(waiting > 0 && g_host.CoroutineCount() == 0, "Koroutinen: Neuladen der Mod stoppt ihre wartenden Koroutinen");
+        g_host.CallSimple("void AfterReload()");   // hot reload: the globals keep their values (keep_globals.cpp)
+    }
     char b[96];
     std::snprintf(b, sizeof b, "Pruefungen: %d, fehlgeschlagen: %d", g_host.Checks(), g_host.Failures());
     Log(b);
     return g_host.Failures();
 }
 
+// for the command line (g3asm check): compile a script as the mod <name> without main(); return value 1 = no errors
+extern "C" __declspec(dllexport) int g3asm_check_script(const char* name, const char* path) {
+    return g_host.AddScript(name && *name ? name : "main", path ? path : "") ? 1 : 0;
+}
+
+// for the command line: the number of the script interface (GetApiVersion)
+extern "C" __declspec(dllexport) int g3asm_api_version() { return G3ASM_SCRIPT_API_VERSION; }
+
 // for tests (tests/dev_pipe.py): start the dev pipe and run its requests for ms milliseconds, as the game frames would do
 extern "C" __declspec(dllexport) int g3asm_dev_serve(int ms) {
     if (!g_devPipeStart || !g_devPipeFrame || !g_devPipeStart(g_host)) return 0;
     const DWORD end = GetTickCount() + DWORD(ms);
     while (int(GetTickCount() - end) < 0) {
+        g_host.CheckReload();   // hot reload as in the game (tests/keep_globals.py): 1 time each second, runs main() of reloaded mods
         g_devPipeFrame();
+        g_host.TickCoroutines(0.01f);
         Sleep(10);
     }
     return 1;

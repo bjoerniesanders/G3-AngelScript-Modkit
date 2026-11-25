@@ -2,7 +2,7 @@
 # Copyright (C) 2026 G3ASM authors. Zusatzerlaubnisse: LICENSE-EXCEPTIONS.md
 """Test der Dev-Pipe ohne Spiel: g3asm_test laedt eine Test-Mod und bedient die Pipe (G3ASM_TEST_DEVPIPE), g3asm_dev schickt Anfragen.
 Geprueft: Ausgabe von print, Code im Modul einer Mod (deren Globale), Syntaxfehler mit Zeilennummer, Skript-Ausnahme, Abbruch einer
-Endlosschleife nach 5 s, unbekannte Mod, Exit-Codes des Clients.
+Endlosschleife nach 5 s, unbekannte Mod, Exit-Codes des Clients, Wait ausserhalb einer Koroutine, Koroutine aus der Pipe.
 Aufruf: python -I tests/dev_pipe.py <g3asm_test.exe> <SharedBase.dll> <g3asm_dev.exe>"""
 import json
 import os
@@ -37,7 +37,8 @@ tmp = tempfile.mkdtemp(prefix='g3asmdevpipe_')
 mods = os.path.join(tmp, 'mods')
 os.makedirs(os.path.join(mods, 'pipe_ziel'))
 with open(os.path.join(mods, 'pipe_ziel', 'main.as'), 'wb') as f:
-    f.write(b'int zaehler = 41;\nvoid main() { print("pipe_ziel geladen"); }\n')
+    f.write(b'int zaehler = 41;\nvoid main() { print("pipe_ziel geladen"); }\n'
+            b'void Hoch() { Wait(0.2f); zaehler = 100; }\n')
 
 env = dict(os.environ, G3ASM_TEST_DEVPIPE='60000')
 srv = subprocess.Popen([exe, sb, mods], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -64,6 +65,15 @@ try:
 
     rc, d, raw = dev('-m', 'gibt_es_nicht', 'print("x");')
     check(rc == 1 and 'nicht geladen' in d.get('out', ''), 'unbekannte Mod gemeldet')
+
+    rc, d, raw = dev('Wait(1);')
+    check(rc == 1 and 'nur in einer Koroutine' in d.get('out', ''), 'Wait ausserhalb einer Koroutine gemeldet: ' + raw[:160])
+
+    rc, d, raw = dev('-m', 'pipe_ziel', 'print("id " + StartCoroutine(Hoch));')
+    check(rc == 0 and 'id ' in d.get('out', '') and 'id -1' not in d.get('out', ''), 'Koroutine aus der Pipe gestartet: ' + raw[:120])
+    time.sleep(1.0)
+    rc, d, raw = dev('-m', 'pipe_ziel', 'print("zaehler " + zaehler);')
+    check(rc == 0 and 'zaehler 100' in d.get('out', ''), 'Koroutine lief nach Wait weiter: ' + raw[:120])
 
     rc, d, raw = dev('print("nach den Fehlern");')
     check(rc == 0 and 'nach den Fehlern' in d.get('out', ''), 'Pipe arbeitet nach Fehlern weiter')

@@ -29,12 +29,16 @@ Diese Seite ist zum Nachschlagen. Sie nennt alle Funktionen und Typen, die ein S
 | `bCString ToString(int / uint / float / double / bool)` | Zahl oder bool als Text |
 | `float GetFrameTime()` | Dauer des letzten Bildes in Sekunden (Spielzeit) |
 | `uint GetTimeStamp()` | Zeitstempel des Spiels |
-| `int GetApiVersion()` | Version der Skript-Schnittstelle (46) |
+| `int GetApiVersion()` | Version der Skript-Schnittstelle (47) |
 | `bCString GetGameDir()` | Spielordner mit `\` am Ende |
 | `void check(bool, const bCString &in)` | Für Tests: meldet im Protokoll, wenn die Bedingung falsch ist |
 
 Aus den AngelScript-Add-ons: `array<T>` (`insertLast`, `length`, `[]`, ...) und `scriptmath` (`sin`, `cos`, `sqrt`, `abs`, `pow`, `floor`, ... mit
-`float`).
+`float`). Ab Version 47 auch `string` (`scriptstdstring` mit `split`, `join`, `parseInt`, `formatInt`, ...) und `dictionary`. Beispiele stehen im
+[Scripting-Guide](scripting-guide.md#strings-string-ab-version-47).
+
+Koroutinen (ab Version 47): `StartCoroutine`, `Wait`, `Yield`, `StopCoroutine`, `StopAllCoroutines`, `IsCoroutineRunning`. Beschreibung und
+Beispiele im [Scripting-Guide](scripting-guide.md#koroutinen-ab-version-47).
 
 ## Andere Mods und Einstellungen
 
@@ -389,7 +393,8 @@ Die Rechenfunktionen der Typen laufen über die Bibliothek des Spiels. Sie rechn
 
 ### `bCString`
 Text (Windows-1252). `+`, `+=`, `==`, `<`, `+ int/uint/float/double/bool`, `GetLength()`, `IsEmpty()`, `Compare(s)`, `CompareNoCase(s)`,
-`Find(s, start = 0)`, `Contains(s)`, `Left(n)`, `Right(n)`, `Mid(start, n)`, `ToUpper()`, `ToLower()`, `GetUpper()`, `GetLower()`.
+`Find(s, start = 0)`, `Contains(s)`, `Left(n)`, `Right(n)`, `Mid(start, n)`, `ToUpper()`, `ToLower()`, `GetUpper()`, `GetLower()`. Ab Version 47
+wandelt sich `bCString` selbst in `string` um und umgekehrt.
 
 ### `bCVector` (`x`, `y`, `z`)
 Punkt oder Richtung. Y ist oben. Die Einheit ist Zentimeter. `GetMagnitude()`, `GetSquareMagnitude()`, `Normalize()`, `GetNormalized()`,

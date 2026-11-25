@@ -20,14 +20,14 @@ jobs:
         run: cmake -S . -B build -A Win32
 
       - name: Build
-        run: cmake --build build --config Release --parallel --target g3asm g3asm_script g3asm_loader g3asm_packmod g3asm_dev g3asm_test g3asm_loader_test g3asm_sb_stub
+        run: cmake --build build --config Release --parallel --target g3asm g3asm_script g3asm_loader g3asm_packmod g3asm_dev g3asm_cli g3asm_test g3asm_loader_test g3asm_sb_stub
 
       - name: Check build output
         shell: pwsh
         run: |
           $script = Get-ChildItem build/g3asm -Filter 'Script_G3ASM_*.dll' | Select-Object -First 1
           if (-not $script) { throw "Script_G3ASM_*.dll is missing" }
-          foreach ($f in 'build/g3asm/g3asm.dll', "build/g3asm/$($script.Name)", 'build/loader/dbghelp.dll', 'build/g3asm/g3asm_packmod.exe', 'build/g3asm/g3asm_dev.exe', 'build/g3asm/g3asm_test.exe', 'build/g3asm/g3asm_loader_test.exe', 'build/sbstub/SharedBase.dll') {
+          foreach ($f in 'build/g3asm/g3asm.dll', "build/g3asm/$($script.Name)", 'build/loader/dbghelp.dll', 'build/g3asm/g3asm_packmod.exe', 'build/g3asm/g3asm_dev.exe', 'build/g3asm/g3asm.exe', 'build/g3asm/g3asm_test.exe', 'build/g3asm/g3asm_loader_test.exe', 'build/sbstub/SharedBase.dll') {
             if (-not (Test-Path $f)) { throw "$f is missing" }
             "{0,-32} {1,9} bytes" -f $f, (Get-Item $f).Length
           }
@@ -101,6 +101,14 @@ jobs:
       # Dev pipe (developer channel into the running game): print, code in the module of a mod, compile errors, exceptions, 5-s stop.
       - name: Dev pipe (stub SharedBase)
         run: python -I tests/dev_pipe.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll build/g3asm/g3asm_dev.exe
+
+      # Hot reload: the globals keep their values, main() runs again, const values from the new code, keepglobals=0, a run with a syntax error.
+      - name: Hot reload keeps globals (stub SharedBase)
+        run: python -I tests/keep_globals.py build/g3asm/g3asm_test.exe build/sbstub/SharedBase.dll build/g3asm/g3asm_dev.exe
+
+      # Command line g3asm.exe: new, check (without the game, also all example mods), pack, release, log, each with --json.
+      - name: Command line g3asm (stub SharedBase)
+        run: python -I tests/cli.py build/g3asm/g3asm.exe build/sbstub/SharedBase.dll
 
       - name: Build a sample release package
         shell: pwsh

@@ -43,8 +43,123 @@ bCString links = s.Left(5);
 bool drin = s.Contains("Welt");
 ```
 
-Einen Typ `string` gibt es nicht. Alle Texte sind `bCString`. Auch `Format`-Funktionen fehlen. Für eine Zahl in einem Text nimm `ToString(5)` oder
-`"" + 5`.
+Für eine Zahl in einem Text nimm `ToString(5)` oder `"" + 5`.
+
+## Strings: `string` (ab Version 47)
+
+`string` ist der Text-Typ von AngelScript (Add-on `scriptstdstring`). Du brauchst ihn für `dictionary` und für Funktionen wie `split`, `join`,
+`parseInt` und `formatInt`. Sonst reicht `bCString`.
+
+Beide Typen wandeln sich selbst ineinander um. Du kannst einen `string` an jede Funktion geben, die einen `bCString` erwartet, und umgekehrt.
+
+```angelscript
+string s = "Gothic";                          // das Literal ist bCString und wird zu string
+bCString b = s;                               // string wird zu bCString
+int n = GetHero().GetItemCount(s);            // string an eine Engine-Funktion
+array<string> teile = string("a,b,c").split(",");
+print(join(teile, "-"));                      // Ergebnis: a-b-c
+int zahl = parseInt("42");
+```
+
+**Achtung:** Ein Text in Anführungszeichen ist immer `bCString`. Methoden von `string` gehen deshalb nicht direkt am Literal. Schreibe
+`string("a,b,c").split(",")`, nicht `"a,b,c".split(",")`.
+
+## Tabellen: `dictionary` (ab Version 47)
+
+Ein `dictionary` speichert Werte unter einem Schlüssel (Text). Werte können Zahlen, `bool`, `bCString`, `string`, `Entity` und andere Typen
+sein.
+
+```angelscript
+dictionary d;
+d.set("gold", 100);
+d["name"] = bCString("Diego");
+int gold = 0;
+if (d.get("gold", gold)) print("Gold: " + gold);   // Ergebnis: Gold: 100
+int g = int(d["gold"]);                            // Wert über [] lesen
+if (d.exists("name")) d.delete("name");
+array<string>@ schluessel = d.getKeys();
+dictionary preise = {{"It_Apple", 5}, {"It_Bread", 10}};
+```
+
+| Funktion | Beschreibung |
+|---|---|
+| `set(key, value)`, `d[key] = value` | Speichert einen Wert. Ein vorhandener Wert wird ersetzt |
+| `bool get(key, value &out)` | Liest den Wert. `false`, wenn der Schlüssel fehlt |
+| `d[key]` | Wert lesen, zum Beispiel `int(d["gold"])` oder `bCString(d["name"])` |
+| `bool exists(key)`, `bool delete(key)`, `deleteAll()` | Prüfen, einen Eintrag oder alle entfernen |
+| `uint getSize()`, `bool isEmpty()` | Zahl der Einträge |
+| `array<string>@ getKeys()` | Alle Schlüssel, ohne feste Reihenfolge |
+
+**Achtung:** Fehlt der Schlüssel, gibt `get` `false` zurück und schreibt trotzdem einen zufälligen Wert in die Variable. Ein Startwert wie
+`int n = 0` bleibt nicht erhalten. Setze den Standardwert deshalb nach dem Aufruf:
+
+```angelscript
+int n;
+if (!d.get(name, n)) n = 0;   // Ergebnis: n ist 0, wenn name fehlt
+d.set(name, n + 1);
+```
+
+**Achtung:** Ein `dictionary` in einer globalen Variable geht beim Neuladen der Mod (Hot-Reload) verloren. Es wird auch nicht im Spielstand
+gespeichert. Für Entities im `dictionary` gilt dieselbe Regel wie sonst: nicht über einen Weltwechsel aufbewahren
+(siehe [Objekte prüfen](#objekte-prüfen)).
+
+## Koroutinen (ab Version 47)
+
+Eine Koroutine ist eine Funktion, die mitten im Ablauf warten kann. Mit `Wait(sekunden)` hält sie an, und das Spiel läuft weiter. Nach der
+Wartezeit macht sie an derselben Stelle weiter. So schreibst du Abläufe über mehrere Sekunden ohne Zähler in `OnFrame`.
+
+```angelscript
+void Countdown() {
+    for (int i = 3; i > 0; i--) {
+        PrintScreen("" + i, 1);
+        Wait(1.0f);                  // 1 Sekunde Spielzeit warten
+    }
+    PrintScreen("Los!", 2);
+}
+
+void main() {
+    StartCoroutine(Countdown);       // Ergebnis: 3, 2, 1, Los! im Sekundentakt
+}
+```
+
+Werte gibst du über ein `dictionary` mit:
+
+```angelscript
+void Gruss(dictionary@ args) {
+    bCString name;
+    if (!args.get("name", name)) name = "Fremder";
+    Wait(2.0f);
+    PrintScreen("Hallo " + name, 3);
+}
+
+void main() {
+    dictionary args = {{"name", "Diego"}};
+    StartCoroutine(Gruss, args);
+}
+```
+
+| Funktion | Beschreibung |
+|---|---|
+| `int StartCoroutine(Coroutine@ f)` | Startet `void f()` als Koroutine. Rückgabe: ID (> 0), `-1` bei einem Fehler |
+| `int StartCoroutine(CoroutineArgs@ f, dictionary@ args)` | Startet `void f(dictionary@ args)` mit Werten |
+| `void Wait(float seconds)` | Wartet die Spielzeit `seconds`. `Wait(0)` wartet bis zum nächsten Bild |
+| `void Yield()` | Wartet bis zum nächsten Bild |
+| `bool StopCoroutine(int id)` | Beendet eine Koroutine der eigenen Mod. `false`, wenn sie nicht mehr läuft |
+| `int StopAllCoroutines()` | Beendet alle Koroutinen der eigenen Mod. Rückgabe: ihre Zahl |
+| `bool IsCoroutineRunning(int id)` | `true`, solange die Koroutine läuft oder wartet |
+
+- Eine Koroutine beginnt im **nächsten Bild**, nicht sofort beim Aufruf von `StartCoroutine`.
+- `Wait` zählt die **Spielzeit**. Im ESC-Menü und beim Laden steht sie still. Im Inventar, auf der Karte und in anderen Bildschirmen läuft sie
+  weiter, wie das Spiel selbst.
+- Eine Koroutine läuft höchstens einmal je Bild. Ist die Wartezeit kürzer als ein Bild, geht es im nächsten Bild weiter.
+- Jede Mod kann höchstens 256 Koroutinen zugleich haben. Danach gibt `StartCoroutine` `-1` zurück.
+
+**Achtung:**
+- `Wait` und `Yield` gehen nur in einer Koroutine. In `main`, `OnFrame` oder einem Ereignis brechen sie den Aufruf mit einer Skript-Ausnahme ab.
+- Zwischen zwei `Wait` gilt dieselbe Grenze von 5 Sekunden wie bei jedem Skriptaufruf. Eine Schleife ohne `Wait` bricht das Modkit danach ab.
+- Lädt die Mod neu (Hot-Reload) oder endet das Spiel, enden alle ihre Koroutinen. Der Spielstand speichert keine Koroutinen.
+- Beim Laden eines Spielstands laufen Koroutinen weiter. Für Entities gilt die Regel aus [Objekte prüfen](#objekte-prüfen): nach einem
+  Weltwechsel neu holen.
 
 ## Objekte prüfen
 

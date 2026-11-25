@@ -25,7 +25,8 @@ und die Hausregeln.
        void OnNPCKilled(Entity opfer) { PrintScreen("Getötet: " + opfer.GetName(), 3, 255, 120, 120); }
 
 3. **Das Spiel starten.** Das Modkit schreibt Ausgaben und Fehler in `<Spielordner>\g3asm.log`. Jeder Fehler zeigt die Zeile und die Spalte.
-   Wenn du `main.as` im laufenden Spiel speicherst, ist die neue Fassung nach etwa 1 Sekunde aktiv (Hot-Reload).
+   Wenn du `main.as` im laufenden Spiel speicherst, ist die neue Fassung nach etwa 1 Sekunde aktiv (Hot-Reload). Die globalen Variablen
+   behalten dabei ihre Werte. Ohne Spiel prüft `bin\g3asm\g3asm.exe check <Mod-Ordner>` das Skript ([Kommandozeile](docs/modkit/cli.md)).
 
 4. **Die Reihenfolge und die Schalter festlegen** in `g3asm\mods\load_order.txt`:
    - `-name` schaltet eine Mod ab.

@@ -17,8 +17,8 @@ Die Regeln für die Skript-Schnittstelle stehen in [docs/modkit/api-policy.md](d
 
 ## Bauen (32 Bit)
     cmake -S . -B build32 -A Win32
-    cmake --build build32 --config Release --target g3asm g3asm_script g3asm_test g3asm_packmod g3asm_dev g3asm_loader g3asm_loader_test g3asm_sb_stub
-Ausgabe: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, Tests, g3asm_packmod, g3asm_dev) und `build32/loader/dbghelp.dll` (Loader).
+    cmake --build build32 --config Release --target g3asm g3asm_script g3asm_test g3asm_packmod g3asm_dev g3asm_cli g3asm_loader g3asm_loader_test g3asm_sb_stub
+Ausgabe: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, Tests, g3asm_packmod, g3asm_dev, Kommandozeile g3asm.exe) und `build32/loader/dbghelp.dll` (Loader).
 
 ## Test
     g3asm_test.exe <SharedBase.dll> tests\scripts\selftest.as
@@ -28,13 +28,15 @@ Ausgabe: `build32/g3asm/` (g3asm.dll, Script_G3ASM_<API>.dll, Tests, g3asm_packm
     python -I tests\packed_mods.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (gepackte Mods entpacken, aktuell halten, entfernen)
     python -I tests\packmod_release.py g3asm_test.exe <SharedBase.dll> g3asm_packmod.exe   (Paket für Spieler bauen, einspielen, starten)
     python -I tests\dev_pipe.py g3asm_test.exe <SharedBase.dll> g3asm_dev.exe   (Dev-Pipe: Ausgabe, Fehler, 5-s-Abbruch)
+    python -I tests\keep_globals.py g3asm_test.exe <SharedBase.dll> g3asm_dev.exe   (Hot-Reload behält die Globalen)
+    python -I tests\cli.py g3asm.exe <SharedBase.dll>   (Kommandozeile: new, check, pack, release, log)
 Ohne Spieldateien: als `<SharedBase.dll>` die Ersatz-DLL `build32\sbstub\SharedBase.dll` nehmen (Ziel `g3asm_sb_stub`), als `<dbghelp_orig.dll>`
 die System-DLL `%WINDIR%\SysWOW64\dbghelp.dll`. Die Ersatz-DLL hat nur die Exporte, die das Modkit für bCString und die Mathe-Typen braucht,
 und rechnet nicht bitgenau wie das Original; Messungen am Verhalten des Originals nur mit der echten SharedBase.dll.
 
 ## CI und Release (GitHub Actions)
 - `.github/workflows/ci.yml` (jeder Push auf `main`, Pull-Requests, von Hand): baut 32 Bit mit MSVC, prüft, dass `g3asm.dll` kein `fninit` enthält
-  (`tools/check_no_fninit.ps1`, Schutz für den FPU-Fix), führt Selbsttest, Test-Mods, Kompilierprüfung der Beispiel-Mods und Loader-Test mit der Ersatz-SharedBase aus, dazu `tests/packmod_generations.py`, `tests/file_patches_overlay.py`, `tests/packed_mods.py`, `tests/packmod_release.py` und `tests/dev_pipe.py`, und packt probeweise ein Zip (Artefakt, 7 Tage).
+  (`tools/check_no_fninit.ps1`, Schutz für den FPU-Fix), führt Selbsttest, Test-Mods, Kompilierprüfung der Beispiel-Mods und Loader-Test mit der Ersatz-SharedBase aus, dazu `tests/packmod_generations.py`, `tests/file_patches_overlay.py`, `tests/packed_mods.py`, `tests/packmod_release.py`, `tests/dev_pipe.py`, `tests/keep_globals.py` und `tests/cli.py`, und packt probeweise ein Zip (Artefakt, 7 Tage).
 - `.github/workflows/release.yml`: beim Push eines Tags `v*` dasselbe plus GitHub-Release mit dem Zip:
       git tag -a v0.46.0-beta.1 -m "G3 AngelScript Modkit v0.46.0-beta.1"
       git push origin v0.46.0-beta.1
@@ -88,7 +90,7 @@ das Spiel läuft, und ist standardmäßig aus. Die Script-DLL für Spieler (`Scr
 
 ## Vor jedem Commit
 1. [Bauen](#bauen-32-bit) und die [Testläufe](#test): Selbsttest, `tests\mods`, Kompilierprüfung `examples\mods`
-   (dort ist genau der eine Fehler "Override-Kette über mehrere Mods" erwartet), Loader-Test, `tests\file_patches_overlay.py`, `tests\packed_mods.py`, `tests\packmod_release.py` und `tests\dev_pipe.py`.
+   (dort ist genau der eine Fehler "Override-Kette über mehrere Mods" erwartet), Loader-Test, `tests\file_patches_overlay.py`, `tests\packed_mods.py`, `tests\packmod_release.py`, `tests\dev_pipe.py`, `tests\keep_globals.py` und `tests\cli.py`.
 2. `powershell -NoProfile -File tools\check_no_fninit.ps1 -Dll <Build>\g3asm\g3asm.dll` und dasselbe für `Script_G3ASM_<API>.dll` (siehe Gleitkomma).
 3. `powershell -NoProfile -File tools\run_clang_tidy.ps1 -BuildDir <Build> -Changed -Strict` (siehe Statische Prüfung).
 4. Was das Verhalten im Spiel ändert, im Spiel prüfen und das Protokoll (`g3asm.log`) lesen. Ohne Spieldateien geht nur der Teil mit der

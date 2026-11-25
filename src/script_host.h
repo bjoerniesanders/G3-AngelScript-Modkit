@@ -99,6 +99,16 @@ public:
     // for the bindings
     static ScriptHost* s_current;
     void Check(bool ok, const char* msg);
+    // Coroutines (from version 47): each one has its own context and belongs to the mod that started it. TickCoroutines runs 1 time for each
+    // frame in the game thread (after OnFrame): it adds dt to the coroutine clock and continues each coroutine whose wait time is over, at most
+    // 1 time for each frame. Each part between two waits has the 5-s stop. Unload stops the coroutines of the mod.
+    int StartCoroutine(asIScriptFunction* f, void* args);   // args: CScriptDictionary* or nullptr; return value: ID > 0, or -1
+    void WaitCoroutine(float seconds);                      // only in a coroutine; if not, a script exception
+    bool StopCoroutine(int id);                             // only coroutines of the current mod
+    int StopAllCoroutines();                                // all coroutines of the current mod; return value: the number
+    bool IsCoroutineRunning(int id) const;
+    void TickCoroutines(float dt);
+    int CoroutineCount() const { return int(coroutines_.size()); }
     float (*frameTime)() = nullptr;
 
 private:
@@ -124,7 +134,7 @@ private:
                  int nev = 0, bool* retBool = nullptr, void* retText = nullptr);   // retText: SStr* for functions with a bCString return value
     int modCallDepth_ = 0;
     bool Build(Mod& m);   // compile (again); first OnShutdown and discard the old module
-    void Unload(Mod& m);
+    void Unload(Mod& m, bool keepGlobals = false);   // keepGlobals: keep the globals for the next Build (hot reload)
     Mod* Find(const std::string& name);
     void CallIn(Mod& m, const char* decl);
     asIScriptEngine* engine_ = nullptr;
@@ -138,8 +148,28 @@ private:
     std::string* capture_ = nullptr;   // RunSnippet: target for the log lines of the call
     std::thread::id captureThread_;
     asIScriptModule* devModule_ = nullptr;
+    struct Coroutine {
+        int id;
+        std::string mod;
+        asIScriptContext* ctx;
+        double wakeAt;        // coroutine clock in seconds
+        unsigned lastTick;    // tick in which it ran last (or was started): at most 1 run for each frame
+        bool stop;
+    };
+    std::vector<Coroutine> coroutines_;
+    double coClock_ = 0;
+    unsigned coTick_ = 0;
+    int nextCoId_ = 1, runningCo_ = 0;   // runningCo_: ID of the coroutine that runs now (0 = none)
+    bool coTicking_ = false;
+    void StopCoroutinesOf(const std::string& mod);   // stop and release now (Unload, Shutdown)
+    void SweepCoroutines();                          // release the coroutines with stop = true
 };
 
+// Hot reload (keep_globals.cpp, from version 47): keep the global variables of a module and give them to the new module
+struct SavedGlobals;
+SavedGlobals* SaveGlobals(asIScriptModule* mod);              // nullptr if it failed
+int RestoreGlobals(SavedGlobals* saved, asIScriptModule* mod);   // number of globals with a kept value, -1 for an error
+void FreeSavedGlobals(SavedGlobals* saved);
 // check a registration with AngelScript: if there is an error (r < 0), write to the log and set ok to false
 inline void CheckRegistration(int r, const char* what, bool& ok) {
     if (r >= 0) return;

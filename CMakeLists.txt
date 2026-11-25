@@ -49,7 +49,9 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     list(APPEND G3ASM_AS_SRCS ${G3ASM_AS_DIR}/angelscript/source/as_callfunc_x64_msvc_asm.asm)
 endif()
 list(APPEND G3ASM_AS_SRCS ${G3ASM_AS_DIR}/add_on/scriptbuilder/scriptbuilder.cpp ${G3ASM_AS_DIR}/add_on/scriptarray/scriptarray.cpp
-                        ${G3ASM_AS_DIR}/add_on/scriptmath/scriptmath.cpp)
+                        ${G3ASM_AS_DIR}/add_on/scriptmath/scriptmath.cpp ${G3ASM_AS_DIR}/add_on/scriptstdstring/scriptstdstring.cpp
+                        ${G3ASM_AS_DIR}/add_on/scriptstdstring/scriptstdstring_utils.cpp ${G3ASM_AS_DIR}/add_on/scriptdictionary/scriptdictionary.cpp
+                        ${G3ASM_AS_DIR}/add_on/serializer/serializer.cpp)
 add_library(g3asm_angelscript STATIC ${G3ASM_AS_SRCS})
 target_include_directories(g3asm_angelscript PUBLIC ${G3ASM_AS_DIR}/angelscript/include ${G3ASM_AS_DIR}/add_on)
 # CLEAR_FPU_STACK=emms: AngelScript setzt vor jedem C++-Aufruf sonst per fninit das x87-Steuerwort zurueck (037F statt Genome 007F = 24 Bit).
@@ -60,7 +62,7 @@ set_target_properties(g3asm_angelscript PROPERTIES MSVC_RUNTIME_LIBRARY MultiThr
 enable_language(C)
 file(GLOB G3ASM_MINHOOK_SRCS ${G3ASM_MINHOOK_DIR}/src/*.c ${G3ASM_MINHOOK_DIR}/src/hde/*.c)
 set(G3ASM_SRCS src/g3asm_main.cpp src/script_host.cpp src/sb_api.cpp src/engine_bindings.cpp src/game_hooks.cpp
-              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/packed_mods.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp src/combat_patches.cpp src/schema_dump.cpp src/ai_trace.cpp src/trade_hooks.cpp src/mod_settings.cpp)
+              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/packed_mods.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp src/combat_patches.cpp src/schema_dump.cpp src/ai_trace.cpp src/trade_hooks.cpp src/mod_settings.cpp src/keep_globals.cpp)
 list(TRANSFORM G3ASM_SRCS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
 # Gemeinsame Objekte fuer g3asm.dll (Loader-Weg) und Script_G3ASM_<API>.dll (Script-DLL fuer Spieler); einmal uebersetzt
 add_library(g3asm_core OBJECT ${G3ASM_SRCS} ${G3ASM_MINHOOK_SRCS})
@@ -97,8 +99,11 @@ add_executable(g3asm_test tests/test_runner.cpp)
 add_executable(g3asm_packmod tools/packmod_main.cpp src/pack_mod.cpp)
 # Client for the dev pipe (src/dev_pipe.cpp): g3asm_dev "<code>"
 add_executable(g3asm_dev tools/dev_main.cpp)
+# Command line for modders (tools/cli_main.cpp): g3asm new|check|pack|release|log, as g3asm.exe next to g3asm.dll
+add_executable(g3asm_cli tools/cli_main.cpp)
+set_target_properties(g3asm_cli PROPERTIES OUTPUT_NAME g3asm)
 
-foreach(t g3asm g3asm_test g3asm_packmod g3asm_dev)
+foreach(t g3asm g3asm_test g3asm_packmod g3asm_dev g3asm_cli)
     set_target_properties(${t} PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreaded RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/g3asm)
 endforeach()
 
