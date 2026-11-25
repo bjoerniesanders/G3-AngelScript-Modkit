@@ -37,8 +37,9 @@ Funktionen zusätzlich die Vermerke **Experimentell**, **Im Spiel nicht geprüft
   (`DumpPropertySchema`).
 
 **Quests, Dialoge, Dateien**
-- Quests anlegen und steuern, mit Titel, Beschreibung, XP und Attribut-Belohnung. Alle 571 Quests des Spiels aufzählen. Quest-Dateien lesen.
+- Quests anlegen und steuern, mit Titel, XP und Attribut-Belohnung. Alle 571 Quests des Spiels aufzählen. Quest-Dateien lesen.
 - Dialoge lesen (4593 Infos) und eigene anlegen: Optionen im Gesprächsmenü, Zeilen im Questlog, `OnInfoFinished`.
+- Questlog-Einträge ohne Gespräch (`AddQuestLogEntry`, ab v0.47.1), auch nach Speichern, Laden und Neustart des Spiels.
 - Eigene Quests und Dialoge kommen nach Speichern und Laden mit Status und Questlog zurück. Schalter im Spielstand (`SetGameEvent`).
 - Datei-Patches auf Quest-Dateien (`demo_patch`). Das Spiel lädt Mod-Archive (`PackMod`), und sie überschreiben vorhandene Dateien.
 - Zeichnen über HUD und Inventar: Text, Bilder, `WorldToScreen`.
@@ -59,7 +60,8 @@ Funktionen zusätzlich die Vermerke **Experimentell**, **Im Spiel nicht geprüft
 Diese Punkte habe ich im Spiel gemessen oder im Spielcode untersucht:
 
 - **Einfarbige Flächen zeichnen:** Die Rechteck-Funktionen des Spiels zeichnen nichts. Es gehen nur Text und Bilder.
-- **Eigene Talente vom Spiel lernen lassen:** `LearnSkill` liefert für ein geklontes Talent `false`. Die Wirkung muss die Mod selbst herstellen.
+- **Talente lernen, die erst spät geklont werden:** `LearnSkill` lernt einen Klon nur, wenn die Mod ihn in `OnQuestsLoaded` klont. Die Wirkung eines
+  eigenen Talents muss die Mod selbst herstellen.
 - **Verweise per `SetProperty` setzen:** Es liefert `true`, wirkt aber nicht. Dafür gibt es `SetTemplateRef` und `SetEntityRef`.
 - **Ein Treffer-Hook vor der Schadensberechnung:** Die Spiel-DLLs bieten dafür keinen Einstieg. Eingreifen lässt sich über das Spielskript `OnHit`,
   `Override_MonsterDamage` und `Override_Damage` ([Hooks](hooks.md#schaden-ohne-treffer-hook)).
@@ -67,11 +69,15 @@ Diese Punkte habe ich im Spiel gemessen oder im Spielcode untersucht:
 - **Datei-Patches bei Spielern:** Die Laufzeit startet als Script-DLL erst, nachdem das Spiel seine Dateiliste gelesen hat. Mod-Pakete liefern
   geänderte Spieldateien deshalb als Archiv. Datei-Patches wirken nur mit dem Loader.
 - **Quest-Dateien schreiben.**
-- **Direkt ins Questlog schreiben:** Einträge entstehen über Dialogzeilen (`SetInfoQuest`).
+- **Die Beschreibung einer Quest im Questlog:** Das Log zeigt den Text von `SetQuestDescription` nicht. Einträge ohne Gespräch gehen ab v0.47.1
+  mit `AddQuestLogEntry` ([Quests](quests.md#einträge-ohne-gespräch-ab-v0471)).
 - **Bedingungen eigener Infos** (Items, Reputation, Fähigkeiten) lassen sich nicht setzen. Das Skript prüft sie selbst in `Override_InfoAvailable`.
 - **Text für Umgebungsgerede:** `GetSpeechText` findet für `SVM_..._Smalltalk_NN` keinen Text.
 - **Attribut `"XP"`** liest 0. Die Erfahrung steht in `GetProperty(GetHero(), "PlayerMemory", "XP")`. Quest-XP zahlt das Spiel selbst aus.
-- **Attribute von NPCs:** `GetAttribute` und `SetAttribute` wirken nur beim Helden. NPCs geben `-1`.
+- **Attribute von NPCs:** `GetAttribute` und `SetAttribute` wirken nur beim Helden. NPCs geben `-1`. Lesen geht über Spielskripte, zum Beispiel
+  `CallScript("GetHitPointsMax", npc, Entity())` (auch `GetHitPoints`, `GetStaminaPoints`, `GetManaPoints`, `GetStrength`). Die aktuellen
+  Lebenspunkte ändern `CallScript("AddHitPoints", npc, Entity(), menge)` und `HurtHitPoints`. Höchstwerte und Stärke von NPCs ließen sich so
+  nicht ändern. `GetProperty(npc, "DamageReceiver", "HitPoints")` liefert bei NPCs außerhalb der Verarbeitung 1.
 
 ## Gibt es nicht
 
@@ -88,8 +94,8 @@ Diese Punkte habe ich nicht gebaut oder noch nicht untersucht. Sie sind also nic
 
 Diese Funktionen laufen, aber ihre Wirkung habe ich nicht vollständig geprüft. Name und Verhalten dürfen sich noch ändern:
 
-- `HurtHitPoints`: senkt Lebenspunkte, tötet aber nicht.
-- `SetProperty`: schreibt nur Textwerte.
+- `HurtHitPoints`: senkt Lebenspunkte von NPCs, tötet aber nicht.
+- `SetProperty`: schreibt Texte, Zahlen, Bool-Werte und Enums. Ob das Spiel den Wert beachtet, hängt von der Eigenschaft ab.
 - `GenerateTradeGoods`: liefert `true`, aber die Ware bleibt bisher gleich.
 - `Override_CombatMove`: Schläge werden sichtbar schneller. Bei `Recover` kann die Waffe statt des Kämpfers kommen.
 

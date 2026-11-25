@@ -732,8 +732,6 @@ typedef void*(__stdcall* WorldCurFn)();
 typedef void*(__thiscall* WorldCreateDynFn)(void*);
 typedef bool(__thiscall* EntFromTplFn)(void*, const void*);
 typedef bool(__thiscall* WorldDestroyDynFn)(void*, void*);
-typedef void*(__stdcall* SectorForEntFn)(const void*);         // gCWorld::GetSectorForEntity(const eCEntity*) (statisch)
-typedef void*(__thiscall* WorldSysSectorFn)(void*);            // gCWorld::GetSystemSector() -> gCSector&
 typedef void(__thiscall* SetLocalRotFn)(void*, const void*);   // eCEntity::SetLocalRotation(const bCQuaternion&)
 std::map<void*, void*>
     g_spawned;   // entities made by SpawnNPC -> the world in which they were made (DestroyNPC can remove only these)
@@ -744,8 +742,6 @@ struct SpawnApi {
     EntFromTplFn fromTpl = nullptr;
     WorldDestroyDynFn destroyDyn = nullptr;
     SetLocalRotFn setLocalRot = nullptr;
-    SectorForEntFn sectorFor = nullptr;
-    WorldSysSectorFn sysSector = nullptr;
 } g_sp;
 bool ResolveSpawn() {
     if (g_sp.tried) return g_sp.current && g_sp.createDyn && g_sp.fromTpl;
@@ -757,9 +753,6 @@ bool ResolveSpawn() {
     g_sp.fromTpl = reinterpret_cast<EntFromTplFn>(GetProcAddress(g_e.engine, "?CreateFromTemplate@eCEntity@@QAE_NABVeCTemplateEntity@@@Z"));
     g_sp.destroyDyn =
         reinterpret_cast<WorldDestroyDynFn>(GetProcAddress(g_e.game, "?DestroyDynamicEntity@gCWorld@@QAE_NPAVeCDynamicEntity@@@Z"));
-    g_sp.sectorFor =
-        reinterpret_cast<SectorForEntFn>(GetProcAddress(g_e.game, "?GetSectorForEntity@gCWorld@@SGPAVgCSector@@PBVeCEntity@@@Z"));
-    g_sp.sysSector = reinterpret_cast<WorldSysSectorFn>(GetProcAddress(g_e.game, "?GetSystemSector@gCWorld@@QAEAAVgCSector@@XZ"));
     g_sp.setLocalRot = reinterpret_cast<SetLocalRotFn>(GetProcAddress(g_e.engine, "?SetLocalRotation@eCEntity@@QAEXABVbCQuaternion@@@Z"));
     return g_sp.current && g_sp.createDyn && g_sp.fromTpl;
 }
@@ -787,8 +780,34 @@ int SafeSpawn(void* admin, const void* name, const char* wanted, const SVec3* po
         return 0;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return -3; }
 }
+// Mark of the entities that SpawnNPC makes (from v0.47.1): the first 4 bytes of the node ID are "G3AS", the other 12 bytes stay as the
+// engine gave them. The game saves the ID with the entity, thus DestroyNPC and IsDynamicSpawn recognize these NPCs also after a save and a
+// load. The system sector of the world alone does not show this: the spawn points of the game put their animals there too (measured
+// 2026-11-25: DestroyNPC removed all 147 scavengers of the world).
+const unsigned char kSpawnMark[4] = {'G', '3', 'A', 'S'};
+bool SafeMarkSpawn(void* ent) {
+    __try {
+        const void* cur = g_i.nodeId(ent);
+        if (!cur) return false;
+        PropIdVal v;
+        std::memcpy(&v, cur, sizeof v);
+        std::memcpy(v.core, kSpawnMark, sizeof kSpawnMark);
+        g_i.setId(ent, v);
+        const void* now = g_i.nodeId(ent);
+        return now && std::memcmp(now, kSpawnMark, sizeof kSpawnMark) == 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool SafeHasSpawnMark(void* ent) {
+    __try {
+        const void* id = g_i.nodeId(ent);
+        return id && std::memcmp(id, kSpawnMark, sizeof kSpawnMark) == 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool HasSpawnMark(void* ent) { return ent && ResolveInv() && g_i.nodeId && SafeHasSpawnMark(ent); }
+
 Entity SpawnNPC(const SStr& tplName, const SVec3& pos) {
     Entity result{nullptr};
+    bool marked = false;
     int rc;
     if (!ResolveSpawn())
         rc = -4;
@@ -802,12 +821,14 @@ Entity SpawnNPC(const SStr& tplName, const SVec3& pos) {
         if (rc == 0) {
             result.p = ent;
             g_spawned[ent] = world;
+            marked = g_i.nodeId && g_i.setId && SafeMarkSpawn(ent);
         }
     }
     if (ScriptHost::s_current) {
-        char b[256];
-        std::snprintf(b, sizeof b, "SpawnNPC(%s, %.0f %.0f %.0f): %s (Code %d, Entity %p)", tplName.c_str(), pos.x, pos.y, pos.z,
-                      rc == 0 ? "ok" : "fehlgeschlagen", rc, result.p);
+        char b[300];
+        std::snprintf(b, sizeof b, "SpawnNPC(%s, %.0f %.0f %.0f): %s (Code %d, Entity %p)%s", tplName.c_str(), pos.x, pos.y, pos.z,
+                      rc == 0 ? "ok" : "fehlgeschlagen", rc, result.p,
+                      rc == 0 && !marked ? " - Kennzeichen nicht gesetzt: DestroyNPC erkennt ihn nur in dieser Sitzung" : "");
         ScriptHost::s_current->Log(b);
     }
     return result;
@@ -1019,14 +1040,6 @@ void* SafeCurrentWorld() {
     __try {
         return g_sp.current();
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }
-}
-// Does the entity belong to the system sector of the world (entities made by SpawnNPC go there, also after a save and a load)? Hero and player never count.
-bool SafeInSystemSector(void* world, void* ent, void** sector, void** sysSector) {
-    __try {
-        *sector = g_sp.sectorFor(ent);
-        *sysSector = g_sp.sysSector(world);
-        return true;
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 // Does the entity have a gCNPC_PS (is it an NPC)? Script.dll PSNpc(eCEntity*) gives the property set or 0
 typedef void(__thiscall* PSNpcCtorFn)(void*, void*);
@@ -1766,19 +1779,17 @@ SStr ListPropertyTexts(const Entity& e, const SStr& set, int maxn) {
     return SStr(all);
 }
 bool EntIsBuilding(const Entity& e) { return std::strcmp(EntCategory(e).c_str(), "Building") == 0; }
-// the system sector also contains world objects (for example G3_World_Border_001): thus the NPC requirement too.
+// Did SpawnNPC make this NPC (in this session or, through the mark in the ID, in an earlier one)? Hero and player never count.
 bool IsDynamicSpawn(const Entity& e) {
-    if (!EntIsValid(e) || !ResolveSpawn() || !g_sp.sectorFor || !g_sp.sysSector) return false;
+    if (!EntIsValid(e) || !ResolveSpawn()) return false;
     if (!IsNpc(e.p)) return false;
     if (e.p == SafeHero(false) || e.p == SafeHero(true)) return false;
-    void* world = SafeCurrentWorld();
-    void *sec = nullptr, *sys = nullptr;
-    return world && SafeInSystemSector(world, e.p, &sec, &sys) && sec && sec == sys;
+    const auto it = g_spawned.find(e.p);
+    return (it != g_spawned.end() && it->second == SafeCurrentWorld()) || HasSpawnMark(e.p);
 }
-// Removes an entity that SpawnNPC made: one of this session (list) or one in the system sector (after the load of a saved game).
-// Entities from normal sectors (world NPCs), hero and player are refused. Return value: true = removed.
+// Removes an entity that SpawnNPC made: one of this session (list) or one with the mark in its ID (after the load of a saved game).
+// All other entities (world NPCs, animals of the spawn points of the game), hero and player are refused. Return value: true = removed.
 bool DestroyNPC(const Entity& e) {
-    char whyBuf[120];
     const char* why = nullptr;
     bool ok = false;
     auto it = g_spawned.find(e.p);
@@ -1799,10 +1810,7 @@ bool DestroyNPC(const Entity& e) {
             ok = SafeDestroy(world, e.p);
             if (!ok) why = "DestroyDynamicEntity lieferte false";
         } else {
-            void *sec = nullptr, *sys = nullptr;
-            SafeInSystemSector(world, e.p, &sec, &sys);
-            std::snprintf(whyBuf, sizeof whyBuf, "nicht im Systemsektor (Sektor %p, Systemsektor %p)", sec, sys);
-            why = whyBuf;
+            why = "nicht von SpawnNPC erzeugt";
         }
     }
     if (it != g_spawned.end()) g_spawned.erase(it);

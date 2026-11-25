@@ -85,10 +85,9 @@ available. The full list is in [Limits](docs/en/modkit/limitations.md).
 
 **These functions do not work.** I measured them in the game or examined the game code:
 - A mod cannot draw rectangles with only one color. A mod can draw only text and images.
-- The game cannot teach custom skills. The mod must make the effect of the skill itself.
+- The hero learns a custom skill only if the mod clones it in `OnQuestsLoaded`. The mod must make the effect of the skill itself.
 - There is no hit hook before the game calculates the damage. To change a hit, use the game script `OnHit`, `Override_MonsterDamage` or
   `Override_Damage`.
-- A mod cannot write directly to the quest log. The entries come from dialog lines.
 - A mod cannot set the conditions of custom infos. The script must do a check of the conditions itself.
 - Players cannot use file patches (`ScriptPatches`). Mod packages contain changed game files as archives (`ModFiles\<volume>.m0x`).
 

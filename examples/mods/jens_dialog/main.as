@@ -1,6 +1,8 @@
 // Jens dialog: Jens gets two new dialog options (real dialogs of the game, with a connection to the quest log).
 //   "Hast du Arbeit fuer mich?"  -> Jens asks for a wolf skin, the quest starts (title, description and dialog text in the quest log).
 //   "Ich habe das Wolfsfell."     -> shows while the quest runs. Takes the skin, completes the quest, reward.
+// When the hero has a wolf skin while the quest runs (killed, found, bought, received), an entry goes into the quest log without a dialog
+// (AddQuestLogEntry, from v0.47.1).
 // Save and load: the quest and the dialogs are run-time objects and are lost at a load. Thus the progress is in two switches that the
 // game saves in the saved game (SetGameEvent). After each load, the mod makes the quest and the dialogs again and restores the progress.
 // Note: Jens already has his own wolf skin quest in the game (KapDun_Hunter_Fur). This mod quest is independent of it.
@@ -16,6 +18,7 @@ const bCString INFO_TURNIN = "G3ASM_Jens_Turnin";
 const bCString EV_STARTED = "G3ASM_JensWolf_Started";   // switches in the saved game
 const bCString EV_DONE = "G3ASM_JensWolf_Done";
 const bCString EV_FAILED = "G3ASM_JensWolf_Failed";
+const bCString EV_FUR = "G3ASM_JensWolf_HasFur";   // entry "I have a wolf skin" already in the quest log
 
 float timer = 0;
 bool angelegt = false;
@@ -136,6 +139,16 @@ void OnFrame(float dt) {
     if (GetInfoCount() <= 0 || !GetHero().IsValid()) return;
     // after the load, the quest or the dialogs are missing: make them again (the switches can be read only when the hero is loaded)
     if (!angelegt || !InfoExists(INFO_JOB) || !QuestExists(QUEST)) angelegt = Anlegen();
+    FellEintrag();
+}
+
+// The hero has a wolf skin while the quest runs: one entry in the quest log. The check of the inventory covers each way to get the skin.
+// The game saves the entry with the quest; the switch prevents a second entry.
+void FellEintrag() {
+    if (GetQuestStatus(QUEST) != QUEST_RUNNING || IsGameEventSet(EV_FUR) || GetHero().GetItemCount(ITEM) < 1) return;
+    int n = AddQuestLogEntry(QUEST, "", "Ich habe ein Wolfsfell. Jetzt muss ich es nur noch zu Jens bringen.");
+    if (n > 0) SetGameEvent(EV_FUR);
+    print("Questlog-Eintrag 'Wolfsfell': " + n + " Eintraege");
 }
 
 void OnWorldActivate() { angelegt = false; }

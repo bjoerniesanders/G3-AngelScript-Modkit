@@ -124,7 +124,7 @@ give default values.
 | `Entity SpawnNPC(const bCString &in templateName, const bCVector &in position)` | Makes an NPC or an object from a template at the position. Not valid if there is an error |
 | `bool DestroyNPC(const Entity &in)` | Removes an NPC that `SpawnNPC` made |
 | `bool IsNPC(const Entity &in)` | Is the entity an NPC? |
-| `bool IsDynamicSpawn(const Entity &in)` | Is it a spawned NPC (not the hero, not the player)? |
+| `bool IsDynamicSpawn(const Entity &in)` | Did `SpawnNPC` make this NPC? Animals from the spawn points of the game do not count (from v0.47.1) |
 | `int CountTemplateNames(const bCString &in prefix)` (from version 28) | The number of templates with a name that starts with this text, each template one time. `-1` without the game |
 | `bCString FindTemplateNames(const bCString &in prefix, int max = 20)` | The names of the templates that start with this text, as `"Name1;Name2;..."`. Empty if nothing is found |
 | `Entity GetTemplateEntity(const bCString &in name)` (from version 29) | The template with exactly this name (`"It_1H_OrcSlayer_01"`). Not valid if it does not exist |
@@ -132,8 +132,13 @@ give default values.
 
 - **`SpawnNPC`:** The template name must be exactly correct (`FindTemplateNames` helps). Error codes in the log: `-2` unknown template, `-5` no
   world, `-6` and `-7` the spawn failed. With `PickCenter()` and `GetPickPoint()`, you can make an NPC at the point of the crosshair.
-- **`DestroyNPC`** removes only spawned NPCs, also from previous sessions. The function refuses NPCs of the game world, the hero, the player and
-  objects of the world (`false`, reason in the log). Do not use the `Entity` after this.
+- **`DestroyNPC`** removes only NPCs that `SpawnNPC` made, also from previous sessions. The function refuses NPCs of the game world, animals from
+  the spawn points of the game, the hero, the player and objects of the world (`false`, reason in the log). Do not use the `Entity` after this.
+- **Recognition:** From v0.47.1, `SpawnNPC` puts a mark in the ID of each NPC. The mark goes into the saved game. After a load,
+  `DestroyNPC` and `IsDynamicSpawn` do not recognize NPCs that an older version made.
+
+  **Caution:** Up to v0.47.0, the two functions also counted the animals from the spawn points as spawned NPCs. Thus a loop with
+  `IsDynamicSpawn` and `DestroyNPC` removed, for example, all scavengers of the world.
 - **`GetEntityByPart`:** If you remove entities during the loop, go backward.
 - **Run time:** `CountEntities`, `GetEntityByPart` and `FindTemplateNames` search the full world or all templates. One call can take up to
   0.5 s, and the game stops for this time. Do not call them in each frame. Call them one time and keep the result. An empty part (`""`)
@@ -234,6 +239,7 @@ give default values.
 - Status effects: `STATUS_BURNING`, `STATUS_FROZEN`, `STATUS_POISONED`, `STATUS_DISEASED`, `STATUS_TRANSFORMED`, `STATUS_IN_FOG`, `STATUS_GHOST`,
   `STATUS_IN_MAGIC_BARRIER`, `STATUS_SOULTRAVEL` ([Reference](reference.md)). `SetStatusEffect` causes `OnStatusEffect`. The game decides the
   results. For disease and poison, the game also uses its own timer, which this function does not set.
+- `HurtHitPoints` has an effect only on NPCs. The hit points of the hero are in a different location, and the function does not change them.
 - `HurtHitPoints` shows in `OnDamage` without an attacker and without a weapon. At 0 hit points, the NPC stays standing. To kill, use `Kill`.
   Damage with a cause comes from a summon with an owner (example `beliars_klaue`).
 - Effect names are in the spell templates, for example `"eff_magic_summonlightning_target_01"` (the lightning of "Blitz beschwören", summon
@@ -247,8 +253,8 @@ give default values.
 | `bool ActivateSkill(name)`, `bool DeactivateSkill(name)` (from version 30) | Turns a skill on or off (counts as a weapon with a skill) |
 | `bool HasLearnedSkill(name)`, `bool IsSkillActive(name)`, `int GetSkillActivationCount(name)` (from version 30) | Queries |
 
-`name` is the skill template, for example `"Perk_1H_1"`. For an unknown skill or no inventory: `false` or `-1`. For a cloned skill, `LearnSkill`
-gives `false`. The mod must make the effect of a custom skill itself (example `perk_lifesteal`).
+`name` is the skill template, for example `"Perk_1H_1"`. For an unknown skill or no inventory: `false` or `-1`. `LearnSkill` learns a cloned
+skill only if the mod clones it in `OnQuestsLoaded`. For a clone that the mod makes later, it gives `false`. The mod must make the effect of a custom skill itself (example `perk_lifesteal`).
 
 ## Read and write properties
 
@@ -258,7 +264,7 @@ Each entity and each template has property sets (`Item`, `Damage`, `NPC`, `Inven
 |---|---|
 | `bCString GetProperty(const Entity &in e, const bCString &in set, const bCString &in prop)` (from version 29) | Reads a property as text. Empty if it does not exist |
 | `bCString ListProperties(const Entity &in e, const bCString &in set, int max = 200)` (from version 29) | All properties of the set as `"Name=Value;Name=Value;..."` (up to 600) |
-| `bool SetProperty(const Entity &in e, const bCString &in set, const bCString &in prop, const bCString &in value)` (from version 29) | **Experimental.** Writes a property from text. Only text values |
+| `bool SetProperty(const Entity &in e, const bCString &in set, const bCString &in prop, const bCString &in value)` (from version 29) | **Experimental.** Writes a property from text: texts, numbers (`"12"`), `"true"`/`"false"` and enums (number or name) |
 | `bool SetTemplateRef(const Entity &in e, const bCString &in cls, const bCString &in prop, const bCString &in target)` (from version 30) | Sets a reference to a template |
 | `bool SetEntityRef(const Entity &in e, const bCString &in cls, const bCString &in prop, const Entity &in target)` (from version 30) | Sets a reference to an entity |
 | `int DumpPropertySchema(const bCString &in file)` (from version 43) | Writes all property classes with their properties as JSON to `g3asm\<file>` |
@@ -268,6 +274,7 @@ Each entity and each template has property sets (`Item`, `Damage`, `NPC`, `Inven
 - `ListProperties` shows what an item really contains. The mod `demo_properties` writes it to the log when you push a key.
 - For references and lists, the text that you read does not always give useful data. **You cannot write references with `SetProperty`** (it gives
   `true`, but has no effect). Use `SetTemplateRef` and `SetEntityRef` for this. To see if `SetProperty` worked, use `GetProperty` after it.
+- If a value is written, this does not mean that the game uses it. Example: `Kill()` also kills an NPC with `Immortal = true`.
 - Use `SetProperty` and `SetTemplateRef` only on templates and entities that the mod made itself (`CloneTemplate`).
 - Examples: `SetTemplateRef(weapon, "gCItem_PS", "ActivateSkill2", "Perk_Lifesteal")` (the weapon turns on a skill, `perk_lifesteal`) and
   `SetEntityRef(summon, "gCInteraction_PS", "Owner", GetHero())` (the owner of a summon, who also gets the credit for its damage,
@@ -352,14 +359,15 @@ The page [Quests](quests.md) gives the instructions.
 | `bool IsQuestFinished(name)`, `bool IsQuestSucceeded(name)` | Queries |
 | `int GetQuestXP(name)`, `bool SetQuestXP(name, int)` | The experience points of the quest |
 | `bool SetQuestReward(name, attribute, quantity)`, `bCString GetQuestReward(name)` | Attribute reward (for example `"DEX"`, 1). The game gives it and shows it in the success message |
-| `bool SetQuestTopic(name, text)`, `bool SetQuestDescription(name, text)` | The title and the description in the quest log |
+| `bool SetQuestTopic(name, text)`, `bool SetQuestDescription(name, text)` | The title (shows in the quest log) and the description (the quest log does not show it) |
+| `int AddQuestLogEntry(quest, heading, text)` (from v0.47.1) | Adds an entry to the quest log, without a dialog. `heading` shows in front of it, as the name of a speaker (empty = none). Return value: the number of entries, `-1` if there is an error ([Quests](quests.md#entries-without-a-dialog-from-v0471)) |
 | `void RegisterText(id, text)` | Sets your own text for a text ID of the game |
 | `int GetQuestCount()`, `bCString GetQuestNameAt(int)` | Lists all quests |
 | `bool ReloadQuestFiles()` | Reads the quest files of the game again |
 | `bCString GetQuestDir()`, `bCString GetQuestFilePath(name)` | The folder and the file of a quest |
 | `bool LoadQuestFile(name, path)` | Reads the properties of a quest from a `.quest` file |
 | `bCString DescribeQuestRewards()` | All attributes that quests of the game give as a reward |
-| `void QuestDebug()` | Troubleshooting: writes the raw data of the quest list to the log |
+| `void QuestDebug()` | Troubleshooting: writes the raw data of the quest list to the log, from v0.47.1 also the log entries of each quest (as text IDs) |
 | Constants | `QUEST_OPEN` 0, `QUEST_RUNNING` 1, `QUEST_SUCCESS` 2, `QUEST_FAILED` 3, `QUEST_OBSOLETE` 4, `QUEST_CANCELLED` 5, `QUEST_LOST` 6, `QUEST_WON` 7 |
 
 `LoadQuestFile` needs the path as the game uses it: `Data/Quests/<world>/<quest>_quest_<world>.quest`, with `/` and relative to the game folder.

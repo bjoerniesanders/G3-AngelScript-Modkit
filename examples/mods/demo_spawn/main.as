@@ -4,7 +4,8 @@
 //   Numeric keypad -      removes the last NPC that the mod made
 //   Numeric keypad *      removes all NPCs that the mod made in this session
 //   Numeric keypad /      removes ALL entities that SpawnNPC made with the search text in the name, also from previous sessions (after the load
-//                         of a saved game). World NPCs stay (DestroyNPC refuses entities outside of the system sector)
+//                         of a saved game). World NPCs and the animals of the game's spawn points stay (from v0.47.1, SpawnNPC puts a
+//                         mark in the ID; IsDynamicSpawn and DestroyNPC accept only NPCs with this mark)
 // If the NPC looks away from the hero, set BLICK_VERSATZ to 180. Log: g3asm.log.
 const bCString SUCHE = "Diego";
 const float BLICK_VERSATZ = 0;

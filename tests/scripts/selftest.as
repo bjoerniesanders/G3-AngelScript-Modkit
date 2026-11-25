@@ -140,7 +140,7 @@ void TestEntity() {
     { Entity z; check(!DestroyNPC(z) && !IsDynamicSpawn(z) && !z.LookAt(z) && !z.SetRotation(bCQuaternion()), "ohne Spiel kein DestroyNPC/LookAt/SetRotation"); }
     check(!QuestExists("X") && !CreateQuest("X") && !RunQuest("X") && !SucceedQuest("X") && !FailQuest("X") && !CloseQuest("X") && !RemoveQuest("X"), "ohne Spiel keine Quests");
     check(GetQuestStatus("X") == -1 && GetQuestXP("X") == -1 && !SetQuestStatus("X", QUEST_RUNNING) && !SetQuestXP("X", 5) && !ReloadQuestFiles(), "ohne Spiel keine Queststatus");
-    check(!SetQuestTopic("X", "t") && !SetQuestDescription("X", "t") && !LoadQuestFile("X", "p") && GetQuestCount() == -1 && GetQuestNameAt(0).IsEmpty(), "ohne Spiel keine Quest-Texte");
+    check(!SetQuestTopic("X", "t") && !SetQuestDescription("X", "t") && AddQuestLogEntry("X", "h", "t") == -1 && !LoadQuestFile("X", "p") && GetQuestCount() == -1 && GetQuestNameAt(0).IsEmpty(), "ohne Spiel keine Quest-Texte");
     check(GetQuestDir().IsEmpty() && GetQuestFilePath("X").IsEmpty() && !GetGameDir().IsEmpty(), "Quest-Pfade ohne Spiel");
     check(GetInfoCount() == -1 && GetInfoName(0).IsEmpty() && GetInfoOwner(0).IsEmpty() && !DescribeInfo("X").IsEmpty(), "ohne Spiel keine Infos");
     check(!InfoExists("X") && !CreateInfo("X", "Y") && !RemoveInfo("X") && !SetInfoQuest("X", "q") && !SetInfoType("X", 3) && !SetInfoCondition("X", INFO_COND_GENERAL) &&

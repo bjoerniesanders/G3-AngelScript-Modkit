@@ -90,6 +90,7 @@ If the player added the mod after a saved game, this saved game does not know th
 - Set the status with `SetQuestStatus(quest, QUEST_RUNNING)`. Do **not** use `RunQuest`. If you use it, the game shows "Quest angenommen"
   (quest accepted) again.
 - For complete quests, set the XP and the reward to 0 first. If you do not, the game gives them again when you set the status.
-- You cannot restore the quest log in this way.
+- You cannot restore the dialog lines in the quest log in this way. From v0.47.1, you can write your own entries again with
+  `AddQuestLogEntry` ([Quests](quests.md#entries-without-a-dialog-from-v0471)).
 
 `examples/mods/jens_dialog/main.as` does the two: load events in the normal case, and switches as the fallback.

@@ -982,9 +982,21 @@ bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const boo
     return false;
 }
 
+// Events and overrides can come during a script call (for example HurtHitPoints in a mod -> OnDamage of all mods). The caller then must
+// keep its own mod name (log prefix, owner of coroutines, settings): each dispatch restores curMod_ when it ends.
+struct KeepCurMod {
+    std::string& ref;
+    std::string saved;
+    explicit KeepCurMod(std::string& r) : ref(r), saved(r) {}
+    ~KeepCurMod() { ref = saved; }
+    KeepCurMod(const KeepCurMod&) = delete;
+    KeepCurMod& operator=(const KeepCurMod&) = delete;
+};
+
 void ScriptHost::CallIn(Mod& m, const char* decl) {
     if (!m.module) return;
     if (asIScriptFunction* f = FindFn(m, decl)) {
+        const KeepCurMod keep(curMod_);
         curMod_ = m.name;
         Execute(f, nullptr);
     }
@@ -1032,6 +1044,7 @@ bool ScriptHost::CallOverride(const char* decl, const EvArg* args, int n, std::f
     c0.original = std::move(original);
     bool ret = false;
     bool ok = false;
+    const KeepCurMod keep(curMod_);
     for (size_t i = 0; i < mods_.size() && !ok; ++i) {
         asIScriptFunction* f = FindFn(mods_[i], decl);
         if (!f) continue;
@@ -1110,6 +1123,7 @@ static bool DropForeignThread(ScriptHost* host, const char* decl) {
 
 void ScriptHost::CallEvent(const char* decl, const EvArg* args, int n) {
     if (DropForeignThread(this, decl)) return;
+    const KeepCurMod keep(curMod_);
     for (size_t i = 0; i < mods_.size(); ++i) {
         Mod& m = mods_[i];
         if (!m.module) continue;

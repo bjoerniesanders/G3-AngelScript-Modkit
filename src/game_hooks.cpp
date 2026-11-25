@@ -685,6 +685,7 @@ bool __fastcall HLoadQuests(void* self, void*) {
         LogLine(tb);
     }
     SetQuestManagerOverride(self);   // the bindings now work on the manager that the game just made
+    EnsureTextHooks();   // quest log entries with the text in the ID (AddQuestLogEntry, from v0.47.1) are in the saved game: resolve them also without own texts
     g_host->CallEvent("void OnQuestsLoaded()", nullptr, 0);
     SetQuestManagerOverride(nullptr);
     return r;

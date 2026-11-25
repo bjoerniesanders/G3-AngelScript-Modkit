@@ -88,6 +88,7 @@ Kam die Mod erst nach einem Spielstand dazu, kennt dieser Spielstand ihre Quest 
 **Achtung:**
 - Setze den Status mit `SetQuestStatus(quest, QUEST_RUNNING)`, **nicht** mit `RunQuest`. Sonst meldet das Spiel noch einmal „Quest angenommen“.
 - Setze bei abgeschlossenen Quests vorher XP und Belohnung auf 0. Sonst zahlt das Spiel sie beim Setzen des Status noch einmal aus.
-- Das Questlog lässt sich so nicht wiederherstellen.
+- Die Gesprächszeilen im Questlog lassen sich so nicht wiederherstellen. Eigene Einträge kannst du ab v0.47.1 mit `AddQuestLogEntry` neu
+  schreiben ([Quests](quests.md#einträge-ohne-gespräch-ab-v0471)).
 
 `examples/mods/jens_dialog/main.as` macht beides: Lade-Ereignisse im Normalfall, Schalter als Rückfall.

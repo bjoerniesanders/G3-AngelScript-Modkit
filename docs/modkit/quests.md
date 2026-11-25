@@ -62,9 +62,44 @@ Der Titel erscheint im Questlog. Umlaute gehen, wenn die `.as`-Datei als ANSI (W
 
 ## Questlog und Dialoge
 
-Das Questlog von Gothic 3 besteht aus **Dialogen** (Infos). Die Einträge entstehen, wenn der Spieler Gespräche mit NPCs führt. Sie kommen nicht aus
-einer Liste, die ein Skript füllt. Eine per Skript angelegte Quest hat deshalb zunächst nur Titel und Beschreibung. Logeinträge entstehen über eigene
-Dialogzeilen, die du mit der Quest verbindest (`SetInfoQuest`, siehe [Dialoge](dialogs.md)). Direkt ins Log schreiben kann eine Mod nicht.
+Im Questlog von Gothic 3 stehen unter dem Titel die **Gesprächszeilen**, die der Spieler zu dieser Quest gehört hat: jede Zeile mit dem Namen des
+Sprechers davor. Eine per Skript angelegte Quest zeigt im Log deshalb zunächst nur ihren Titel. Einträge entstehen auf zwei Wegen:
+
+- über eigene Dialogzeilen, die du mit der Quest verbindest (`SetInfoQuest`, siehe [Dialoge](dialogs.md)),
+- ab v0.47.1 ohne Gespräch mit `AddQuestLogEntry` (siehe unten).
+
+**Achtung:** Die Beschreibung aus `SetQuestDescription` zeigt das Questlog nicht an, auch nicht, wenn sie sich später ändert. Für Fortschritt im Log
+nimm `AddQuestLogEntry` oder Dialogzeilen.
+
+### Einträge ohne Gespräch (ab v0.47.1)
+
+`AddQuestLogEntry(quest, heading, text)` hängt einen Eintrag an das Log der Quest an. `heading` steht davor wie der Name eines Sprechers. Ist
+`heading` leer, steht nichts davor.
+
+```angelscript
+float timer = 0;
+void OnFrame(float dt) {
+    timer += dt;
+    if (timer < 1.0f) return;
+    timer = 0;
+    // erlegt, gefunden, gekauft oder geschenkt: entscheidend ist, dass der Held ein Fell hat
+    if (GetQuestStatus(QUEST) != QUEST_RUNNING || IsGameEventSet("MeinMod_FellLog") || GetHero().GetItemCount("It_Wolf_Fur") < 1) return;
+    if (AddQuestLogEntry(QUEST, "", "Ich habe ein Wolfsfell. Jetzt muss ich es nur noch zu Jens bringen.") > 0)
+        SetGameEvent("MeinMod_FellLog");   // nur einmal
+}
+```
+
+Ergebnis im Questlog: unter „Wolfsfell für Jens“ steht die neue Zeile. Rückgabe ist die Zahl der Einträge der Quest, `-1` bei einem Fehler (Quest
+unbekannt, ohne Spiel).
+
+- Das Spiel speichert die Einträge mit der Quest. Sie kommen nach Speichern, Laden und einem Neustart des Spiels zurück. Die Texte stehen im Eintrag
+  selbst, die Mod muss nichts erneut anlegen.
+- Damit die Quest nach dem Laden noch da ist, muss die Mod sie in `OnQuestsLoaded` anlegen (siehe [Speichern und Laden](saving.md)). Eine Quest, die
+  nur zur Laufzeit entsteht, fehlt nach dem Laden mitsamt ihren Einträgen.
+- Jeder Aufruf hängt einen neuen Eintrag an. Merke dir mit einem Schalter im Spielstand (`SetGameEvent`), welche Einträge schon geschrieben sind.
+- Ein Eintrag bleibt so, wie er geschrieben wurde, auch wenn die Mod später einen anderen Text verwendet.
+- Umlaute gehen, wenn die `.as`-Datei als ANSI (Windows-1252) gespeichert ist.
+- Beispiel: `jens_dialog` (der Held hat ein Wolfsfell).
 
 ## Alle Quests des Spiels
 

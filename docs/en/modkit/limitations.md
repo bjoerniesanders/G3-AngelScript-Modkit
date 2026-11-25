@@ -39,8 +39,9 @@ functions also have the labels **Experimental**, **Not checked in the game**, **
   (`DumpPropertySchema`).
 
 **Quests, dialogs, files**
-- Make quests and control them, with a title, a description, XP and an attribute reward. List all 571 quests of the game. Read quest files.
+- Make quests and control them, with a title, XP and an attribute reward. List all 571 quests of the game. Read quest files.
 - Read dialogs (4593 infos) and make your own: options in the dialog menu, lines in the quest log, `OnInfoFinished`.
+- Entries in the quest log without a dialog (`AddQuestLogEntry`, from v0.47.1), also after a save, a load and a restart of the game.
 - Your own quests and dialogs come back with their status and quest log after a save and a load. Switches in the saved game (`SetGameEvent`).
 - File patches on quest files (`demo_patch`). The game loads mod archives (`PackMod`), and they overwrite existing files.
 - Draw above the HUD and the inventory: text, images, `WorldToScreen`.
@@ -61,7 +62,8 @@ installations I checked.
 I measured these items in the game or examined them in the game code:
 
 - **Draw rectangles with only one color:** The rectangle functions of the game draw nothing. Only text and images work.
-- **Let the game teach custom skills:** `LearnSkill` gives `false` for a cloned skill. The mod must make the effect itself.
+- **Learn skills that the mod clones late:** `LearnSkill` learns a clone only if the mod clones it in `OnQuestsLoaded`. The mod must make the
+  effect of a custom skill itself.
 - **Set references with `SetProperty`:** it gives `true`, but has no effect. Use `SetTemplateRef` and `SetEntityRef` for this.
 - **A hit hook before the damage calculation:** The game DLLs do not give an entry point for this. You can change the damage through the game
   script `OnHit`, `Override_MonsterDamage` and `Override_Damage` ([Hooks](hooks.md#damage-without-a-hit-hook)).
@@ -70,11 +72,16 @@ I measured these items in the game or examined them in the game code:
 - **File patches for players:** The runtime starts as a script DLL only after the game has read its file list. Thus mod packages give changed game
   files as an archive. File patches work only with the loader.
 - **Write quest files.**
-- **Write directly to the quest log:** Entries come from dialog lines (`SetInfoQuest`).
+- **The description of a quest in the quest log:** The log does not show the text of `SetQuestDescription`. From v0.47.1, entries without a
+  dialog are possible with `AddQuestLogEntry` ([Quests](quests.md#entries-without-a-dialog-from-v0471)).
 - **Conditions of custom infos** (items, reputation, skills): you cannot set them. The script does the check itself in `Override_InfoAvailable`.
 - **Text for ambient talk:** `GetSpeechText` finds no text for `SVM_..._Smalltalk_NN`.
 - **Attribute `"XP"`** reads 0. The experience is in `GetProperty(GetHero(), "PlayerMemory", "XP")`. The game itself gives the quest XP.
-- **Attributes of NPCs:** `GetAttribute` and `SetAttribute` have an effect only on the hero. NPCs give `-1`.
+- **Attributes of NPCs:** `GetAttribute` and `SetAttribute` have an effect only on the hero. NPCs give `-1`. To read the values, use game
+  scripts, for example `CallScript("GetHitPointsMax", npc, Entity())` (also `GetHitPoints`, `GetStaminaPoints`, `GetManaPoints`, `GetStrength`).
+  To change the current hit points, use `CallScript("AddHitPoints", npc, Entity(), amount)` or `HurtHitPoints`. It was not possible to change
+  the maximum values and the strength of NPCs in this way. For NPCs out of processing range, `GetProperty(npc, "DamageReceiver", "HitPoints")`
+  gives 1.
 
 ## Not available
 
@@ -91,8 +98,8 @@ I did not make these items or did not examine them yet. Thus they are not shown 
 
 These functions run, but I did not fully check their effect. Their names and their behavior can still change:
 
-- `HurtHitPoints`: decreases the hit points, but does not kill.
-- `SetProperty`: writes only text values.
+- `HurtHitPoints`: decreases the hit points of NPCs, but does not kill.
+- `SetProperty`: writes texts, numbers, Boolean values and enums. It depends on the property if the game uses the value.
 - `GenerateTradeGoods`: gives `true`, but the goods do not change at this time.
 - `Override_CombatMove`: hits are visibly faster. For `Recover`, the weapon can come in place of the fighter.
 

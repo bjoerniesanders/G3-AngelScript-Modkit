@@ -33,6 +33,24 @@ typedef void(__thiscall* SetU32Fn)(void*, const unsigned*);
 typedef void(__thiscall* LocCtorFn)(void*, const void*);
 typedef void(__thiscall* LocDtorFn)(void*);
 typedef void(__thiscall* SetLocFn)(void*, const void*);
+// Text IDs that contain their text (from v0.47.1, quest log entries of AddQuestLogEntry): "G3ASM_TXT:<text in Windows-1252>". The saved game
+// keeps only the ID of a log entry. With the text in the ID, the entry needs no registration after a restart of the game.
+const char kTextInIdPrefix[] = "G3ASM_TXT:";
+const size_t kTextInIdLen = sizeof kTextInIdPrefix - 1;
+// gCQuest_PS::LogText is a bTObjArray<SLogEntry> (SDK: {T* m_pArray; GEU32 m_u32Count; GEU32 m_u32Capacity}), SLogEntry = {eCLocString Heading,
+// eCLocString Text} (2 x 4 bytes). The quest log shows these entries; the field QuestDesc (SetQuestDesc) it does not show (measured 2026-11-25).
+struct LogEntryRaw {
+    void* heading;
+    void* text;
+};
+struct ObjArrayRaw {
+    void* data;
+    unsigned count;
+    unsigned capacity;
+};
+typedef void(__thiscall* SetLogTextFn)(void*, const ObjArrayRaw*);   // gCQuest_PS::SetLogText(bTObjArray<SLogEntry> const&)
+typedef const ObjArrayRaw*(__thiscall* GetLogTextFn)(const void*);    // gCQuest_PS::GetLogText() const
+typedef const void*(__thiscall* LocIdFn)(const void*);               // eCLocString::GetID() const -> bCString const&
 typedef bool(__thiscall* FileFn)(void*, const void*);
 
 struct QuestApi {
@@ -47,6 +65,9 @@ struct QuestApi {
     LocCtorFn locCtor = nullptr;
     LocDtorFn locDtor = nullptr;
     SetLocFn setTopic = nullptr, setDesc = nullptr;
+    SetLogTextFn setLogText = nullptr;
+    GetLogTextFn getLogText = nullptr;
+    LocIdFn locId = nullptr;
     FileFn readFile = nullptr;   // write (gCQuest_PS::Write) removed with API 46: it never wrote a file
     GetRefFn getName = nullptr;
     GetRefFn getAttrib = nullptr, getAttribAmount = nullptr;
@@ -77,9 +98,12 @@ bool Resolve() {
     if (HMODULE eng = GetModuleHandleA("Engine.dll")) {
         g_q.locCtor = reinterpret_cast<LocCtorFn>(GetProcAddress(eng, "??0eCLocString@@QAE@ABVbCString@@@Z"));
         g_q.locDtor = reinterpret_cast<LocDtorFn>(GetProcAddress(eng, "??1eCLocString@@QAE@XZ"));
+        g_q.locId = reinterpret_cast<LocIdFn>(GetProcAddress(eng, "?GetID@eCLocString@@QBEABVbCString@@XZ"));
     }
     g_q.setTopic = reinterpret_cast<SetLocFn>(G("?SetLogTopic@gCQuest_PS@@QAEXABVeCLocString@@@Z"));
     g_q.setDesc = reinterpret_cast<SetLocFn>(G("?SetQuestDesc@gCQuest_PS@@QAEXABVeCLocString@@@Z"));
+    g_q.setLogText = reinterpret_cast<SetLogTextFn>(G("?SetLogText@gCQuest_PS@@QAEXABV?$bTObjArray@USLogEntry@gCQuest_PS@@@@@Z"));
+    g_q.getLogText = reinterpret_cast<GetLogTextFn>(G("?GetLogText@gCQuest_PS@@QBEABV?$bTObjArray@USLogEntry@gCQuest_PS@@@@XZ"));
     g_q.readFile = reinterpret_cast<FileFn>(G("?Read@gCQuest_PS@@QAE_NABVbCString@@@Z"));
     g_q.getName = reinterpret_cast<GetRefFn>(G("?GetName@gCQuest_PS@@QBEABVbCString@@XZ"));
     g_q.getAttrib = reinterpret_cast<GetRefFn>(G("?GetAttribSuccess@gCQuest_PS@@QBEABVbCString@@XZ"));
@@ -234,6 +258,43 @@ bool SetQuestText(SetLocFn fn, const SStr& name, const char* prefix, const SStr&
 }
 bool SetQuestTopic(const SStr& name, const SStr& text) { return SetQuestText(g_q.setTopic, name, "G3ASM_QTOPIC_", text); }
 bool SetQuestDescription(const SStr& name, const SStr& text) { return SetQuestText(g_q.setDesc, name, "G3ASM_QDESC_", text); }
+// Append one entry {Heading, Text} to LogText (the quest log). SetLogText copies an array: the new array has its own copies of all old entries
+// (made from their IDs), thus nothing points into the old array while the game replaces it. Return value: number of entries after it, -1 error.
+int SafeAppendLogEntry(void* q, const void* headingId, const void* textId) {
+    __try {
+        const ObjArrayRaw* cur = g_q.getLogText(q);
+        const unsigned n = cur && cur->data ? cur->count : 0;
+        if (n > 4000) return -1;
+        LogEntryRaw* arr = static_cast<LogEntryRaw*>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(LogEntryRaw) * (n + 1)));
+        if (!arr) return -1;
+        const LogEntryRaw* old = n ? static_cast<const LogEntryRaw*>(cur->data) : nullptr;
+        for (unsigned i = 0; i < n; ++i) {
+            g_q.locCtor(&arr[i].heading, g_q.locId(&old[i].heading));
+            g_q.locCtor(&arr[i].text, g_q.locId(&old[i].text));
+        }
+        g_q.locCtor(&arr[n].heading, headingId);
+        g_q.locCtor(&arr[n].text, textId);
+        const ObjArrayRaw a{arr, n + 1, n + 1};
+        g_q.setLogText(q, &a);
+        for (unsigned i = 0; i <= n; ++i) {
+            g_q.locDtor(&arr[i].text);
+            g_q.locDtor(&arr[i].heading);
+        }
+        HeapFree(GetProcessHeap(), 0, arr);
+        const ObjArrayRaw* now = g_q.getLogText(q);
+        return now ? int(now->count) : -1;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return -1; }
+}
+bool InstallTextHooks();
+// An entry in the quest log without a dialog (from v0.47.1). The game saves the entry with the quest; heading and text are in the IDs
+// ("G3ASM_TXT:..."), thus they come back also after a restart of the game. An empty heading stays empty.
+int AddQuestLogEntry(const SStr& name, const SStr& heading, const SStr& text) {
+    void* q = FindQuest(name);
+    if (!q || !g_q.setLogText || !g_q.getLogText || !g_q.locId || !g_q.locCtor || !g_q.locDtor || !InstallTextHooks()) return -1;
+    const SStr hid(*heading.c_str() ? (std::string(kTextInIdPrefix) + heading.c_str()).c_str() : "");
+    const SStr tid((std::string(kTextInIdPrefix) + text.c_str()).c_str());
+    return SafeAppendLogEntry(q, &hid, &tid);
+}
 bool LoadQuestFile(const SStr& name, const SStr& path) {   // gCQuest_PS::Read(path): read the properties of the quest from an ini file
     void* q = FindQuest(name);
     bool r = false;
@@ -322,6 +383,22 @@ SStr GetQuestNameAt(int i) {
     if (i >= 0 && ArrayView(&d, &n) && i < n && QuestAtIndex(d, i, nm, sizeof nm)) return SStr(nm);
     return SStr();
 }
+// "n=<count> [Heading|Text] ..." for a quest with LogText entries; false if there are none
+bool SafeLogTextInfo(void* q, char* out, size_t n) {
+    out[0] = 0;
+    __try {
+        const ObjArrayRaw* a = g_q.getLogText(q);
+        if (!a || !a->count || !a->data) return false;
+        int len = std::snprintf(out, n, "n=%u", a->count);
+        const LogEntryRaw* e = static_cast<const LogEntryRaw*>(a->data);
+        for (unsigned i = 0; i < a->count && i < 4 && len > 0 && size_t(len) < n; ++i) {
+            const char* hd = g_sb.strGetText(g_q.locId(&e[i].heading));
+            const char* tx = g_sb.strGetText(g_q.locId(&e[i].text));
+            len += std::snprintf(out + len, n - size_t(len), " [%s|%s]", hd ? hd : "", tx ? tx : "");
+        }
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
 void QuestDebug() {
     ScriptHost* h = ScriptHost::s_current;
     if (!h || !Resolve()) return;
@@ -339,6 +416,12 @@ void QuestDebug() {
     if (ArrayView(&d, &n)) {
         std::snprintf(b, sizeof b, "QuestDebug: %d Quests lesbar (Daten %p)", n, d);
         h->Log(b);
+        for (int i = 0; i < n && g_q.getLogText && g_q.locId; ++i) {   // LogText entries (Heading / Text as text IDs)
+            char nm[96];
+            void* q = QuestAtIndex(d, i, nm, sizeof nm);
+            char lt[400];
+            if (q && SafeLogTextInfo(q, lt, sizeof lt)) h->Log(std::string("QuestDebug: ") + nm + " LogText " + lt);
+        }
     } else
         h->Log("QuestDebug: Array nicht deutbar");
 }
@@ -362,13 +445,23 @@ const char* SafeLocId(const void* self) {
         return g_sb.strGetText(self);
     } __except (EXCEPTION_EXECUTE_HANDLER) { return nullptr; }   // eCLocString = one bCString (4 bytes)
 }
+std::wstring TextFrom1252(const char* t) {
+    const int len = MultiByteToWideChar(1252, 0, t, -1, nullptr, 0);
+    std::wstring w(len > 0 ? len - 1 : 0, L'\0');
+    if (len > 1) MultiByteToWideChar(1252, 0, t, -1, &w[0], len);
+    return w;
+}
 // own text for the ID in self: builds it in ret (bCUnicodeString) and gives true. The text is copied under the read lock.
 bool BuildOwnText(const void* self, void* ret) {
     if (!self) return false;
+    const char* id = SafeLocId(self);
+    if (id && std::strncmp(id, kTextInIdPrefix, kTextInIdLen) == 0) {
+        g_uniCtor(ret, TextFrom1252(id + kTextInIdLen).c_str());
+        return true;
+    }
     bool found = false;
     AcquireSRWLockShared(&g_textsLock);
-    const char* id = g_texts.empty() ? nullptr : SafeLocId(self);   // without own texts, the hook costs only the lock
-    if (id && *id) {
+    if (id && *id && !g_texts.empty()) {
         auto it = g_texts.find(id);
         if (it != g_texts.end()) {
             g_uniCtor(ret, it->second.c_str());
@@ -414,10 +507,7 @@ bool InstallTextHooks() {
 }
 
 void RegisterText(const SStr& id, const SStr& text) {
-    const char* t = text.c_str();
-    const int len = MultiByteToWideChar(1252, 0, t, -1, nullptr, 0);
-    std::wstring w(len > 0 ? len - 1 : 0, L'\0');
-    if (len > 1) MultiByteToWideChar(1252, 0, t, -1, &w[0], len);
+    const std::wstring w = TextFrom1252(text.c_str());
     AcquireSRWLockExclusive(&g_textsLock);
     g_texts[id.c_str()] = w;
     ReleaseSRWLockExclusive(&g_textsLock);
@@ -605,6 +695,8 @@ bool RegisterQuestBindings(asIScriptEngine* e) {
     G3ASM_REG(e->RegisterGlobalFunction("bCString GetQuestReward(const bCString &in)", asFUNCTION(GetQuestReward), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bCString DescribeQuestRewards()", asFUNCTION(DescribeQuestRewards), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("void QuestDebug()", asFUNCTION(QuestDebug), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("int AddQuestLogEntry(const bCString &in quest, const bCString &in heading, const bCString &in text)",
+                                        asFUNCTION(AddQuestLogEntry), asCALL_CDECL));   // from v0.47.1
     G3ASM_REG(e->RegisterGlobalFunction("void RegisterText(const bCString &in, const bCString &in)", asFUNCTION(RegisterText), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bCString GetQuestDir()", asFUNCTION(GetQuestDir), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bCString GetQuestFilePath(const bCString &in)", asFUNCTION(GetQuestFilePath), asCALL_CDECL));
