@@ -95,7 +95,7 @@ available. The full list is in [Limits](docs/en/modkit/limitations.md).
 - Custom user interface (UI) controls with input, a settings menu in the game.
 - File patches for compressed archive entries (`Strings.pak`) and for binary files.
 
-**Experimental:** `HurtHitPoints`, `SetProperty`, `GenerateTradeGoods`, `Override_CombatMove`.
+**Experimental:** `HurtHitPoints`, `SetProperty`, `Override_CombatMove`.
 
 **Not tested.** For more data, see [Compatibility](docs/en/compatibility.md):
 - GOG versions, CD versions and DVD versions. G3ASM does not support installations without the Community Patch 1.75 or without the Parallel

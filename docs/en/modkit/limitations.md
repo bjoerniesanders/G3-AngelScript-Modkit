@@ -42,8 +42,9 @@ functions also have the labels **Experimental**, **Not checked in the game**, **
 - Make quests and control them, with a title, XP and an attribute reward. List all 571 quests of the game. Read quest files.
 - Read dialogs (4593 infos) and make your own: options in the dialog menu, lines in the quest log, `OnInfoFinished`.
 - Entries in the quest log without a dialog (`AddQuestLogEntry`, from v0.47.1), also after a save, a load and a restart of the game.
-- Conditions of custom infos: items with a quantity and switches in the saved game (`SetInfoProperty`, from v0.47.2). The game itself does the
-  check.
+- Conditions of custom infos: items with a quantity, switches in the saved game (set and not set) and skills (`SetInfoProperty`, from v0.47.2).
+  The game itself does the check.
+- New goods for traders (`GenerateTradeGoods`, from v0.47.2): the new delivery is added to the old goods.
 - Your own quests and dialogs come back with their status and quest log after a save and a load. Switches in the saved game (`SetGameEvent`).
 - File patches on quest files (`demo_patch`). The game loads mod archives (`PackMod`), and they overwrite existing files.
 - Draw above the HUD and the inventory: text, images, `WorldToScreen`.
@@ -101,7 +102,6 @@ These functions run, but I did not fully check their effect. Their names and the
 
 - `HurtHitPoints`: decreases the hit points of NPCs, but does not kill.
 - `SetProperty`: writes texts, numbers, Boolean values and enums. It depends on the property if the game uses the value.
-- `GenerateTradeGoods`: gives `true`, but the goods do not change at this time.
 - `Override_CombatMove`: hits are visibly faster. For `Recover`, the weapon can come in place of the fighter.
 
 ## Not tested
@@ -113,7 +113,8 @@ These functions run, but I did not fully check their effect. Their names and the
   stays off. If `Script_LearningThresholdTweaks.dll` is installed, `Override_LearnCost` stays off.
 - **Never occurred in the game:** AI routines (`AI_ROUTINE`), the divisor 2 for `Override_MonsterDamage` (summoned attackers), and the doubled
   learn costs with "Alternative Balance".
-- **Other conditions of custom infos:** reputation, skills, worn items and others (`ListInfoProperties` shows them).
+- **Other conditions of custom infos:** reputation, party and others (`ListInfoProperties` shows them). `CondWearsItem` had no effect with the
+  condition type `GENERAL`.
 - **Dependencies in the `mod.ini`** (`version`, `api`, `requires`): tested only without the game.
 - **File patches on `.info` files:** The game loads dialogs from the compiled `Infos.cpt`. It is not known if patches have an effect there.
 - **`owner` in `OnDamage`**, when more than one fighter fights against one victim, is an approximation. It is the current opponent of the victim,

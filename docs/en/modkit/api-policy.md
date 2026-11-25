@@ -60,7 +60,8 @@ From **version 46**, the modkit is in the beta. This means:
 each new version. A function loses the label when I measured its behavior in the game and described it in the reference. This is not a change of
 the interface.
 
-Experimental in version 46: `HurtHitPoints`, `SetProperty`, `GenerateTradeGoods`, `Override_CombatMove`.
+Experimental in version 46: `HurtHitPoints`, `SetProperty`, `GenerateTradeGoods`, `Override_CombatMove`. From v0.47.2, `GenerateTradeGoods` is
+measured and described, thus it is not experimental anymore.
 
 Removed with version 46, because they never worked: `GetPickPosition` (replacement: `PickCenter` and `GetPickPoint`), `ExecuteInfo`, `DumpQuest`.
 

@@ -275,7 +275,8 @@ Jedes Entity und jede Vorlage hat Eigenschaftssets (`Item`, `Damage`, `NPC`, `In
 - Was ein Item wirklich enthält, zeigt `ListProperties`. Die Mod `demo_properties` schreibt es per Taste ins Protokoll.
 - Bei Verweisen und Listen ist der gelesene Text nicht immer aussagekräftig. **Verweise lassen sich mit `SetProperty` nicht schreiben** (`true` ohne
   Wirkung). Dafür gibt es `SetTemplateRef` und `SetEntityRef`. Ob `SetProperty` geklappt hat, zeigt ein `GetProperty` danach.
-- Dass ein Wert geschrieben ist, heißt nicht, dass das Spiel ihn beachtet. Beispiel: `Kill()` tötet auch einen NPC mit `Immortal = true`.
+- Dass ein Wert geschrieben ist, heißt nicht, dass das Spiel ihn beachtet. Beispiel `Immortal = true`: Im Kampf sinken die Lebenspunkte, der NPC
+  stirbt aber nicht. `Kill()` tötet ihn trotzdem.
 - Verwende `SetProperty` und `SetTemplateRef` nur an Vorlagen und Entities, die die Mod selbst angelegt hat (`CloneTemplate`).
 - Beispiele: `SetTemplateRef(waffe, "gCItem_PS", "ActivateSkill2", "Perk_Lifesteal")` (die Waffe schaltet ein Talent ein, `perk_lifesteal`) und
   `SetEntityRef(beschwoerung, "gCInteraction_PS", "Owner", GetHero())` (wem eine Beschwörung gehört und wem ihr Schaden zählt, `beliars_klaue`).
@@ -299,7 +300,7 @@ Ohne Gruppe: `-1` oder ungültig. Die Art eines Mitglieds liefert `GetProperty(m
 
 | Funktion | Beschreibung |
 |---|---|
-| `bool GenerateTradeGoods()` (ab Version 37) | **Experimentell.** Erzeugt die Ware eines Händlers neu, wie das Spiel es tut. Liefert `true`, aber die Ware bleibt bisher gleich |
+| `bool GenerateTradeGoods()` (ab Version 37, wirkt ab v0.47.2) | Gibt einem Händler eine neue Lieferung: Das Spiel erzeugt die Ware aller seiner Ware-Sets noch einmal und legt sie **zur alten dazu**. Willst du nur die neue Ware, nimm die alte vorher mit `RemoveItems` weg |
 
 Löst `Override_TradeGenerate` und `OnTradeGenerated` aus. Kauf und Verkauf meldet das Ereignis [`OnTrade`](events.md) (ab Version 47).
 

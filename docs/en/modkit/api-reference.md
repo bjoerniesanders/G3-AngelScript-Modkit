@@ -274,7 +274,8 @@ Each entity and each template has property sets (`Item`, `Damage`, `NPC`, `Inven
 - `ListProperties` shows what an item really contains. The mod `demo_properties` writes it to the log when you push a key.
 - For references and lists, the text that you read does not always give useful data. **You cannot write references with `SetProperty`** (it gives
   `true`, but has no effect). Use `SetTemplateRef` and `SetEntityRef` for this. To see if `SetProperty` worked, use `GetProperty` after it.
-- If a value is written, this does not mean that the game uses it. Example: `Kill()` also kills an NPC with `Immortal = true`.
+- If a value is written, this does not mean that the game uses it. Example `Immortal = true`: in a fight, the hit points decrease, but the NPC
+  does not die. `Kill()` kills it all the same.
 - Use `SetProperty` and `SetTemplateRef` only on templates and entities that the mod made itself (`CloneTemplate`).
 - Examples: `SetTemplateRef(weapon, "gCItem_PS", "ActivateSkill2", "Perk_Lifesteal")` (the weapon turns on a skill, `perk_lifesteal`) and
   `SetEntityRef(summon, "gCInteraction_PS", "Owner", GetHero())` (the owner of a summon, who also gets the credit for its damage,
@@ -298,7 +299,7 @@ Without a group: `-1` or not valid. `GetProperty(m, "Party", "PartyMemberType")`
 
 | Function | Description |
 |---|---|
-| `bool GenerateTradeGoods()` (from version 37) | **Experimental.** Makes the goods of a trader again, as the game does. Gives `true`, but the goods do not change at this time |
+| `bool GenerateTradeGoods()` (from version 37, has an effect from v0.47.2) | Gives a trader a new delivery: the game makes the goods of all its trade sets again and adds them **to the old goods**. If you want only the new goods, remove the old goods before with `RemoveItems` |
 
 Causes `Override_TradeGenerate` and `OnTradeGenerated`. The event [`OnTrade`](events.md) reports purchases and sales (from version 47).
 

@@ -1915,6 +1915,8 @@ bool TemplateNamesUnique(const SStr& part, int maxUnique, std::vector<std::strin
     }
     return true;
 }
+// The raw count of the engine is not always two times the number of templates (measured 2026-11-25: "Perk_" 145 for 73, "It_1H" 69 for 31):
+// thus the names are read, half of the raw count would be wrong.
 int CountTemplateNames(const SStr& part) {
     std::vector<std::string> names;
     return TemplateNamesUnique(part, 40000, &names) ? int(names.size()) : -1;
@@ -2160,12 +2162,26 @@ int EntInventoryAmount(const Entity& e, int idx) {
     int am = -1;
     return inv && SafeStackItem(inv, idx, nullptr, &am) ? am : -1;
 }
+// A new delivery of goods for a trader (from v0.47.2). GenerateTradeInvFromTreasureSets does nothing while GeneratedTrade is set (measured
+// 2026-11-25: true, but the goods stayed the same). Thus first GeneratedTrade = false; then the game makes the goods of all trade sets again and
+// adds them to the old goods (Joey: arrows 268 -> 577, 3 more bows), and it sets GeneratedTrade again.
+// Not used: RefreshTradeInvFromTreasureSets only adds missing items of the refresh set (one potion), sold goods do not come back.
+typedef void(__thiscall* SetBoolRefFn)(void*, const bool*);
+bool SafeSetGenerated(SetBoolRefFn f, void* inv) {
+    __try {
+        const bool no = false;
+        f(inv, &no);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
 bool EntGenerateTradeGoods(const Entity& e) {
     void* inv = InventoryOf(e);   // also resolves g_e.game
-    static GenTradeFn f = nullptr;
-    if (!f && g_e.game) f = reinterpret_cast<GenTradeFn>(GetProcAddress(g_e.game, "?GenerateTradeInvFromTreasureSets@gCInventory_PS@@QAE_NXZ"));
+    static GenTradeFn generate = nullptr;
+    static SetBoolRefFn setGenerated = nullptr;
+    if (!generate && g_e.game) generate = reinterpret_cast<GenTradeFn>(GetProcAddress(g_e.game, "?GenerateTradeInvFromTreasureSets@gCInventory_PS@@QAE_NXZ"));
+    if (!setGenerated && g_e.game) setGenerated = reinterpret_cast<SetBoolRefFn>(GetProcAddress(g_e.game, "?SetGeneratedTrade@gCInventory_PS@@QAEXAB_N@Z"));
     bool ok = false;
-    return inv && f && SafeGenTrade(f, inv, &ok) && ok;
+    return inv && generate && setGenerated && SafeSetGenerated(setGenerated, inv) && SafeGenTrade(generate, inv, &ok) && ok;
 }
 
 // ---- Screen text + menu page (API 3): gCSession::GetScreenOutputCtrl()->PrintScreen(bCUnicodeString, bCByteAlphaColor, seconds)

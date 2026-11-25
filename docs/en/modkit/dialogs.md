@@ -108,12 +108,14 @@ Result: the option shows only when the hero has two wolf skins **and** the switc
 | `CondItems` | `[It_Wolf_Fur]` | The necessary item |
 | `CondItemAmounts` | `[2]` | The necessary quantity. Without an entry, one item is sufficient |
 | `ConditionPlayerKnows` | `[MyMod_Switch]` | A switch that the mod sets with `SetGameEvent`. The game uses the same list for its own switches (`[Chris_DeerDead]`) |
+| `ConditionPlayerKnowsNot` | `[MyMod_Switch]` | The option shows only while the switch is **not** set |
+| `CondHasSkill` | `[Perk_1H_1]` | The option shows only if the hero learned the skill |
 
 - Lists are in square brackets. The value of `CondItemAmounts` that you read is empty or `[]`, also if the quantity has an effect.
 - Set the conditions when you make the info, thus in `OnInfosLoaded`, and then call `RebuildInfos()`. As the info itself, they do not come back
   from the saved game.
-- The info also has other conditions (`ListInfoProperties` shows them): `ConditionPlayerKnowsNot`, `CondWearsItem`, `CondHasSkill`,
-  `CondReputGroup`, `CondPlayerPartyMember` and others. I did not measure their effect.
+- The info also has other conditions (`ListInfoProperties` shows them): `CondReputGroup`, `CondPlayerPartyMember` and others. I did not measure
+  their effect. `CondWearsItem` had no effect with the condition type `GENERAL`: the option also showed without the item.
 - Example: in `jens_dialog`, "Ich habe das Wolfsfell." shows only when the hero has a wolf skin.
 
 ## Example: a quest through a dialog

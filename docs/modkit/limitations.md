@@ -40,7 +40,9 @@ Funktionen zusätzlich die Vermerke **Experimentell**, **Im Spiel nicht geprüft
 - Quests anlegen und steuern, mit Titel, XP und Attribut-Belohnung. Alle 571 Quests des Spiels aufzählen. Quest-Dateien lesen.
 - Dialoge lesen (4593 Infos) und eigene anlegen: Optionen im Gesprächsmenü, Zeilen im Questlog, `OnInfoFinished`.
 - Questlog-Einträge ohne Gespräch (`AddQuestLogEntry`, ab v0.47.1), auch nach Speichern, Laden und Neustart des Spiels.
-- Bedingungen eigener Infos: Items mit Menge und Schalter im Spielstand (`SetInfoProperty`, ab v0.47.2). Das Spiel prüft sie selbst.
+- Bedingungen eigener Infos: Items mit Menge, Schalter im Spielstand (gesetzt und nicht gesetzt) und Talente (`SetInfoProperty`, ab v0.47.2). Das
+  Spiel prüft sie selbst.
+- Neue Ware für Händler (`GenerateTradeGoods`, ab v0.47.2): Die neue Lieferung kommt zur alten dazu.
 - Eigene Quests und Dialoge kommen nach Speichern und Laden mit Status und Questlog zurück. Schalter im Spielstand (`SetGameEvent`).
 - Datei-Patches auf Quest-Dateien (`demo_patch`). Das Spiel lädt Mod-Archive (`PackMod`), und sie überschreiben vorhandene Dateien.
 - Zeichnen über HUD und Inventar: Text, Bilder, `WorldToScreen`.
@@ -96,7 +98,6 @@ Diese Funktionen laufen, aber ihre Wirkung habe ich nicht vollständig geprüft.
 
 - `HurtHitPoints`: senkt Lebenspunkte von NPCs, tötet aber nicht.
 - `SetProperty`: schreibt Texte, Zahlen, Bool-Werte und Enums. Ob das Spiel den Wert beachtet, hängt von der Eigenschaft ab.
-- `GenerateTradeGoods`: liefert `true`, aber die Ware bleibt bisher gleich.
 - `Override_CombatMove`: Schläge werden sichtbar schneller. Bei `Recover` kann die Waffe statt des Kämpfers kommen.
 
 ## Nicht getestet
@@ -108,7 +109,8 @@ Diese Funktionen laufen, aber ihre Wirkung habe ich nicht vollständig geprüft.
   `Override_MonsterDamage` aus. Ist `Script_LearningThresholdTweaks.dll` installiert, bleibt `Override_LearnCost` aus.
 - **Im Spiel nie aufgetreten:** KI-Routinen (`AI_ROUTINE`), der Teiler 2 bei `Override_MonsterDamage` (beschworene Angreifer) und die verdoppelten
   Lernkosten mit „Alternative Balance“.
-- **Weitere Bedingungen eigener Infos:** Ruf, Talente, getragene Items und andere (`ListInfoProperties` zeigt sie).
+- **Weitere Bedingungen eigener Infos:** Ruf, Gruppe und andere (`ListInfoProperties` zeigt sie). `CondWearsItem` wirkte bei Bedingungsart
+  `GENERAL` nicht.
 - **Abhängigkeiten in der `mod.ini`** (`version`, `api`, `requires`): nur ohne Spiel getestet.
 - **Datei-Patches auf `.info`-Dateien:** Das Spiel lädt Dialoge aus der kompilierten `Infos.cpt`. Ob Patches dort ankommen, ist offen.
 - **`owner` bei `OnDamage`**, wenn mehrere gegen einen kämpfen, ist eine Näherung. Es ist der aktuelle Gegner des Opfers, nicht sicher der Schläger.

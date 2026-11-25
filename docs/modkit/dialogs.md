@@ -108,12 +108,14 @@ Ergebnis: Die Option erscheint erst, wenn der Held zwei Wolfsfelle hat **und** d
 | `CondItems` | `[It_Wolf_Fur]` | Das nötige Item |
 | `CondItemAmounts` | `[2]` | Die nötige Menge. Ohne Eintrag genügt ein Stück |
 | `ConditionPlayerKnows` | `[MeinMod_Schalter]` | Ein Schalter, den die Mod mit `SetGameEvent` setzt. Das Spiel benutzt dieselbe Liste für seine eigenen Schalter (`[Chris_DeerDead]`) |
+| `ConditionPlayerKnowsNot` | `[MeinMod_Schalter]` | Die Option erscheint nur, solange der Schalter **nicht** gesetzt ist |
+| `CondHasSkill` | `[Perk_1H_1]` | Die Option erscheint nur, wenn der Held das Talent gelernt hat |
 
 - Listen stehen in eckigen Klammern. Der gelesene Wert von `CondItemAmounts` ist leer oder `[]`, auch wenn die Menge wirkt.
 - Setze die Bedingungen beim Anlegen der Info, also in `OnInfosLoaded`, und rufe danach `RebuildInfos()` auf. Wie die Info selbst kommen sie nicht
   aus dem Spielstand zurück.
-- Weitere Bedingungen hat die Info auch (`ListInfoProperties` zeigt sie): `ConditionPlayerKnowsNot`, `CondWearsItem`, `CondHasSkill`, `CondReputGroup`,
-  `CondPlayerPartyMember` und andere. Ihre Wirkung habe ich nicht gemessen.
+- Weitere Bedingungen hat die Info auch (`ListInfoProperties` zeigt sie): `CondReputGroup`, `CondPlayerPartyMember` und andere. Ihre Wirkung habe
+  ich nicht gemessen. `CondWearsItem` wirkte bei Bedingungsart `GENERAL` nicht: Die Option erschien auch ohne das Item.
 - Beispiel: In `jens_dialog` erscheint „Ich habe das Wolfsfell.“ nur, wenn der Held ein Wolfsfell hat.
 
 ## Beispiel: Quest über ein Gespräch
