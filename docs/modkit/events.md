@@ -40,6 +40,7 @@ Overrides ändern eine Spielfunktion oder brechen sie ab. Sie stehen auf der Sei
 | `void OnTouch(Entity self, Entity other)` (ab Version 37) | `other` berührt `self` |
 | `void OnTransformStart(Entity self, Entity target)`, `void OnTransformEnd(Entity self)` (ab Version 37) | Eine Verwandlung beginnt oder endet |
 | `void OnTradeGenerated(Entity trader, int ok)` (ab Version 37) | Das Spiel hat die Ware eines Händlers erzeugt (`ok` 1 = gelungen) |
+| `void OnTrade(Entity trader, const bCString &in item, int amount, int gold, bool bought)` (ab Version 47) | Der Held hat beim Händler gekauft (`bought` = `true`) oder verkauft (`false`) |
 | `void OnDamage(Entity victim, Entity attacker, int amount, int type)` | Alte Form ohne `owner`. `attacker` ist der `inflictor` |
 
 Die ersten fünf Ereignisse meldet das Questsystem des Spiels, und zwar bei **jedem** Vorfall, nicht nur bei laufenden Quests. Das Spiel hat den
@@ -58,6 +59,12 @@ Vorgang dann schon ausgeführt. Deine Funktion läuft danach.
 - **`OnTouch`** kommt sehr oft: nach dem Laden tausende Male in wenigen Sekunden, meist für NPCs an Navigationszonen. Filtere zuerst, zum Beispiel
   `if (self != GetHero() && other != GetHero()) return;`. Arbeite erst danach.
 - **`OnTransformEnd`:** `self` ist das verwandelte Wesen (z. B. der Snapper), nicht der Held.
+- **`OnTrade`** kommt nach dem Bestätigen auf der Handelsseite, einmal je Ware (Name der Item-Vorlage, z. B. `It_Apple`). `amount` ist die Menge
+  dieser Ware. `gold` ist das Gold, das im selben Handel in die Gegenrichtung ging: beim Kauf das Gold, das der Held zahlt, beim Verkauf das Gold,
+  das der Händler zahlt. Für mehrere Waren einer Richtung steht dort die Summe. **Achtung:** Kauft und verkauft der Held im selben Handel, verrechnet
+  das Spiel beides. Nur die Seite mit dem höheren Wert bekommt Gold, die andere Richtung meldet `gold` = 0. Beispiel: Zwei Waffen verkauft und
+  einen Schnaps gekauft ergibt beim Verkauf `gold` = 295 und beim Kauf `gold` = 0. Gold selbst meldet `OnTrade` nicht als Ware. Plündern, Geschenke
+  und Dialoge lösen `OnTrade` nicht aus. `OnReceiveItem` meldet einen Handel nicht.
 
 ## Quests, Dialoge, Laden und Speichern
 

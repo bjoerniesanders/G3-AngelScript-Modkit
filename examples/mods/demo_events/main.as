@@ -1,4 +1,4 @@
-// Example mod: shows game events (kills, items, areas, spells) as screen text and in the log.
+// Example mod: shows game events (kills, items, areas, spells, trade) as screen text and in the log.
 // Installation: copy the folder to <Gothic3>\g3asm\mods\demo_events. To turn off: write "-demo_events" in g3asm\mods\load_order.txt.
 // Screen text only for the hero (items, areas, spells). All other events only in the log.
 bool IstHeld(Entity e) { return e.IsValid() && e == GetHero(); }
@@ -27,4 +27,8 @@ void OnLeave(Entity wer, const bCString &in bereich) {
 void OnSpellCast(Entity wer, Entity ziel, const bCString &in zauber) {
     print(wer.GetName() + " zaubert " + zauber + " auf " + ziel.GetName());
     if (IstHeld(wer)) PrintScreen("Zauber: " + zauber, 2, 200, 140, 255);
+}
+void OnTrade(Entity haendler, const bCString &in item, int menge, int gold, bool gekauft) {
+    print((gekauft ? "gekauft: " : "verkauft: ") + item + " x" + menge + " bei " + haendler.GetName() + " (Gold der Gegenrichtung " + gold + ")");
+    PrintScreen((gekauft ? "Gekauft: " : "Verkauft: ") + item + " x" + menge, 3, 255, 220, 120);
 }

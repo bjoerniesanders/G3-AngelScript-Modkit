@@ -13,7 +13,7 @@
 #include <thread>
 #include <vector>
 
-#define G3ASM_SCRIPT_API_VERSION 46
+#define G3ASM_SCRIPT_API_VERSION 47
 
 class asIScriptEngine;
 class asIScriptContext;
@@ -26,12 +26,13 @@ namespace g3asm {
 
 // argument of a game event for scripts (see ScriptHost::CallEvent)
 struct EvArg {
-    enum Kind { Entity, Text, UInt } kind;
+    enum Kind { Entity, Text, UInt, Bool } kind;
     const void* ptr;   // Entity: eCEntity*; text: pointer to a bCString object
-    unsigned value;    // UInt
+    unsigned value;    // UInt; Bool: 0 or 1
     static EvArg Ent(const void* e) { return {Entity, e, 0}; }
     static EvArg Str(const void* s) { return {Text, s, 0}; }
     static EvArg U(unsigned v) { return {UInt, nullptr, v}; }
+    static EvArg B(bool v) { return {Bool, nullptr, v ? 1u : 0u}; }
 };
 
 void SetPrintToGameLog(bool on);   // ini [g3asm] printgame
@@ -209,9 +210,9 @@ std::map<std::string, std::string> ReadIniSection(const std::string& path, const
 void SetAiTraceOptions(bool enabled, const char* filter, int maxLines);
 void SetAniSpeedLog(bool enabled);   // ini [g3asm] anispeedlog: Messung SetPlaySpeed/GetPlaySpeed (Roadmap 6.3)
 int InstallAiTrace(ScriptHost& host);
-// Trade measurement (trade_trace.cpp): only log, ini [g3asm] tradelog=1; InstallTradeTrace installs only if turned on
+// Trade (trade_hooks.cpp): event OnTrade (always) and trade measurement (only log, ini [g3asm] tradelog=1)
 void SetTradeLog(bool enabled);
-int InstallTradeTrace(ScriptHost& host);
+int InstallTradeHooks(ScriptHost& host);
 // Changes in the middle of game scripts (combat_patches.cpp, original bytes checked): Override_MonsterDamage; call at each world activation (effect only 1 time)
 int InstallScriptGamePatches(ScriptHost& host);   // 1 time for each frame (game cycle): OnTouch handler, transformation hooks, measurement
 // build a Script.dll entity object (0xA8 bytes, measured) with the constructor of Script.dll; buffer with kScriptEntityBytes, alignment 8

@@ -8,7 +8,7 @@ game starts. It runs them when game events occur. When you save a script file wh
 
 **For whom:** Modders with basic knowledge of programming.
 
-Current script interface: **version 46** (`GetApiVersion()`).
+Current script interface: **version 47** (`GetApiVersion()`).
 
 The log messages of the modkit are in German. This documentation quotes them in German and gives the English meaning where necessary.
 

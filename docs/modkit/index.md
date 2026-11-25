@@ -8,7 +8,7 @@ Es führt sie aus, wenn Spielereignisse eintreten. Speicherst du eine Skriptdate
 
 **Für wen:** Modder mit Grundkenntnissen im Programmieren.
 
-Aktuelle Skript-Schnittstelle: **Version 46** (`GetApiVersion()`).
+Aktuelle Skript-Schnittstelle: **Version 47** (`GetApiVersion()`).
 
 ## Inhalt
 

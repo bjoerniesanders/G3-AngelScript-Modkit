@@ -857,7 +857,9 @@ bool ScriptHost::Execute(void* fp, float* argFloat, const int* argInt, const boo
                 NoteNull("Text-Parameter eines Ereignisses (leer weitergegeben)");
             }
             ctx_->SetArgObject(i, const_cast<void*>(s));
-        } else
+        } else if (ev[i].kind == EvArg::Bool)
+            ctx_->SetArgByte(i, ev[i].value ? 1 : 0);
+        else
             ctx_->SetArgDWord(i, ev[i].value);
     }
     // The time guard belongs to the context, not to the saved state: a nested call leaves the guard of the outer call

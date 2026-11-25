@@ -145,7 +145,7 @@ Kreis 1,5 m neben ihn. Dazu fängt sie das Spielskript `MagicTeleport` ab (`Watc
 
 | Mod | Zeigt | Bedienung |
 |---|---|---|
-| `demo_events` | Alle Ereignisse des Questsystems im Protokoll und auf dem Bildschirm | – |
+| `demo_events` | Alle Ereignisse des Questsystems und der Handel (`OnTrade`) im Protokoll und auf dem Bildschirm | – |
 | `demo_hooks` | Spielfunktionen mit `Override_...` und `Super()` ändern ([Hooks](hooks.md)) | – |
 | `demo_quest` | Alle Quest-Funktionen an einer Demo-Quest | Ziffernblock 1–6: Status, anlegen und starten, Erfolg, Fehlschlag, entfernen, XP. Bild hoch: Quests auflisten. Bild runter: Infos ansehen. Einfg: Quest-Dateien neu laden |
 | `demo_properties` | Eigenschaften eines Items lesen | Strg + Ziffernblock /: Item in der Hand (sonst unter dem Fadenkreuz) ins Protokoll |

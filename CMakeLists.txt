@@ -60,7 +60,7 @@ set_target_properties(g3asm_angelscript PROPERTIES MSVC_RUNTIME_LIBRARY MultiThr
 enable_language(C)
 file(GLOB G3ASM_MINHOOK_SRCS ${G3ASM_MINHOOK_DIR}/src/*.c ${G3ASM_MINHOOK_DIR}/src/hde/*.c)
 set(G3ASM_SRCS src/g3asm_main.cpp src/script_host.cpp src/sb_api.cpp src/engine_bindings.cpp src/game_hooks.cpp
-              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/packed_mods.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp src/combat_patches.cpp src/schema_dump.cpp src/ai_trace.cpp src/trade_trace.cpp src/mod_settings.cpp)
+              src/quest_bindings.cpp src/dialog_bindings.cpp src/file_patches.cpp src/packed_mods.cpp src/pack_mod.cpp src/script_calls.cpp src/draw_api.cpp src/more_events.cpp src/combat_patches.cpp src/schema_dump.cpp src/ai_trace.cpp src/trade_hooks.cpp src/mod_settings.cpp)
 list(TRANSFORM G3ASM_SRCS PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
 # Gemeinsame Objekte fuer g3asm.dll (Loader-Weg) und Script_G3ASM_<API>.dll (Script-DLL fuer Spieler); einmal uebersetzt
 add_library(g3asm_core OBJECT ${G3ASM_SRCS} ${G3ASM_MINHOOK_SRCS})

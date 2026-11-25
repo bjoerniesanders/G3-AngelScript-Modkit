@@ -133,6 +133,8 @@ void TestEntity() {
     check(GetGameDay() == -1 && GetGameHour() == -1 && GetGameMinute() == -1, "ohne Spiel keine Uhr");
     check(!SetGameTime(1, 12, 0), "ohne Spiel keine Uhr setzen");
     check(e.GetItemCount("It_Wolf_Fur") == -1 && e.RemoveItems("It_Wolf_Fur", 1) == -1 && e.AddItems("It_Wolf_Fur", 1) == -1, "ohne Spiel kein Inventar");
+    check(e.GetInventoryStackCount() == -1 && e.GetInventoryItem(0).IsEmpty() && e.GetInventoryAmount(0) == -1 && e.GetInventoryAmount(-1) == -1,
+          "Inventar aufzaehlen ohne Spiel: leer und -1");
     check(CloneTemplate("It_Wolf_Fur", "G3ASM_Klon") < 0, "ohne Spiel kein Template-Klonen");
     check(!SpawnNPC("Diego", bCVector(0, 0, 0)).IsValid() && FindTemplateNames("Diego") == "", "ohne Spiel kein SpawnNPC");
     { Entity z; check(!DestroyNPC(z) && !IsDynamicSpawn(z) && !z.LookAt(z) && !z.SetRotation(bCQuaternion()), "ohne Spiel kein DestroyNPC/LookAt/SetRotation"); }
@@ -181,6 +183,11 @@ void OnReceiveItem(Entity giver, Entity receiver, const bCString &in name, const
 }
 void OnEnter(Entity e, const bCString &in area) { enters++; check(!e.IsValid() && area.IsEmpty(), "OnEnter: Nulltext kommt als leerer Text an"); }
 void OnNPCKilled(Entity victim) { kills++; check(!victim.IsValid(), "OnNPCKilled: Entity ungueltig ohne Spiel"); }
+int buys = 0, sells = 0;
+void OnTrade(Entity trader, const bCString &in item, int amount, int gold, bool bought) {
+    check(!trader.IsValid() && item == "It_Apple" && amount == 3 && gold == 12, "OnTrade: Haendler, Ware, Menge, Gold");
+    if (bought) buys++; else sells++;
+}
 bool Override_Test(uint v) { check(v == 5, "Override_Test: Argument"); bool r = Super(); return !r; }
 bool Override_TestCancel(uint v) { return true; }
 bool Override_TestArg(uint v) {
@@ -195,4 +202,5 @@ void OnShutdown() {
     check(frames == 1, "OnFrame genau einmal aufgerufen");
     check(keysDown == 1 && keysUp == 1, "OnKey: je einmal gedrueckt und losgelassen");
     check(items == 1 && kills == 1 && enters == 1, "Spielereignisse genau einmal zugestellt");
+    check(buys == 1 && sells == 1, "OnTrade: bool kommt als true und false an");
 }

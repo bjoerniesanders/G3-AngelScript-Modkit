@@ -40,6 +40,7 @@ Overrides change or cancel a game function. The page [Hooks](hooks.md) describes
 | `void OnTouch(Entity self, Entity other)` (from version 37) | `other` touches `self` |
 | `void OnTransformStart(Entity self, Entity target)`, `void OnTransformEnd(Entity self)` (from version 37) | A transformation starts or ends |
 | `void OnTradeGenerated(Entity trader, int ok)` (from version 37) | The game made the goods of a trader (`ok` 1 = success) |
+| `void OnTrade(Entity trader, const bCString &in item, int amount, int gold, bool bought)` (from version 47) | The hero bought from a trader (`bought` = `true`) or sold to a trader (`false`) |
 | `void OnDamage(Entity victim, Entity attacker, int amount, int type)` | The old form without `owner`. `attacker` is the `inflictor` |
 
 The quest system of the game reports the first five events. It reports them for **each** occurrence, not only for running quests. At that time,
@@ -59,6 +60,12 @@ the game has already done the action. Your function runs after it.
 - **`OnTouch`** comes very frequently: thousands of times in a few seconds after a load, usually for NPCs at navigation zones. Filter first, for
   example `if (self != GetHero() && other != GetHero()) return;`. Then do the work.
 - **`OnTransformEnd`:** `self` is the transformed creature (for example the snapper), not the hero.
+- **`OnTrade`** comes after the player confirms on the trade page, one time for each item (name of the item template, for example `It_Apple`).
+  `amount` is the quantity of this item. `gold` is the gold that went in the other direction in the same trade: for a purchase, the gold that the
+  hero pays. For a sale, the gold that the trader pays. For more than one item in one direction, `gold` is the total. **Caution:** If the hero
+  buys and sells in the same trade, the game offsets the two. Only the side with the higher value gets gold. The other direction gives `gold` = 0.
+  Example: two weapons sold and one bottle of booze bought give `gold` = 295 for the sale and `gold` = 0 for the purchase. `OnTrade` does not report
+  gold as an item. Looting, gifts and dialogs do not cause `OnTrade`. `OnReceiveItem` does not report a trade.
 
 ## Quests, dialogs, load and save
 

@@ -509,6 +509,11 @@ extern "C" __declspec(dllexport) int g3asm_run_file(const char* path) {
         g_host.CallEvent("void OnNPCKilled(Entity)", a, 1);
         EvArg n[] = {EvArg::Ent(nullptr), EvArg::Str(nullptr)};   // null pointer from the engine: the script gets an empty text
         g_host.CallEvent("void OnEnter(Entity, const bCString &in)", n, 2);
+        SStr ware("It_Apple");   // OnTrade (API 47): int and bool arguments (bool through SetArgByte)
+        EvArg t[] = {EvArg::Ent(nullptr), EvArg::Str(&ware), EvArg::U(3), EvArg::U(12), EvArg::B(true)};
+        g_host.CallEvent("void OnTrade(Entity, const bCString &in, int, int, bool)", t, 5);
+        t[4] = EvArg::B(false);
+        g_host.CallEvent("void OnTrade(Entity, const bCString &in, int, int, bool)", t, 5);
     }
     {   // override chain: Super() calls the "original", the script changes the return value; without Super(), the original is skipped
         EvArg a[] = {EvArg::U(5)};

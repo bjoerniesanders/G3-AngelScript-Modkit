@@ -145,7 +145,7 @@ in a circle 1.5 m next to the hero. For this, it intercepts the game script `Mag
 
 | Mod | Shows | Controls |
 |---|---|---|
-| `demo_events` | All events of the quest system in the log and on the screen | – |
+| `demo_events` | All events of the quest system and trade (`OnTrade`) in the log and on the screen | – |
 | `demo_hooks` | Change game functions with `Override_...` and `Super()` ([Hooks](hooks.md)) | – |
 | `demo_quest` | All quest functions on a demo quest | Numeric keypad 1–6: status, make and start, success, failure, remove, XP. Page Up: list the quests. Page Down: show infos. Insert: load the quest files again |
 | `demo_properties` | Read the properties of an item | Ctrl + numeric keypad /: write the item in the hand (if there is none, the item below the crosshair) to the log |

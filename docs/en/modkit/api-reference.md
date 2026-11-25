@@ -1,4 +1,4 @@
-# API reference (script interface version 46)
+# API reference (script interface version 47)
 
 [Deutsch](../../modkit/api-reference.md) | **English**
 
@@ -182,6 +182,8 @@ give default values.
 | `int RemoveItems(const bCString &in itemName, int count)` | Removes up to `count` items. Return value: the number removed. `-1` = error |
 | `int DeleteItemStack(const bCString &in name)` (from version 30) | Fully removes all stacks of this item. Return value: the number of stacks |
 | `int GetInventoryStackCount() const` (from version 37) | The number of stacks in the inventory. `-1` without an inventory |
+| `bCString GetInventoryItem(int index) const` (from version 47) | The name of the item template in the stack `index` (`0` to `GetInventoryStackCount() - 1`), for example `It_Gold`. Empty if the index is wrong or if there is no inventory |
+| `int GetInventoryAmount(int index) const` (from version 47) | The quantity in the stack `index`. `-1` if the index is wrong or if there is no inventory |
 | `Entity GetSlotItem(int slot) const` (from version 28) | The item in the equipment slot. Not valid if the slot is empty |
 | `uint GetSlotQuality(int slot) const`, `bool SetSlotQuality(int slot, uint bits)` (from version 28) | The quality (bits `QUALITY_*`) of the item in the equipment slot |
 
@@ -197,6 +199,15 @@ give default values.
 - Item names are the names of item templates (`It_Wolf_Fur`, `It_Water`, `It_1H_Longsword_01`). `OnReceiveItem` shows them in the log.
 - `RemoveItems` decreases only the quantity. Permanent items (learn items of skills) then leave an empty stack. `DeleteItemStack` removes these
   stacks.
+- **List the inventory** with `GetInventoryStackCount`, `GetInventoryItem` and `GetInventoryAmount`:
+
+      Entity hero = GetHero();
+      for (int i = 0; i < hero.GetInventoryStackCount(); i++)
+          print(hero.GetInventoryItem(i) + " x" + hero.GetInventoryAmount(i));
+
+  **Caution:** The list also contains stacks that the inventory in the game does not show: the fist (`Fist`), learned spells (`It_Spell_*`),
+  skills (`It_Perk_*`) and the body (`Body_*`). One item can be in more than one stack, for example with different qualities. `GetItemCount`
+  gives the total quantity. The stack numbers change when items are added or removed.
 - Equipment slots: `SLOT_RIGHT_HAND`, `SLOT_LEFT_HAND`, `SLOT_BACK_LEFT`, `SLOT_BACK_RIGHT`, `SLOT_BOW`, `SLOT_AMMO`. Qualities:
   `QUALITY_DISEASED`, `QUALITY_POISONED`, `QUALITY_BURNING`, `QUALITY_FROZEN`, `QUALITY_SHARP`, `QUALITY_BLESSED`, `QUALITY_FORGED`, `QUALITY_WORN`
   and `QUALITY_LIFESTEAL` (a bit of the modkit). The [Reference](reference.md) gives the values.
@@ -278,7 +289,7 @@ Without a group: `-1` or not valid. `GetProperty(m, "Party", "PartyMemberType")`
 |---|---|
 | `bool GenerateTradeGoods()` (from version 37) | **Experimental.** Makes the goods of a trader again, as the game does. Gives `true`, but the goods do not change at this time |
 
-Causes `Override_TradeGenerate` and `OnTradeGenerated`.
+Causes `Override_TradeGenerate` and `OnTradeGenerated`. The event [`OnTrade`](events.md) reports purchases and sales (from version 47).
 
 ## Focus and crosshair
 

@@ -1,4 +1,4 @@
-# API-Referenz (Skript-Schnittstelle Version 46)
+# API-Referenz (Skript-Schnittstelle Version 47)
 
 **Deutsch** | [English](../en/modkit/api-reference.md)
 
@@ -182,6 +182,8 @@ Standardwerte.
 | `int RemoveItems(const bCString &in itemName, int count)` | Entfernt bis zu `count` Stück. Rückgabe: entfernte Zahl. `-1` = Fehler |
 | `int DeleteItemStack(const bCString &in name)` (ab Version 30) | Entfernt alle Stapel dieses Items ganz. Rückgabe: Zahl der Stapel |
 | `int GetInventoryStackCount() const` (ab Version 37) | Zahl der Stapel im Inventar. `-1` ohne Inventar |
+| `bCString GetInventoryItem(int index) const` (ab Version 47) | Name der Item-Vorlage im Stapel `index` (`0` bis `GetInventoryStackCount() - 1`), z. B. `It_Gold`. Leer bei falschem Index oder ohne Inventar |
+| `int GetInventoryAmount(int index) const` (ab Version 47) | Menge im Stapel `index`. `-1` bei falschem Index oder ohne Inventar |
 | `Entity GetSlotItem(int slot) const` (ab Version 28) | Item im Ausrüstungsplatz. Ungültig, wenn der Platz leer ist |
 | `uint GetSlotQuality(int slot) const`, `bool SetSlotQuality(int slot, uint bits)` (ab Version 28) | Qualität (Bits `QUALITY_*`) des Items im Ausrüstungsplatz |
 
@@ -197,6 +199,15 @@ Standardwerte.
 - Item-Namen sind Namen von Item-Vorlagen (`It_Wolf_Fur`, `It_Water`, `It_1H_Longsword_01`). `OnReceiveItem` zeigt sie im Protokoll.
 - `RemoveItems` verringert nur die Menge. Dauerhafte Items (Lern-Items von Talenten) hinterlassen dabei einen leeren Stapel. Diese Stapel entfernt
   `DeleteItemStack`.
+- **Inventar aufzählen** mit `GetInventoryStackCount`, `GetInventoryItem` und `GetInventoryAmount`:
+
+      Entity held = GetHero();
+      for (int i = 0; i < held.GetInventoryStackCount(); i++)
+          print(held.GetInventoryItem(i) + " x" + held.GetInventoryAmount(i));
+
+  **Achtung:** Die Liste enthält auch Stapel, die das Inventar im Spiel nicht zeigt: die Faust (`Fist`), gelernte Zauber (`It_Spell_*`), Talente
+  (`It_Perk_*`) und den Körper (`Body_*`). Ein Item kann in mehreren Stapeln stehen, zum Beispiel mit verschiedener Qualität. Die Gesamtmenge
+  gibt `GetItemCount`. Die Stapelnummern ändern sich, wenn Items dazukommen oder wegfallen.
 - Ausrüstungsplätze: `SLOT_RIGHT_HAND`, `SLOT_LEFT_HAND`, `SLOT_BACK_LEFT`, `SLOT_BACK_RIGHT`, `SLOT_BOW`, `SLOT_AMMO`. Qualitäten:
   `QUALITY_DISEASED`, `QUALITY_POISONED`, `QUALITY_BURNING`, `QUALITY_FROZEN`, `QUALITY_SHARP`, `QUALITY_BLESSED`, `QUALITY_FORGED`, `QUALITY_WORN`
   und `QUALITY_LIFESTEAL` (eigenes Bit des Modkits). Die Zahlenwerte stehen in der [Referenz](reference.md).
@@ -278,7 +289,7 @@ Ohne Gruppe: `-1` oder ungültig. Die Art eines Mitglieds liefert `GetProperty(m
 |---|---|
 | `bool GenerateTradeGoods()` (ab Version 37) | **Experimentell.** Erzeugt die Ware eines Händlers neu, wie das Spiel es tut. Liefert `true`, aber die Ware bleibt bisher gleich |
 
-Löst `Override_TradeGenerate` und `OnTradeGenerated` aus.
+Löst `Override_TradeGenerate` und `OnTradeGenerated` aus. Kauf und Verkauf meldet das Ereignis [`OnTrade`](events.md) (ab Version 47).
 
 ## Fokus und Fadenkreuz
 

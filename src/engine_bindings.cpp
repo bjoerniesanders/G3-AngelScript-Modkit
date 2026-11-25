@@ -2105,6 +2105,51 @@ int EntStackCount(const Entity& e) {
     int n = -1;
     return inv && g_i.stackCount && SafeStackCount(inv, &n) ? n : -1;
 }
+// ---- List the inventory (API 47): stack index -> template name and amount. The name comes from gCInventorySlot::m_entTemplate
+// (eCTemplateEntityProxy at +0xC of the stack, SDK ge_inventoryslot.h; the same way as trade_hooks.cpp, measured in the game 2026-11-24).
+typedef void*(__thiscall* TplProxyGetFn)(void*);
+TplProxyGetFn TplProxyGet() {
+    static TplProxyGetFn f = nullptr;
+    static bool tried = false;
+    if (!tried && g_e.engine) {
+        tried = true;
+        f = reinterpret_cast<TplProxyGetFn>(GetProcAddress(g_e.engine, "?GetEntity@eCTemplateEntityProxy@@QAEPAVeCTemplateEntity@@XZ"));
+    }
+    return f;
+}
+// stack idx of inv: amount and (if name != nullptr) template name; false if the stack is not readable
+bool SafeStackItem(void* inv, int idx, const char** name, int* amount) {
+    __try {
+        auto* st = static_cast<unsigned char*>(g_i.getStack(inv, idx));
+        if (!st) return false;
+        *amount = g_i.amount(st);
+        if (name) {
+            *name = nullptr;
+            TplProxyGetFn proxyGet = TplProxyGet();
+            if (proxyGet && ReadableMem(st + 0xC, 12))
+                if (void* tpl = proxyGet(st + 0xC)) *name = g_sb.strGetText(g_e.getName(tpl));
+        }
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+// inventory and checked index; nullptr if there is no inventory or the index is not in 0 .. GetInventoryStackCount()-1
+void* InvAt(const Entity& e, int idx) {
+    void* inv = InventoryOf(e);
+    int n = -1;
+    if (!inv || !g_i.stackCount || !g_i.getStack || !g_i.amount || !SafeStackCount(inv, &n)) return nullptr;
+    return idx >= 0 && idx < n ? inv : nullptr;
+}
+SStr EntInventoryItem(const Entity& e, int idx) {
+    void* inv = InvAt(e, idx);
+    const char* nm = nullptr;
+    int am = 0;
+    return inv && SafeStackItem(inv, idx, &nm, &am) && nm ? SStr(nm) : SStr();
+}
+int EntInventoryAmount(const Entity& e, int idx) {
+    void* inv = InvAt(e, idx);
+    int am = -1;
+    return inv && SafeStackItem(inv, idx, nullptr, &am) ? am : -1;
+}
 bool EntGenerateTradeGoods(const Entity& e) {
     void* inv = InventoryOf(e);   // also resolves g_e.game
     static GenTradeFn f = nullptr;
@@ -2295,6 +2340,8 @@ bool RegisterEngineBindings(asIScriptEngine* e) {
     G3ASM_REG(e->RegisterObjectMethod("Entity", "bool Kill(const Entity &in killer)", asFUNCTION(EntKill), asCALL_CDECL_OBJFIRST));   // API 46
     G3ASM_REG(e->RegisterObjectMethod("Entity", "bool Kill()", asFUNCTION(EntKillNoKiller), asCALL_CDECL_OBJFIRST));
     G3ASM_REG(e->RegisterObjectMethod("Entity", "int GetInventoryStackCount() const", asFUNCTION(EntStackCount), asCALL_CDECL_OBJFIRST));
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "bCString GetInventoryItem(int index) const", asFUNCTION(EntInventoryItem), asCALL_CDECL_OBJFIRST));   // API 47
+    G3ASM_REG(e->RegisterObjectMethod("Entity", "int GetInventoryAmount(int index) const", asFUNCTION(EntInventoryAmount), asCALL_CDECL_OBJFIRST));
     G3ASM_REG(e->RegisterObjectMethod("Entity", "bool GenerateTradeGoods()", asFUNCTION(EntGenerateTradeGoods), asCALL_CDECL_OBJFIRST));   // experimentell
     G3ASM_REG(e->RegisterGlobalFunction("bool EffectExists(const bCString &in name)", asFUNCTION(EffectExistsScript), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bool StartEffect(const bCString &in name, const Entity &in at)", asFUNCTION(StartEffectScript), asCALL_CDECL));
