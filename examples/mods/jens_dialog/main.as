@@ -1,6 +1,7 @@
 // Jens dialog: Jens gets two new dialog options (real dialogs of the game, with a connection to the quest log).
 //   "Hast du Arbeit fuer mich?"  -> Jens asks for a wolf skin, the quest starts (title, description and dialog text in the quest log).
-//   "Ich habe das Wolfsfell."     -> shows while the quest runs. Takes the skin, completes the quest, reward.
+//   "Ich habe das Wolfsfell."     -> shows while the quest runs and the hero has a wolf skin (the game checks it, from v0.47.2).
+//                                    Takes the skin, completes the quest, reward.
 // When the hero has a wolf skin while the quest runs (killed, found, bought, received), an entry goes into the quest log without a dialog
 // (AddQuestLogEntry, from v0.47.1).
 // Save and load: the quest and the dialogs are run-time objects and are lost at a load. Thus the progress is in two switches that the
@@ -93,6 +94,10 @@ bool ErstelleInfos() {
     SetInfoType(INFO_TURNIN, INFO_TYPE_INFO);
     SetInfoCondition(INFO_TURNIN, INFO_COND_RUNNING);   // shows while the quest runs
     SetInfoQuest(INFO_TURNIN, QUEST);
+    // condition: the hero has at least one wolf skin (the game checks it itself; without it, the option does not show)
+    SetInfoProperty(INFO_TURNIN, "ConditionItemContainer", "PC_Hero");
+    SetInfoProperty(INFO_TURNIN, "CondItems", "[" + ITEM + "]");
+    SetInfoProperty(INFO_TURNIN, "CondItemAmounts", "[1]");
     AddInfoLine(INFO_TURNIN, "Say", "player", "", "", "", "Ich habe das Wolfsfell.");
     AddInfoLine(INFO_TURNIN, "Say", "npc", "", "", "", "Zeig her.");
     AddInfoLine(INFO_TURNIN, "Say", "npc", "", "", "", "Gute Arbeit. Hier, nimm diesen Bogen, ich brauche ihn nicht mehr.");

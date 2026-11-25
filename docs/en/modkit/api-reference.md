@@ -388,7 +388,8 @@ changes a number argument during this call. `uint GetOverrideArg(int index)` rea
 
 The page [Dialogs](dialogs.md) gives the instructions and the functions: `GetInfoCount`, `GetInfoName`, `GetInfoOwner`, `DescribeInfo`,
 `DescribeCommands`, `InfoExists`, `CreateInfo`, `RemoveInfo`, `SetInfoQuest`, `SetInfoParent`, `SetInfoType`, `SetInfoCondition`, `AddInfoLine`,
-`RebuildInfos`, `SetInfoGiven`, `IsInfoGiven`, and the constants `INFO_COND_*` and `INFO_TYPE_*`.
+`RebuildInfos`, `SetInfoGiven`, `IsInfoGiven`, from v0.47.2 `GetInfoProperty`, `SetInfoProperty` and `ListInfoProperties` (conditions), and
+the constants `INFO_COND_*` and `INFO_TYPE_*`.
 
 ## Mod archives
 

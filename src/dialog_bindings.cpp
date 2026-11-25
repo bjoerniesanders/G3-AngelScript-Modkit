@@ -454,6 +454,21 @@ bool IsInfoGiven(const SStr& name) {
 }
 
 bool InfoExists(const SStr& name) { return Resolve() && FindInfoByName(name.c_str()) != nullptr; }
+// Properties of an info (from v0.47.2; gCInfo_PS: conditions CondItems, CondItemAmounts, ConditionPlayerKnows, ...). Measured 2026-11-25: the game
+// itself checks CondItems + CondItemAmounts (in ConditionItemContainer) and ConditionPlayerKnows (switches of SetGameEvent).
+SStr GetInfoProperty(const SStr& name, const SStr& prop) {
+    void* info = Resolve() ? FindInfoByName(name.c_str()) : nullptr;
+    SStr r;
+    return info && GetObjectPropertyText(info, prop, &r) ? r : SStr();
+}
+bool SetInfoProperty(const SStr& name, const SStr& prop, const SStr& value) {
+    void* info = WriteReady() ? FindInfoByName(name.c_str()) : nullptr;
+    return info && SetObjectPropertyText(info, prop, value);
+}
+SStr ListInfoProperties(const SStr& name) {
+    void* info = Resolve() ? FindInfoByName(name.c_str()) : nullptr;
+    return info ? ListObjectPropertyTexts(info, 200) : SStr();
+}
 
 // Names of all infos that scripts made. In addition to the info list (+0x2c), gCInfoManager_PS has a name table (+0x4c) that GetInfo
 // uses for the search. LoadInfosFromInis frees only the list; the table keeps the old entries. If the load from ini files came AFTER the setup (for example
@@ -594,6 +609,10 @@ bool RegisterDialogBindings(asIScriptEngine* e) {
     G3ASM_REG(e->RegisterGlobalFunction("bCString GetInfoOwner(int)", asFUNCTION(GetInfoOwner), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bCString DescribeInfo(const bCString &in)", asFUNCTION(DescribeInfo), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bool SetInfoGiven(const bCString &in, bool)", asFUNCTION(SetInfoGiven), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString GetInfoProperty(const bCString &in info, const bCString &in prop)", asFUNCTION(GetInfoProperty), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bool SetInfoProperty(const bCString &in info, const bCString &in prop, const bCString &in value)",
+                                        asFUNCTION(SetInfoProperty), asCALL_CDECL));
+    G3ASM_REG(e->RegisterGlobalFunction("bCString ListInfoProperties(const bCString &in info)", asFUNCTION(ListInfoProperties), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bool IsInfoGiven(const bCString &in)", asFUNCTION(IsInfoGiven), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bool InfoExists(const bCString &in)", asFUNCTION(InfoExists), asCALL_CDECL));
     G3ASM_REG(e->RegisterGlobalFunction("bool CreateInfo(const bCString &in name, const bCString &in owner)", asFUNCTION(CreateInfo),

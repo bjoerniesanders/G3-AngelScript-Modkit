@@ -42,6 +42,8 @@ functions also have the labels **Experimental**, **Not checked in the game**, **
 - Make quests and control them, with a title, XP and an attribute reward. List all 571 quests of the game. Read quest files.
 - Read dialogs (4593 infos) and make your own: options in the dialog menu, lines in the quest log, `OnInfoFinished`.
 - Entries in the quest log without a dialog (`AddQuestLogEntry`, from v0.47.1), also after a save, a load and a restart of the game.
+- Conditions of custom infos: items with a quantity and switches in the saved game (`SetInfoProperty`, from v0.47.2). The game itself does the
+  check.
 - Your own quests and dialogs come back with their status and quest log after a save and a load. Switches in the saved game (`SetGameEvent`).
 - File patches on quest files (`demo_patch`). The game loads mod archives (`PackMod`), and they overwrite existing files.
 - Draw above the HUD and the inventory: text, images, `WorldToScreen`.
@@ -74,7 +76,6 @@ I measured these items in the game or examined them in the game code:
 - **Write quest files.**
 - **The description of a quest in the quest log:** The log does not show the text of `SetQuestDescription`. From v0.47.1, entries without a
   dialog are possible with `AddQuestLogEntry` ([Quests](quests.md#entries-without-a-dialog-from-v0471)).
-- **Conditions of custom infos** (items, reputation, skills): you cannot set them. The script does the check itself in `Override_InfoAvailable`.
 - **Text for ambient talk:** `GetSpeechText` finds no text for `SVM_..._Smalltalk_NN`.
 - **Attribute `"XP"`** reads 0. The experience is in `GetProperty(GetHero(), "PlayerMemory", "XP")`. The game itself gives the quest XP.
 - **Attributes of NPCs:** `GetAttribute` and `SetAttribute` have an effect only on the hero. NPCs give `-1`. To read the values, use game
@@ -112,6 +113,7 @@ These functions run, but I did not fully check their effect. Their names and the
   stays off. If `Script_LearningThresholdTweaks.dll` is installed, `Override_LearnCost` stays off.
 - **Never occurred in the game:** AI routines (`AI_ROUTINE`), the divisor 2 for `Override_MonsterDamage` (summoned attackers), and the doubled
   learn costs with "Alternative Balance".
+- **Other conditions of custom infos:** reputation, skills, worn items and others (`ListInfoProperties` shows them).
 - **Dependencies in the `mod.ini`** (`version`, `api`, `requires`): tested only without the game.
 - **File patches on `.info` files:** The game loads dialogs from the compiled `Infos.cpt`. It is not known if patches have an effect there.
 - **`owner` in `OnDamage`**, when more than one fighter fights against one victim, is an approximation. It is the current opponent of the victim,

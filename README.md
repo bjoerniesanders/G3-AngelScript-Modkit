@@ -88,7 +88,6 @@ vollständige Liste steht unter [Grenzen](docs/modkit/limitations.md).
 - Ein eigenes Talent lernt der Held nur, wenn die Mod es in `OnQuestsLoaded` klont. Die Wirkung des Talents muss die Mod selbst herstellen.
 - Es gibt keinen Treffer-Hook, bevor das Spiel den Schaden berechnet. Um einen Treffer zu ändern, nutze das Spielskript `OnHit`,
   `Override_MonsterDamage` oder `Override_Damage`.
-- Eine Mod kann die Bedingungen eigener Infos nicht setzen. Das Skript muss die Bedingungen selbst prüfen.
 - Spieler können keine Datei-Patches (`ScriptPatches`) nutzen. Mod-Pakete enthalten geänderte Spieldateien als Archive (`ModFiles\<Volume>.m0x`).
 
 **Diese Funktionen gibt es nicht.** Ich habe sie noch nicht gebaut oder untersucht:

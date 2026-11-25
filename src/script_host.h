@@ -183,6 +183,11 @@ inline void CheckRegistration(int r, const char* what, bool& ok) {
 void RegisterTextForId(const std::string& id, const std::string& text);
 void RegisterTextWide(const std::string& id, const std::wstring& text);   // Unicode; always saves, the hooks are installed later when necessary
 bool EnsureTextHooks();                                                   // true when the text hooks are active
+// properties of a property object that is not an entity (engine_bindings.cpp; text form as GetProperty/SetProperty)
+class SStr;
+bool GetObjectPropertyText(void* ps, const SStr& prop, SStr* out);
+bool SetObjectPropertyText(void* ps, const SStr& prop, const SStr& value);
+SStr ListObjectPropertyTexts(void* ps, int maxn);
 std::string CurrentGameLanguage();   // "English", "German", ...; empty while the game is not ready
 // During a load: set the manager that the game makes again temporarily as the "current" manager for the bindings (nullptr = back)
 void SetQuestManagerOverride(void* mgr);

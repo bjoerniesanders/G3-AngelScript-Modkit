@@ -389,7 +389,8 @@ schreiben.
 
 Anleitung und Funktionen stehen auf der Seite [Dialoge](dialogs.md): `GetInfoCount`, `GetInfoName`, `GetInfoOwner`, `DescribeInfo`, `DescribeCommands`,
 `InfoExists`, `CreateInfo`, `RemoveInfo`, `SetInfoQuest`, `SetInfoParent`, `SetInfoType`, `SetInfoCondition`, `AddInfoLine`, `RebuildInfos`,
-`SetInfoGiven`, `IsInfoGiven`, dazu die Konstanten `INFO_COND_*` und `INFO_TYPE_*`.
+`SetInfoGiven`, `IsInfoGiven`, ab v0.47.2 `GetInfoProperty`, `SetInfoProperty` und `ListInfoProperties` (Bedingungen), dazu die Konstanten
+`INFO_COND_*` und `INFO_TYPE_*`.
 
 ## Mod-Archive
 

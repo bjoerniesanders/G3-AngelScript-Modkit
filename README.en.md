@@ -88,7 +88,6 @@ available. The full list is in [Limits](docs/en/modkit/limitations.md).
 - The hero learns a custom skill only if the mod clones it in `OnQuestsLoaded`. The mod must make the effect of the skill itself.
 - There is no hit hook before the game calculates the damage. To change a hit, use the game script `OnHit`, `Override_MonsterDamage` or
   `Override_Damage`.
-- A mod cannot set the conditions of custom infos. The script must do a check of the conditions itself.
 - Players cannot use file patches (`ScriptPatches`). Mod packages contain changed game files as archives (`ModFiles\<volume>.m0x`).
 
 **These functions are not available.** I did not make or examine them yet:

@@ -72,6 +72,8 @@ The first `Say` line of the player is the text in the dialog menu.
 | `bool RebuildInfos()` | Makes the owner list of the game again. **Call it after you make infos.** If you do not, the options do not show |
 | `bool RemoveInfo(name)` | Removes an info |
 | `bool SetInfoGiven(name, bool)`, `bool IsInfoGiven(name)` | "The info was already given". This hides the option |
+| `bCString GetInfoProperty(name, prop)`, `bool SetInfoProperty(name, prop, value)` (from v0.47.2) | Reads or writes a property of the info as text, for example its conditions (see below) |
+| `bCString ListInfoProperties(name)` (from v0.47.2) | All properties of the info as `"Name=Value;..."` |
 
 **`CreateInfo`, read this carefully:**
 - If the info already exists, `CreateInfo` changes nothing and gives `true`. A subsequent `AddInfoLine` then adds the lines a second time, and
@@ -83,6 +85,36 @@ The first `Say` line of the player is the text in the dialog menu.
 
 Event: `void OnInfoFinished(const bCString &in info, const bCString &in owner, const bCString &in quest)` comes when the speakers have said all
 lines of a dialog. Use it for results that the game cannot do itself: a check of the inventory, the end of a quest, rewards.
+
+## Conditions: items and switches (from v0.47.2)
+
+An option can depend on items in the inventory and on switches in the saved game. The game itself does a check of the conditions before it
+shows the option. You do not need `Override_InfoAvailable` for this.
+
+```angelscript
+SetInfoCondition(INFO_DELIVERY, INFO_COND_RUNNING);                       // while the quest runs
+SetInfoProperty(INFO_DELIVERY, "ConditionItemContainer", "PC_Hero");      // whose inventory counts
+SetInfoProperty(INFO_DELIVERY, "CondItems", "[It_Wolf_Fur]");              // which item
+SetInfoProperty(INFO_DELIVERY, "CondItemAmounts", "[2]");                  // how many
+SetInfoProperty(INFO_DELIVERY, "ConditionPlayerKnows", "[MyMod_MetJens]");  // switch from SetGameEvent
+RebuildInfos();
+```
+
+Result: the option shows only when the hero has two wolf skins **and** the switch `MyMod_MetJens` is set.
+
+| Property | Value | Effect |
+|---|---|---|
+| `ConditionItemContainer` | `PC_Hero` (or the name of an NPC) | The inventory in which the game looks for the items |
+| `CondItems` | `[It_Wolf_Fur]` | The necessary item |
+| `CondItemAmounts` | `[2]` | The necessary quantity. Without an entry, one item is sufficient |
+| `ConditionPlayerKnows` | `[MyMod_Switch]` | A switch that the mod sets with `SetGameEvent`. The game uses the same list for its own switches (`[Chris_DeerDead]`) |
+
+- Lists are in square brackets. The value of `CondItemAmounts` that you read is empty or `[]`, also if the quantity has an effect.
+- Set the conditions when you make the info, thus in `OnInfosLoaded`, and then call `RebuildInfos()`. As the info itself, they do not come back
+  from the saved game.
+- The info also has other conditions (`ListInfoProperties` shows them): `ConditionPlayerKnowsNot`, `CondWearsItem`, `CondHasSkill`,
+  `CondReputGroup`, `CondPlayerPartyMember` and others. I did not measure their effect.
+- Example: in `jens_dialog`, "Ich habe das Wolfsfell." shows only when the hero has a wolf skin.
 
 ## Example: a quest through a dialog
 

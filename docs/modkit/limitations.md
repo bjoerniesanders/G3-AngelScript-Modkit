@@ -40,6 +40,7 @@ Funktionen zusätzlich die Vermerke **Experimentell**, **Im Spiel nicht geprüft
 - Quests anlegen und steuern, mit Titel, XP und Attribut-Belohnung. Alle 571 Quests des Spiels aufzählen. Quest-Dateien lesen.
 - Dialoge lesen (4593 Infos) und eigene anlegen: Optionen im Gesprächsmenü, Zeilen im Questlog, `OnInfoFinished`.
 - Questlog-Einträge ohne Gespräch (`AddQuestLogEntry`, ab v0.47.1), auch nach Speichern, Laden und Neustart des Spiels.
+- Bedingungen eigener Infos: Items mit Menge und Schalter im Spielstand (`SetInfoProperty`, ab v0.47.2). Das Spiel prüft sie selbst.
 - Eigene Quests und Dialoge kommen nach Speichern und Laden mit Status und Questlog zurück. Schalter im Spielstand (`SetGameEvent`).
 - Datei-Patches auf Quest-Dateien (`demo_patch`). Das Spiel lädt Mod-Archive (`PackMod`), und sie überschreiben vorhandene Dateien.
 - Zeichnen über HUD und Inventar: Text, Bilder, `WorldToScreen`.
@@ -71,7 +72,6 @@ Diese Punkte habe ich im Spiel gemessen oder im Spielcode untersucht:
 - **Quest-Dateien schreiben.**
 - **Die Beschreibung einer Quest im Questlog:** Das Log zeigt den Text von `SetQuestDescription` nicht. Einträge ohne Gespräch gehen ab v0.47.1
   mit `AddQuestLogEntry` ([Quests](quests.md#einträge-ohne-gespräch-ab-v0471)).
-- **Bedingungen eigener Infos** (Items, Reputation, Fähigkeiten) lassen sich nicht setzen. Das Skript prüft sie selbst in `Override_InfoAvailable`.
 - **Text für Umgebungsgerede:** `GetSpeechText` findet für `SVM_..._Smalltalk_NN` keinen Text.
 - **Attribut `"XP"`** liest 0. Die Erfahrung steht in `GetProperty(GetHero(), "PlayerMemory", "XP")`. Quest-XP zahlt das Spiel selbst aus.
 - **Attribute von NPCs:** `GetAttribute` und `SetAttribute` wirken nur beim Helden. NPCs geben `-1`. Lesen geht über Spielskripte, zum Beispiel
@@ -108,6 +108,7 @@ Diese Funktionen laufen, aber ihre Wirkung habe ich nicht vollständig geprüft.
   `Override_MonsterDamage` aus. Ist `Script_LearningThresholdTweaks.dll` installiert, bleibt `Override_LearnCost` aus.
 - **Im Spiel nie aufgetreten:** KI-Routinen (`AI_ROUTINE`), der Teiler 2 bei `Override_MonsterDamage` (beschworene Angreifer) und die verdoppelten
   Lernkosten mit „Alternative Balance“.
+- **Weitere Bedingungen eigener Infos:** Ruf, Talente, getragene Items und andere (`ListInfoProperties` zeigt sie).
 - **Abhängigkeiten in der `mod.ini`** (`version`, `api`, `requires`): nur ohne Spiel getestet.
 - **Datei-Patches auf `.info`-Dateien:** Das Spiel lädt Dialoge aus der kompilierten `Infos.cpt`. Ob Patches dort ankommen, ist offen.
 - **`owner` bei `OnDamage`**, wenn mehrere gegen einen kämpfen, ist eine Näherung. Es ist der aktuelle Gegner des Opfers, nicht sicher der Schläger.

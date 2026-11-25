@@ -1759,10 +1759,7 @@ Entity GetTemplateEntityScript(const SStr& name) {
     return {g_e.sceneAdmin ? SafeFindTemplate(g_e.sceneAdmin, &name, name.c_str()) : nullptr};
 }
 // "name=value; name=value; ..." for all properties of the set (and of its base classes), maximum max items; ';' in values becomes a space
-SStr ListPropertyTexts(const Entity& e, const SStr& set, int maxn) {
-    if (!EntIsValid(e) || !ResolveProps()) return SStr();
-    void* ps = PropSetFor(e, set);
-    if (!ps) return SStr();
+SStr ListPsTexts(void* ps, int maxn) {   // all properties of a property object as "Name=Value;..."
     char acc[32] = {};
     if (!SafePropStart(ps, acc)) return SStr();
     std::string all;
@@ -1777,6 +1774,11 @@ SStr ListPropertyTexts(const Entity& e, const SStr& set, int maxn) {
     }
     SafePropEnd(acc);
     return SStr(all);
+}
+SStr ListPropertyTexts(const Entity& e, const SStr& set, int maxn) {
+    if (!EntIsValid(e) || !ResolveProps()) return SStr();
+    void* ps = PropSetFor(e, set);
+    return ps ? ListPsTexts(ps, maxn) : SStr();
 }
 bool EntIsBuilding(const Entity& e) { return std::strcmp(EntCategory(e).c_str(), "Building") == 0; }
 // Did SpawnNPC make this NPC (in this session or, through the mark in the ID, in an earlier one)? Hero and player never count.
@@ -2246,6 +2248,19 @@ bool PrintGameMessageText(const SStr& s, int type) { return ResolveScreen() && S
 int GetActivePage() { return ResolveScreen() ? SafeActivePage() : -1; }
 
 }   // namespace
+
+// Properties of objects that are not entities (for example gCInfo_PS of a dialog): the same text form as GetProperty/SetProperty.
+bool GetObjectPropertyText(void* ps, const SStr& prop, SStr* out) {
+    std::string r;
+    if (!ps || !ResolveProps() || SafePropOne(ps, &prop, &r) != 1) return false;
+    if (r.size() > 3000) r.resize(3000);
+    *out = SStr(r);
+    return true;
+}
+bool SetObjectPropertyText(void* ps, const SStr& prop, const SStr& value) {
+    return ps && ResolveProps() && g_pa.convStr && SafePropWrite(ps, &prop, &value) == 1;
+}
+SStr ListObjectPropertyTexts(void* ps, int maxn) { return ps && ResolveProps() ? ListPsTexts(ps, maxn) : SStr(); }
 
 bool RegisterEngineBindings(asIScriptEngine* e) {
     bool ok = true;

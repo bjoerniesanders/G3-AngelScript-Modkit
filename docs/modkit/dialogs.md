@@ -72,6 +72,8 @@ Die erste Zeile `Say` des Spielers ist der Text im Gesprächsmenü.
 | `bool RebuildInfos()` | Baut das Besitzerverzeichnis des Spiels neu auf. **Rufe es nach dem Anlegen auf.** Sonst erscheinen die Optionen nicht |
 | `bool RemoveInfo(name)` | Entfernt eine Info |
 | `bool SetInfoGiven(name, bool)`, `bool IsInfoGiven(name)` | „Info wurde schon gegeben“. Blendet die Option aus |
+| `bCString GetInfoProperty(name, prop)`, `bool SetInfoProperty(name, prop, value)` (ab v0.47.2) | Liest oder schreibt eine Eigenschaft der Info als Text, zum Beispiel ihre Bedingungen (siehe unten) |
+| `bCString ListInfoProperties(name)` (ab v0.47.2) | Alle Eigenschaften der Info als `"Name=Wert;..."` |
 
 **`CreateInfo`, bitte genau lesen:**
 - Gibt es die Info schon, ändert `CreateInfo` nichts und liefert `true`. Ein folgendes `AddInfoLine` hängt die Zeilen dann ein zweites Mal an, und
@@ -83,6 +85,36 @@ Die erste Zeile `Say` des Spielers ist der Text im Gesprächsmenü.
 
 Ereignis: `void OnInfoFinished(const bCString &in info, const bCString &in owner, const bCString &in quest)` kommt, wenn ein Gespräch zu Ende
 gesprochen ist. Daran hängst du Folgen, die das Spiel nicht selbst kann: Inventar prüfen, Quest beenden, Belohnungen.
+
+## Bedingungen: Items und Schalter (ab v0.47.2)
+
+Eine Option kann an Items im Inventar und an Schalter im Spielstand hängen. Das Spiel prüft die Bedingungen selbst, bevor es die Option zeigt. Du
+brauchst dafür kein `Override_InfoAvailable`.
+
+```angelscript
+SetInfoCondition(INFO_ABGABE, INFO_COND_RUNNING);                       // solange die Quest läuft
+SetInfoProperty(INFO_ABGABE, "ConditionItemContainer", "PC_Hero");      // wessen Inventar zählt
+SetInfoProperty(INFO_ABGABE, "CondItems", "[It_Wolf_Fur]");              // welches Item
+SetInfoProperty(INFO_ABGABE, "CondItemAmounts", "[2]");                  // wie viele
+SetInfoProperty(INFO_ABGABE, "ConditionPlayerKnows", "[MeinMod_JensGetroffen]");   // Schalter aus SetGameEvent
+RebuildInfos();
+```
+
+Ergebnis: Die Option erscheint erst, wenn der Held zwei Wolfsfelle hat **und** der Schalter `MeinMod_JensGetroffen` gesetzt ist.
+
+| Eigenschaft | Wert | Wirkung |
+|---|---|---|
+| `ConditionItemContainer` | `PC_Hero` (oder der Name eines NPCs) | In wessen Inventar das Spiel die Items sucht |
+| `CondItems` | `[It_Wolf_Fur]` | Das nötige Item |
+| `CondItemAmounts` | `[2]` | Die nötige Menge. Ohne Eintrag genügt ein Stück |
+| `ConditionPlayerKnows` | `[MeinMod_Schalter]` | Ein Schalter, den die Mod mit `SetGameEvent` setzt. Das Spiel benutzt dieselbe Liste für seine eigenen Schalter (`[Chris_DeerDead]`) |
+
+- Listen stehen in eckigen Klammern. Der gelesene Wert von `CondItemAmounts` ist leer oder `[]`, auch wenn die Menge wirkt.
+- Setze die Bedingungen beim Anlegen der Info, also in `OnInfosLoaded`, und rufe danach `RebuildInfos()` auf. Wie die Info selbst kommen sie nicht
+  aus dem Spielstand zurück.
+- Weitere Bedingungen hat die Info auch (`ListInfoProperties` zeigt sie): `ConditionPlayerKnowsNot`, `CondWearsItem`, `CondHasSkill`, `CondReputGroup`,
+  `CondPlayerPartyMember` und andere. Ihre Wirkung habe ich nicht gemessen.
+- Beispiel: In `jens_dialog` erscheint „Ich habe das Wolfsfell.“ nur, wenn der Held ein Wolfsfell hat.
 
 ## Beispiel: Quest über ein Gespräch
 
